@@ -241,6 +241,13 @@ def block_ap(
                     loss_recorder.record(f"{block_index}",step,reconstruction_loss.detach().cpu().item())
                     loss_list.append(reconstruction_loss.detach().cpu())
                     optimizer.zero_grad()
+                    # # debug
+                    # print(f"Loss dtype: {loss.dtype}")
+                    # for param in qlayer.parameters():
+                    #     print(f"Param dtype: {param.dtype}")
+                    #     if param.grad is not None:
+                    #         print(f"Param grad dtype: {param.grad.dtype}")
+
                     norm = loss_scaler(loss, optimizer,parameters=trainable_parameters(qlayer)).cpu()
                     norm_list.append(norm.data)
 

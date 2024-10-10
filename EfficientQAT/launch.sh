@@ -15,11 +15,10 @@
     --net Llama-2 \
     --wbits 4 \
     --group_size 128 \
-    --quant_lr 1e-4 \
+    --quant_lr 1e-5 \
     --weight_lr 1e-5 \
     --real_quant \
     --eval_ppl \
     --epochs 5 \
-    --off_load_to_disk \
     --save_quant_dir $SAVE_PATH 
 )

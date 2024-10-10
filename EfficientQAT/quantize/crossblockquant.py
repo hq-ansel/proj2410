@@ -154,23 +154,23 @@ def cross_block_quantization(
         # copy quant input from fp input, they are same in first layer
         shutil.copytree(fp_train_cache_path, quant_train_cache_path)
         shutil.copytree(fp_val_cache_path, quant_val_cache_path)
-        # quant_train_inps = BlockTrainDataset(args.train_size, args.training_seqlen, 
-        #                             model.config.hidden_size, args.batch_size, dtype, cache_path=quant_train_cache_path,off_load_to_disk=args.off_load_to_disk)
-        # quant_val_inps = BlockTrainDataset(args.val_size, args.training_seqlen, 
-        #                             model.config.hidden_size, args.batch_size, dtype, cache_path=quant_val_cache_path,off_load_to_disk=args.off_load_to_disk)
-        quant_train_inps = OptimBlockTrainDataset(args.train_size, args.training_seqlen, 
+        quant_train_inps = BlockTrainDataset(args.train_size, args.training_seqlen, 
                                     model.config.hidden_size, args.batch_size, dtype, cache_path=quant_train_cache_path,off_load_to_disk=args.off_load_to_disk)
-        quant_val_inps = OptimBlockTrainDataset(args.val_size, args.training_seqlen, 
+        quant_val_inps = BlockTrainDataset(args.val_size, args.training_seqlen, 
                                     model.config.hidden_size, args.batch_size, dtype, cache_path=quant_val_cache_path,off_load_to_disk=args.off_load_to_disk)
+        # quant_train_inps = OptimBlockTrainDataset(args.train_size, args.training_seqlen, 
+        #                             model.config.hidden_size, args.batch_size, dtype, cache_path=quant_train_cache_path,off_load_to_disk=args.off_load_to_disk)
+        # quant_val_inps = OptimBlockTrainDataset(args.val_size, args.training_seqlen, 
+                                    # model.config.hidden_size, args.batch_size, dtype, cache_path=quant_val_cache_path,off_load_to_disk=args.off_load_to_disk)
     else:
-        # quant_train_inps = BlockTrainDataset(args.train_size, args.training_seqlen, 
-        #                             model.config.hidden_size, args.batch_size, dtype, cache_path=quant_train_cache_path,off_load_to_disk=args.off_load_to_disk)
-        # quant_val_inps = BlockTrainDataset(args.val_size, args.training_seqlen, 
-        #                             model.config.hidden_size, args.batch_size, dtype, cache_path=quant_val_cache_path,off_load_to_disk=args.off_load_to_disk)
-        quant_train_inps = OptimBlockTrainDataset(args.train_size, args.training_seqlen, 
+        quant_train_inps = BlockTrainDataset(args.train_size, args.training_seqlen, 
                                     model.config.hidden_size, args.batch_size, dtype, cache_path=quant_train_cache_path,off_load_to_disk=args.off_load_to_disk)
-        quant_val_inps = OptimBlockTrainDataset(args.val_size, args.training_seqlen, 
+        quant_val_inps = BlockTrainDataset(args.val_size, args.training_seqlen, 
                                     model.config.hidden_size, args.batch_size, dtype, cache_path=quant_val_cache_path,off_load_to_disk=args.off_load_to_disk)
+        # quant_train_inps = OptimBlockTrainDataset(args.train_size, args.training_seqlen, 
+        #                             model.config.hidden_size, args.batch_size, dtype, cache_path=quant_train_cache_path,off_load_to_disk=args.off_load_to_disk)
+        # quant_val_inps = OptimBlockTrainDataset(args.val_size, args.training_seqlen, 
+        #                             model.config.hidden_size, args.batch_size, dtype, cache_path=quant_val_cache_path,off_load_to_disk=args.off_load_to_disk)
         for index,data in enumerate(fp_train_inps):
             quant_train_inps.update_data(index, data)
         for index,data in enumerate(fp_val_inps):
@@ -275,19 +275,26 @@ def cross_block_quantization(
 
             best_val_loss = 1e6
             early_stop_flag = 0
-
             for epoch in range(args.epochs):
                 # step: 6.4 training
                 loss_list = []
                 norm_list = []
                 start_time = time.time()
+                # used for debug
+                torch.autograd.set_detect_anomaly(True)
                 for index, (quant_inps, fp_inps) in enumerate(zip(quant_train_inps, fp_train_inps)):    
                     # obtain output of quantization model
-                    with torch.cuda.amp.autocast(False):
+                    with torch.cuda.amp.autocast():
                         hidden_states = quant_inps.to(dev)
                         label = fp_inps.to(dev)
                         for block_index in range(start_idx, end_idx):
+                            if not math.isfinite(hidden_states.sum().item()):
+                                logger.info("hidden_states is NAN, stopping training")
+                                pdb.set_trace()
                             hidden_states = qlayers[block_index](hidden_states, attention_mask=attention_mask_batch,position_ids=position_ids)[0]
+                        if not math.isfinite(hidden_states.sum().item()):
+                            logger.info("hidden_states is NAN, stopping training")
+                            pdb.set_trace()
                         quant_out = hidden_states
                         reconstruction_loss = loss_func(label, quant_out)
                         loss =  reconstruction_loss
@@ -298,7 +305,14 @@ def cross_block_quantization(
                     loss_recorder.record(f"crossblock_loss",step,reconstruction_loss.detach().cpu().item())
                     loss_list.append(reconstruction_loss.detach().cpu())
                     optimizer.zero_grad()
-                    norm = loss_scaler(loss, optimizer,parameters=trainable_parameters(qlayer)).cpu()
+                    # # debug
+                    # print(f"Loss dtype: {loss.dtype}")
+                    # for param in qlayers[start_idx:end_idx].parameters():
+                    #     print(f"Param dtype: {param.dtype}")
+                    #     if param.grad is not None:
+                    #         print(f"Param grad dtype: {param.grad.dtype}")
+
+                    norm = loss_scaler(loss, optimizer,clip_grad=1.0,parameters=trainable_parameters(qlayers[start_idx:end_idx])).cpu()
                     norm_list.append(norm.data)
 
                     # adjust lr
@@ -315,7 +329,7 @@ def cross_block_quantization(
                 for index, (quant_inps,fp_inps) in enumerate(zip(quant_val_inps, fp_val_inps)):  
                     # obtain output of quantization model
                     with torch.no_grad():
-                        with torch.cuda.amp.autocast(False):
+                        with torch.cuda.amp.autocast():
                             hidden_states = quant_inps.to(dev)
                             label = fp_inps.to(dev)
                             for block_index in range(start_idx, end_idx):

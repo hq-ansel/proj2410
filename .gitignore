@@ -1,0 +1,61 @@
+# 操作系统相关文件
+.DS_Store
+Thumbs.db
+
+# 编辑器临时文件
+*.log
+*.swp
+*.swo
+*.tmp
+.idea/
+.vscode/
+
+# Python 虚拟环境
+venv/
+__pycache__/
+*.py[cod]
+
+# 日志和数据库
+*.sqlite3
+*.log
+*.pot
+
+# 单元测试覆盖率报告
+htmlcov/
+.coverage
+.cache
+
+# mypy
+.mypy_cache/
+
+# 构建工具
+build/
+dist/
+*.o
+*.out
+*.a
+*.so
+
+# 日志和数据库
+*.log
+*.sqlite3
+
+# Git 合并冲突
+*.orig
+*.rej
+
+# IDE 配置
+.idea/
+.vscode/
+
+# 系统cache
+hf_home/
+logs/
+log/
+hess/
+model/
+quant_model/
+cache/
+output/
+data/
+build/  

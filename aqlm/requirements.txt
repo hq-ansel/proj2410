@@ -1,0 +1,4 @@
+safetensors>=0.4.3
+sentencepiece==0.2.0
+numpy==1.26.4
+datasets==2.19.0

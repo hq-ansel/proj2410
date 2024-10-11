@@ -21,10 +21,11 @@ from quantize.utils import (
     set_weight_parameters,trainable_parameters_num,get_named_linears,set_op_by_name)
 from datautils_block import BlockTrainDataset,OptimBlockTrainDataset
 
+amp_enabled = os.environ.get("AMP_ENABLED", "True").lower() == "true"
 
 def update_dataset(layers, dataset, dev, attention_mask, position_ids):
     with torch.no_grad():
-        with torch.cuda.amp.autocast():
+        with torch.cuda.amp.autocast(enabled=amp_enabled,dtype=torch.bfloat16):
             for index, inps in enumerate(dataset):
                 inps = inps.to(dev)
                 if len(inps.shape)==2:
@@ -194,8 +195,8 @@ def cross_block_quantization(
     loss_recorder = utils.BlockLossRecorder(file_path=os.path.join(loss_dir,f"Llama2-7b-crossblock-loss-b2.csv"),)
     
     num_layers = len(layers)
-    slide_step = 1
-    window_size = 1
+    slide_step = 2
+    window_size = 2
     qlayers = torch.nn.ModuleList()
     is_quant_layer = [False]*num_layers
 
@@ -265,7 +266,8 @@ def cross_block_quantization(
                 else:
                     set_weight_parameters(qlayer,False)
             optimizer = torch.optim.AdamW(param, weight_decay=args.wd,foreach=True)
-            loss_scaler = utils.NativeScalerWithGradNormCount()
+            
+            loss_scaler = utils.NativeScalerWithGradNormCount(use_amp=amp_enabled)
             trainable_number = trainable_parameters_num(qlayers[start_idx:end_idx])
             print(f"trainable parameter number: {trainable_number/1e6}M")
 
@@ -275,6 +277,7 @@ def cross_block_quantization(
 
             best_val_loss = 1e6
             early_stop_flag = 0
+
             for epoch in range(args.epochs):
                 # step: 6.4 training
                 loss_list = []
@@ -284,7 +287,7 @@ def cross_block_quantization(
                 torch.autograd.set_detect_anomaly(True)
                 for index, (quant_inps, fp_inps) in enumerate(zip(quant_train_inps, fp_train_inps)):    
                     # obtain output of quantization model
-                    with torch.cuda.amp.autocast():
+                    with torch.cuda.amp.autocast(enabled=amp_enabled,dtype=torch.bfloat16):
                         hidden_states = quant_inps.to(dev)
                         label = fp_inps.to(dev)
                         for block_index in range(start_idx, end_idx):
@@ -329,7 +332,7 @@ def cross_block_quantization(
                 for index, (quant_inps,fp_inps) in enumerate(zip(quant_val_inps, fp_val_inps)):  
                     # obtain output of quantization model
                     with torch.no_grad():
-                        with torch.cuda.amp.autocast():
+                        with torch.cuda.amp.autocast(enabled=amp_enabled,dtype=torch.bfloat16):
                             hidden_states = quant_inps.to(dev)
                             label = fp_inps.to(dev)
                             for block_index in range(start_idx, end_idx):

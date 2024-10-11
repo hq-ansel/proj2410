@@ -29,7 +29,7 @@
     # 指定数据集位置
     export HF_HOME="/home/ubuntu/data/exp/proj2410/hf_home"
 
-    export CUDA_VISIBLE_DEVICES=3  # or e.g. 0,1,2,3
+    export CUDA_VISIBLE_DEVICES=0,1,2,3  # or e.g. 0,1,2,3
     export MODEL_PATH=/home/ubuntu/data/exp/proj2410/model/Llama2-7b
     export DATASET_PATH=pajama
     export SAVE_PATH=/home/ubuntu/data/exp/proj2410/quant_model/EfficientQAT/w2gs128/Llama2-7b

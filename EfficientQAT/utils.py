@@ -28,30 +28,51 @@ def ampscaler_get_grad_norm(parameters, norm_type: float = 2.0) -> torch.Tensor:
 class NativeScalerWithGradNormCount:
     state_dict_key = "amp_scaler"
 
-    def __init__(self):
-        self._scaler = torch.cuda.amp.GradScaler()
+    def __init__(self,use_amp=True):
+        # 根据 use_amp 参数决定是否创建 AMP Scaler
+        self.use_amp = use_amp
+        if self.use_amp:
+            self._scaler = torch.cuda.amp.GradScaler()
+        else:
+            self._scaler = None  # 如果不使用 AMP，则不需要 Scaler
 
-    def __call__(self, loss, optimizer, clip_grad=None, parameters=None, create_graph=False, update_grad=True,retain_graph=False):
-        self._scaler.scale(loss).backward(create_graph=create_graph, retain_graph=retain_graph)
+    def __call__(self, loss, optimizer, clip_grad=None, parameters=None, create_graph=False, update_grad=True, retain_graph=False):
+        # 根据 use_amp 决定是否使用 AMP 进行缩放和反向传播
+        if self.use_amp:
+            self._scaler.scale(loss).backward(create_graph=create_graph, retain_graph=retain_graph)
+        else:
+            loss.backward(create_graph=create_graph, retain_graph=retain_graph)
+
         if update_grad:
             if clip_grad is not None:
                 assert parameters is not None
-                self._scaler.unscale_(optimizer)  # unscale the gradients of optimizer's assigned params in-place
+                if self.use_amp:
+                    self._scaler.unscale_(optimizer)  # unscale the gradients of optimizer's assigned params in-place
                 norm = torch.nn.utils.clip_grad_norm_(parameters, clip_grad)
             else:
-                self._scaler.unscale_(optimizer)
+                if self.use_amp:
+                    self._scaler.unscale_(optimizer)
                 norm = ampscaler_get_grad_norm(parameters)
-            self._scaler.step(optimizer)
-            self._scaler.update()
+                
+            if self.use_amp:
+                self._scaler.step(optimizer)
+                self._scaler.update()
+            else:
+                optimizer.step()
         else:
             norm = None
+        
         return norm
 
     def state_dict(self):
-        return self._scaler.state_dict()
+        if self.use_amp:
+            return self._scaler.state_dict()
+        else:
+            return {}
 
     def load_state_dict(self, state_dict):
-        self._scaler.load_state_dict(state_dict)
+        if self.use_amp:
+            self._scaler.load_state_dict(state_dict)
 
 
 def create_logger(output_dir, dist_rank=0, name=''):

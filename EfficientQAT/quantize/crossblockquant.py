@@ -24,7 +24,7 @@ from datautils_block import BlockTrainDataset,OptimBlockTrainDataset
 
 def update_dataset(layers, dataset, dev, attention_mask, position_ids):
     with torch.no_grad():
-        with torch.cuda.amp.autocast(False):
+        with torch.cuda.amp.autocast():
             for index, inps in enumerate(dataset):
                 inps = inps.to(dev)
                 if len(inps.shape)==2:

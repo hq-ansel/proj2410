@@ -191,11 +191,11 @@ def cross_block_quantization(
 
     # step 6.1.1: setup loss recorder
     loss_dir="/home/ubuntu/data/exp/proj2410/logs"
-    loss_recorder = utils.BlockLossRecorder(file_path=os.path.join(loss_dir,f"Llama2-7b-crossblock-loss.csv"),)
+    loss_recorder = utils.BlockLossRecorder(file_path=os.path.join(loss_dir,f"Llama2-7b-crossblock-loss-b2.csv"),)
     
     num_layers = len(layers)
-    slide_step = 2
-    window_size = 2
+    slide_step = 1
+    window_size = 1
     qlayers = torch.nn.ModuleList()
     is_quant_layer = [False]*num_layers
 

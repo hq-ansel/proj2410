@@ -42,6 +42,7 @@
     --group_size 128 \
     --quant_lr 1e-5 \
     --weight_lr 1e-5 \
+    --batch_size 8\
     --real_quant \
     --eval_ppl \
     --epochs 5 \

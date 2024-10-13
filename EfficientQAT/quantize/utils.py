@@ -1,5 +1,5 @@
 from collections import OrderedDict
-from quantize.int_linear_fake import QuantLinear
+from .int_linear_fake import QuantLinear
 import torch
 from torch import nn
 from typing  import Optional

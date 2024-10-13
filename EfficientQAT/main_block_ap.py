@@ -1,20 +1,25 @@
 import os
 import sys
 import random
+import yaml
+import time
+from tqdm import tqdm
+from pathlib import Path
+
+from easydict import EasyDict 
 import numpy as np
 import torch
-import time
-from datautils_block import get_loaders, test_ppl
 import torch.nn as nn
-from quantize.block_ap import block_ap
-from tqdm import tqdm
-import utils
-from pathlib import Path
 from transformers import AutoTokenizer, AutoConfig, AutoModelForCausalLM
-from quantize.int_linear_real import load_quantized_model
 from accelerate import infer_auto_device_map, dispatch_model
 
-from quantize.crossblockquant import cross_block_quantization
+
+from . import utils
+from .datautils_block import get_loaders, test_ppl
+from .quantize.int_linear_real import load_quantized_model
+from .quantize.block_ap import block_ap
+from .quantize.crossblockquant import cross_block_quantization
+
 
 
 torch.backends.cudnn.benchmark = True
@@ -36,7 +41,10 @@ def evaluate(model, tokenizer, args, logger):
         datasets = ["wikitext2", "c4"]
         ppl_results = test_ppl(model, tokenizer, datasets, args.ppl_seqlen)
         for dataset in ppl_results:
-            logger.info(f'{dataset} perplexity: {ppl_results[dataset]:.2f}')
+            if logger is not None:
+                logger.info(f'{dataset} perplexity: {ppl_results[dataset]:.2f}')
+            else: 
+                print(f'{dataset} perplexity: {ppl_results[dataset]:.2f}')
 
     if args.eval_tasks != "":
         import lm_eval
@@ -51,18 +59,59 @@ def evaluate(model, tokenizer, args, logger):
         num_fewshot=0,
         task_manager=task_manager,
         )
-        logger.info(make_table(results))
+        if logger is not None:
+            logger.info(make_table(results))
+        else:
+            print(make_table(results))
         total_acc = 0
         for task in task_list:
             total_acc += results['results'][task]['acc,none']
-        logger.info(f'Average Acc: {total_acc/len(task_list)*100:.2f}%')
+        if logger is not None:
+            logger.info(f'Average Acc: {total_acc/len(task_list)*100:.2f}%')
+        else:
+            print(f'Average Acc: {total_acc/len(task_list)*100:.2f}%')
     return results
+
+def load_config(yaml_path):
+    """
+    从 YAML 文件加载配置
+    """
+    if yaml_path is None:
+        return {}
+    with open(yaml_path, 'r') as file:
+        config = yaml.safe_load(file)
+    return EasyDict(config)
+
+def update_config_with_args(config, args):
+    """
+    用 argparse 的参数更新配置，支持嵌套的参数更新，优先使用 config 中的值
+    """
+    for key, value in vars(args).items():
+        # 只有当命令行提供了非 None 参数时才更新配置
+        if value is not None:
+            if '.' in key:  # 处理嵌套的配置
+                top_key, sub_key = key.split('.')
+                if top_key in config and isinstance(config[top_key], dict):
+                    # 如果命令行中提供了非 None 的值，更新配置
+                    config[top_key][sub_key] = value
+            else:
+                if not config.get(key):
+                    # 如果命令行中提供了非 None 的值，更新配置
+                    config[key] = value
+        # 如果命令行参数存在且为 None，保持 config 中的默认值
+        elif value is None and key not in config:
+            # 如果 config 中没有该 key，则在 config 中加入该 key 的 None 值
+            config[key] = value
+
+    return config
+
 
 
 def main():
     import argparse
 
     parser = argparse.ArgumentParser()
+    parser.add_argument("--config_path", type=str, help="path of config file")
     parser.add_argument("--model", type=str, help="model name of model path")
     parser.add_argument("--cache_dir", default="./cache", type=str, help="direction of cached dataset, leading to faster debug")
     parser.add_argument("--output_dir", default="./log/", type=str, help="direction of logging file")
@@ -94,9 +143,16 @@ def main():
     parser.add_argument("--max_memory", type=str, default="70GiB",help="The maximum memory of each GPU")
     parser.add_argument("--early_stop", type=int, default=0,help="early stoping after validation loss do not decrease")
     parser.add_argument("--off_load_to_disk", action="store_true", default=False, help="save training dataset to disk, saving CPU memory but may reduce training speed")
-
+    parser.add_argument("--log_loss" , type=str, default=None , help="log loss path")
+    parser.add_argument("--loss_func", type=str,
+                        choices=["MSE", "FKLD" , "RKLD", "FKLD_RKLD" ,"MSE_FKLD", "MSE_RKLD", "MSE_FKLD_RKLD"],
+                          default="MSE", help="loss function for training")
+    
     os.environ['TOKENIZERS_PARALLELISM'] = 'false'
     args = parser.parse_args()
+    config = load_config(args.config_path)
+    args = update_config_with_args(config, args)
+
     random.seed(args.seed)
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)

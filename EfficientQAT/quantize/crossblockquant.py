@@ -8,24 +8,26 @@ import math
 
 import torch
 import torch.nn as nn
+from torch.amp import autocast, GradScaler
 import torch.nn.functional as F
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from torch.utils.data import DataLoader
 
-import utils
-import quantize.int_linear_fake as int_linear_fake
-import quantize.int_linear_real as int_linear_real
-from quantize.utils import (
+from .. import utils
+from . import int_linear_fake, int_linear_real
+from .utils import (
     quant_parameters,weight_parameters,trainable_parameters,
     set_quant_state,quant_inplace,set_quant_parameters,
     set_weight_parameters,trainable_parameters_num,get_named_linears,set_op_by_name)
-from datautils_block import BlockTrainDataset,OptimBlockTrainDataset
+from ..datautils_block import BlockTrainDataset,OptimBlockTrainDataset
+from ..loss_utils import get_loss_func
 
 amp_enabled = os.environ.get("AMP_ENABLED", "True").lower() == "true"
 
+
 def update_dataset(layers, dataset, dev, attention_mask, position_ids):
     with torch.no_grad():
-        with torch.cuda.amp.autocast(enabled=amp_enabled,dtype=torch.bfloat16):
+        with torch.autocast(device_type="cuda",enabled=amp_enabled,dtype=torch.bfloat16):
             for index, inps in enumerate(dataset):
                 inps = inps.to(dev)
                 if len(inps.shape)==2:
@@ -79,14 +81,14 @@ def cross_block_quantization(
         fp_val_cache_path = None
         quant_train_cache_path = None
         quant_val_cache_path = None
-    # fp_train_inps = BlockTrainDataset(args.train_size, args.training_seqlen, 
-    #                             model.config.hidden_size, args.batch_size, dtype, cache_path=fp_train_cache_path,off_load_to_disk=args.off_load_to_disk)
-    # fp_val_inps = BlockTrainDataset(args.val_size, args.training_seqlen, 
-    #                             model.config.hidden_size, args.batch_size, dtype, cache_path=fp_val_cache_path,off_load_to_disk=args.off_load_to_disk)
-    fp_train_inps = OptimBlockTrainDataset(args.train_size, args.training_seqlen, 
-                                    model.config.hidden_size, args.batch_size, dtype, cache_path=fp_train_cache_path,off_load_to_disk=args.off_load_to_disk)
-    fp_val_inps = OptimBlockTrainDataset(args.val_size, args.training_seqlen, 
-                                    model.config.hidden_size, args.batch_size, dtype, cache_path=fp_val_cache_path,off_load_to_disk=args.off_load_to_disk)
+    fp_train_inps = BlockTrainDataset(args.train_size, args.training_seqlen, 
+                                model.config.hidden_size, args.batch_size, dtype, cache_path=fp_train_cache_path,off_load_to_disk=args.off_load_to_disk)
+    fp_val_inps = BlockTrainDataset(args.val_size, args.training_seqlen, 
+                                model.config.hidden_size, args.batch_size, dtype, cache_path=fp_val_cache_path,off_load_to_disk=args.off_load_to_disk)
+    # fp_train_inps = OptimBlockTrainDataset(args.train_size, args.training_seqlen, 
+    #                                 model.config.hidden_size, args.batch_size, dtype, cache_path=fp_train_cache_path,off_load_to_disk=args.off_load_to_disk)
+    # fp_val_inps = OptimBlockTrainDataset(args.val_size, args.training_seqlen, 
+    #                                 model.config.hidden_size, args.batch_size, dtype, cache_path=fp_val_cache_path,off_load_to_disk=args.off_load_to_disk)
 
     # step 3: catch the input of thefirst layer 
     class Catcher(nn.Module):
@@ -188,17 +190,19 @@ def cross_block_quantization(
 
 
     # step 6: start training    
-    loss_func = torch.nn.MSELoss()
+    loss_func = get_loss_func(args.loss_func)
 
     # step 6.1.1: setup loss recorder
     loss_dir="/home/ubuntu/data/exp/proj2410/logs"
-    loss_recorder = utils.BlockLossRecorder(file_path=os.path.join(loss_dir,f"Llama2-7b-crossblock-loss-b2.csv"),)
+    if args.log_loss:
+        loss_recorder = utils.BlockLossRecorder(file_path=args.log_loss,)
     
     num_layers = len(layers)
-    slide_step = 2
-    window_size = 2
     qlayers = torch.nn.ModuleList()
     is_quant_layer = [False]*num_layers
+
+    slide_step = args.crossblock_window_size
+    window_size = args.crossblock_window_size
 
     for start_idx in range(0, num_layers, slide_step):
         end_idx = min(start_idx + window_size, num_layers)  # 窗口范围
@@ -287,7 +291,7 @@ def cross_block_quantization(
                 torch.autograd.set_detect_anomaly(True)
                 for index, (quant_inps, fp_inps) in enumerate(zip(quant_train_inps, fp_train_inps)):    
                     # obtain output of quantization model
-                    with torch.cuda.amp.autocast(enabled=amp_enabled,dtype=torch.bfloat16):
+                    with torch.autocast(device_type="cuda",enabled=amp_enabled,dtype=torch.bfloat16):
                         hidden_states = quant_inps.to(dev)
                         label = fp_inps.to(dev)
                         for block_index in range(start_idx, end_idx):
@@ -305,7 +309,8 @@ def cross_block_quantization(
                     if not math.isfinite(loss.item()):
                         logger.info("Loss is NAN, stopping training")
                         pdb.set_trace()
-                    loss_recorder.record(f"crossblock_loss",step,reconstruction_loss.detach().cpu().item())
+                    if args.log_loss:
+                        loss_recorder.record(f"blk{start_idx}-{end_idx}",step,reconstruction_loss.detach().cpu().item())
                     loss_list.append(reconstruction_loss.detach().cpu())
                     optimizer.zero_grad()
                     # # debug
@@ -332,7 +337,7 @@ def cross_block_quantization(
                 for index, (quant_inps,fp_inps) in enumerate(zip(quant_val_inps, fp_val_inps)):  
                     # obtain output of quantization model
                     with torch.no_grad():
-                        with torch.cuda.amp.autocast(enabled=amp_enabled,dtype=torch.bfloat16):
+                        with torch.autocast(device_type="cuda",enabled=amp_enabled,dtype=torch.bfloat16):
                             hidden_states = quant_inps.to(dev)
                             label = fp_inps.to(dev)
                             for block_index in range(start_idx, end_idx):
@@ -372,8 +377,8 @@ def cross_block_quantization(
         ori_layers = layers[start_idx:end_idx]
         for block_index in range(start_idx, end_idx):
             layers[block_index] = qlayers[block_index].to("cpu")
-
-        loss_recorder.save_to_file()
+        if args.log_loss:
+            loss_recorder.save_to_file()
         # step 7: pack quantized weights into low-bits format, note that this process is slow on poor CPU or busy CPU
         if args.real_quant:
             for qlayer in qlayers[start_idx:start_idx+slide_step]:

@@ -20,6 +20,41 @@ def clamp_ste(x: torch.Tensor, min, max):
 #     return (x.clamp(min,max) - x).detach() + x
 
 
+class ClampMAD(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, x, min_val, max_val):
+        """
+        前向传播：执行截断操作。
+        """
+        ctx.save_for_backward(x, min_val, max_val)
+        return x.clamp(min_val, max_val)
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        """
+        反向传播：应用 MAD 规则调整梯度。
+        """
+        x, min_val, max_val = ctx.saved_tensors
+        # 初始化梯度系数 alpha 为 1
+        alpha = torch.ones_like(x)
+        
+        # 对于 x < min_val，alpha = min_val / x
+        alpha = torch.where(x < min_val, min_val / x, alpha)
+        
+        # 对于 x > max_val，alpha = max_val / x
+        alpha = torch.where(x > max_val, max_val / x, alpha)
+        
+        # 对于 min_val <= x <= max_val，alpha 保持为 1
+        grad_input = grad_output * alpha
+        return grad_input, None, None
+
+def clamp_mad(x: torch.Tensor, min_val, max_val):
+    """
+    使用 ClampMAD 进行截断操作。
+    """
+    return ClampMAD.apply(x, torch.tensor(min_val, device=x.device), torch.tensor(max_val, device=x.device))
+
+
 class UniformAffineQuantizer(nn.Module):
     def __init__(
         self,
@@ -45,6 +80,7 @@ class UniformAffineQuantizer(nn.Module):
                 range = xmax - xmin
                 scale = range / (2**self.n_bits-1)
                 scale = scale.clamp(min=1e-4, max=1e4)
+                # scale = clamp_mad(scale, 1e-4, 1e4)
                 zero_point = -(xmin/scale).clamp(min=-1e4, max=1e4) 
                 self.scale = nn.Parameter(scale)
                 self.zero_point = nn.Parameter(zero_point.round())

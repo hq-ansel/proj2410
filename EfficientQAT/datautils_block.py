@@ -227,7 +227,6 @@ def test_ppl(model, tokenizer, datasets=['wikitext2'],ppl_seqlen=2048):
         results[dataset] = ppl.item()
     model.config.use_cache = use_cache
     return results
-
 class BlockTrainDataset(Dataset):
     def __init__(self, size, seqlen, hidden_size, batch_size, dtype, cache_path='./cache/block_training_data', off_load_to_disk=False):
         self.size = size
@@ -274,8 +273,6 @@ class BlockTrainDataset(Dataset):
             torch.save(new_data.to(self.dtype), filepath)
         else:
             self.data[idx] = new_data
-
-
 
 
 import os

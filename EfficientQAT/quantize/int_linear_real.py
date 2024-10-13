@@ -1,18 +1,17 @@
-import math
 from logging import getLogger
+import math
+import gc  
+from tqdm import tqdm
 
 import numpy as np
 import torch
 import torch.nn as nn
 import transformers
-
-from quantize.triton_utils.kernels import dequant_dim0, dequant_dim1
-import math
 from transformers import AutoModelForCausalLM, AutoTokenizer, AutoConfig
 from accelerate import init_empty_weights, infer_auto_device_map, load_checkpoint_in_model
-from tqdm import tqdm
-import gc  
-from quantize.utils import get_named_linears,set_op_by_name
+
+from .triton_utils.kernels import dequant_dim0, dequant_dim1
+from .utils import get_named_linears,set_op_by_name
 
 logger = getLogger(__name__)
 

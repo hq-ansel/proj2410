@@ -12,14 +12,14 @@ import torch.nn.functional as F
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from torch.utils.data import DataLoader
 
-import utils
-import quantize.int_linear_fake as int_linear_fake
-import quantize.int_linear_real as int_linear_real
-from quantize.utils import (
+from .. import utils
+from . import int_linear_real
+from . import int_linear_fake
+from .utils import (
     quant_parameters,weight_parameters,trainable_parameters,
     set_quant_state,quant_inplace,set_quant_parameters,
     set_weight_parameters,trainable_parameters_num,get_named_linears,set_op_by_name)
-from datautils_block import BlockTrainDataset
+from ..datautils_block import BlockTrainDataset
 
 
 def update_dataset(layer, dataset, dev, attention_mask, position_ids):

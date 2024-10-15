@@ -201,7 +201,7 @@ def cross_block_quantization(
     qlayers = torch.nn.ModuleList()
     is_quant_layer = [False]*num_layers
 
-    slide_step = args.crossblock_window_size
+    slide_step = 1
     window_size = args.crossblock_window_size
 
     for start_idx in range(0, num_layers, slide_step):
@@ -228,7 +228,8 @@ def cross_block_quantization(
                 qlayers.append(qlayer)
                 is_quant_layer[block_index] = True
             else:
-                qlayer = qlayers[block_index]
+                # fix crossblock quantization device not int same
+                qlayer = qlayers[block_index].to(dev)
         # step 6.2: obtain output of full-precision model for MSE
         set_quant_state(qlayers[start_idx:end_idx],weight_quant=False) # deactivate quantization for obtaining ground truth
         if args.epochs > 0:

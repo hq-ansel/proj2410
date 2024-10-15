@@ -58,6 +58,14 @@ def MSE_FKLD_RKLD(output, target):
     fkld_rkld = FKLD_RKLD(output, target)
     return mse + fkld_rkld
 
+def MSE_MAX_ABS_ERROR(output, target):
+    """
+    Combination of MSE and max absolute error.
+    """
+    mse = MSE(output, target)
+    max_abs_error = torch.max(torch.abs(output - target))
+    return mse + max_abs_error*0.01
+
 def get_loss_func(loss_type: str):
     """
     Get the loss function based on the loss type.
@@ -76,5 +84,7 @@ def get_loss_func(loss_type: str):
         return MSE_RKLD
     elif loss_type == 'MSE_FKLD_RKLD':
         return MSE_FKLD_RKLD
+    elif loss_type == 'MSE_MAX_ABS_ERROR':
+        return MSE_MAX_ABS_ERROR
     else:
         raise ValueError(f'Invalid loss type: {loss_type}')

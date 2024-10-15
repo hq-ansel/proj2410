@@ -25,7 +25,7 @@ from .quantize.crossblockquant import cross_block_quantization
 torch.backends.cudnn.benchmark = True
 
 @torch.no_grad()
-def evaluate(model, tokenizer, args, logger):
+def evaluate(model, tokenizer, args, logger=None):
     '''
     Note: evaluation simply move model to single GPU. 
     Therefor, to evaluate large model such as Llama-2-70B on single A100-80GB,
@@ -34,6 +34,10 @@ def evaluate(model, tokenizer, args, logger):
     # import pdb;pdb.set_trace()
     block_class_name = model.model.layers[0].__class__.__name__
     device_map = infer_auto_device_map(model, max_memory={i: args.max_memory for i in range(torch.cuda.device_count())}, no_split_module_classes=[block_class_name])
+    if logger is not None:
+        logger.info(f"device_map: {device_map}")
+    else:
+        print(f"device_map: {device_map}")
     model = dispatch_model(model, device_map=device_map)
     results = {}
 

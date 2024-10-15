@@ -38,11 +38,8 @@ class ClampMAD(torch.autograd.Function):
         # 初始化梯度系数 alpha 为 1
         alpha = torch.ones_like(x)
         
-        # 对于 x < min_val，alpha = min_val / x
-        alpha = torch.where(x < min_val, min_val / x, alpha)
-        
         # 对于 x > max_val，alpha = max_val / x
-        alpha = torch.where(x > max_val, max_val / x, alpha)
+        alpha = torch.where(x.abs() > max_val, max_val / x.abs(), alpha)
         
         # 对于 min_val <= x <= max_val，alpha 保持为 1
         grad_input = grad_output * alpha
@@ -94,7 +91,9 @@ class UniformAffineQuantizer(nn.Module):
     def fake_quant(self, x):
         scale = clamp_ste(self.scale,1e-4, 1e4)
         round_zero_point = clamp_ste(round_ste(self.zero_point), self.qmin, self.qmax)
-        
+        # scale = clamp_mad(self.scale, 1e-4, 1e4)
+        # round_zero_point = clamp_mad(round_ste(self.zero_point), self.qmin, self.qmax)
+
         dim1, dim2 = x.shape
         x = x.reshape(-1, self.group_size)
         x_int = round_ste(x / scale)

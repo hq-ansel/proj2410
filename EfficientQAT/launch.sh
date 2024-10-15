@@ -26,17 +26,18 @@
 # )
 
 (
-    cd /home/ubuntu/data/exp/proj2410/EfficientQAT
+    cd /home/ubuntu/data/exp/proj2410/
     # 指定数据集位置
     export HF_HOME="/home/ubuntu/data/exp/proj2410/hf_home"
     export WINDOW_SIZE=1
-    export CUDA_VISIBLE_DEVICES=0,1  # or e.g. 0,1,2,3
+    export CUDA_VISIBLE_DEVICES=0  # or e.g. 0,1,2,3
     export MODEL_PATH=/home/ubuntu/data/exp/proj2410/model/Llama2-7b
     export DATASET_PATH=pajama
+    export AMP_ENABLED=True
     export SAVE_PATH=/home/ubuntu/data/exp/proj2410/quant_model/EfficientQAT/w4gs128/Llama2-7b
-    export CONFIG_PATH=/home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/b4gs128.yaml
+    export CONFIG_PATH=/home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/b4gs128-crossblock2.yaml
 
-    python main_block_ap.py  \
+    python -m EfficientQAT.main_block_ap  \
     --config_path $CONFIG_PATH \
     --model $MODEL_PATH \
     --output_dir /home/ubuntu/data/exp/proj2410/EfficientQAT/output/block_ap_log/Llama-2-7b-w4g128 \
@@ -49,7 +50,6 @@
     --real_quant \
     --eval_ppl \
     --epochs 5 \
-    --off_load_to_disk \
     --save_quant_dir $SAVE_PATH 
 )
 # --loss_func MSE \

@@ -1,4 +1,5 @@
-from transformers import Trainer
+from transformers import Trainer, TrainerCallback
+import torch
 import torch.nn.functional as F
 class CustomTrainCallback(TrainerCallback):
     def __init__(self, model, num_blocks=32):

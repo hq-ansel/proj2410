@@ -7,7 +7,7 @@
     export MODEL_PATH=/home/ubuntu/data/exp/proj2410/model/Llama2-7b
     OUTPATH=/home/ubuntu/data/exp/proj2410/BitDistiller/cache
 
-    CUDA_VISIBLE_DEVICES=8 python autoclip.py \
+    CUDA_VISIBLE_DEVICES=4,5,6,7 python autoclip.py \
     --model_path $MODEL_PATH \
     --calib_dataset pile \
     --quant_type int \

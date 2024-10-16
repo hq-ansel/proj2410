@@ -12,12 +12,15 @@ def main(args):
     n_gpus = torch.cuda.device_count()
     print(f"using {n_gpus} GPUs to generate")
 
-    model = LLM(model=args.base_model, tensor_parallel_size=n_gpus)
+    model = LLM(model=args.base_model, 
+                tensor_parallel_size=n_gpus,
+                dtype=torch.bfloat16,
+                gpu_memory_utilization=0.6,)
 
     tokenizer = AutoTokenizer.from_pretrained(args.base_model, use_fast=False)
 
     prompts, _ = get_gen_dataset(args.dataset_name, args.max_sample, tokenizer)
-
+    print(f"number of prompts: {len(prompts)}")
     sampling_params = SamplingParams(temperature=args.temperature, top_p=1, max_tokens=args.max_new_tokens)
 
     with torch.no_grad():

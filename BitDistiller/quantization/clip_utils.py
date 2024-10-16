@@ -183,7 +183,7 @@ def build_model_and_enc(model_path):
 
     kwargs = {"torch_dtype": torch.bfloat16, "low_cpu_mem_usage": True}
     model = AutoModelForCausalLM.from_pretrained(
-        model_path, config=config, trust_remote_code=True, **kwargs)
+        model_path, config=config, trust_remote_code=True,device_map="auto", **kwargs)
 
     model.eval()
 

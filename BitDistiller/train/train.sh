@@ -1,4 +1,4 @@
-export MODEL_PATH='/root/WizardCoder-Python-7B/'
+export MODEL_PATH='/home/ubuntu/data/exp/proj2410/model/Llama2-7b'
 export SAVE_PATH=$2
 export MASTER_ADDR="localhost"
 export MASTER_PORT="1321"

@@ -8,6 +8,7 @@ import math
 
 import torch
 import torch.nn as nn
+from torch.utils.data import Dataset
 from torch.amp import autocast, GradScaler
 import torch.nn.functional as F
 from torch.optim.lr_scheduler import CosineAnnealingLR
@@ -24,6 +25,24 @@ from ..loss_utils import get_loss_func
 
 amp_enabled = os.environ.get("AMP_ENABLED", "True").lower() == "true"
 
+# 定义联合加载的Dataset
+class QuantFPDataset(Dataset):
+    def __init__(self, quant_train_dataset, fp_train_dataset):
+        # 确保量化数据和浮点数据集的长度一致
+        assert len(quant_train_dataset) == len(fp_train_dataset), "Quant and FP datasets must have the same length"
+
+        self.quant_train_dataset = quant_train_dataset
+        self.fp_train_dataset = fp_train_dataset
+
+    def __len__(self):
+        # 返回数据集的大小
+        return len(self.quant_train_dataset)
+
+    def __getitem__(self, idx):
+        # 根据索引从量化数据集和浮点数据集获取数据
+        quant_inp = self.quant_train_dataset[idx]
+        fp_inp = self.fp_train_dataset[idx]
+        return quant_inp, fp_inp
 
 def update_dataset(layers, dataset, dev, attention_mask, position_ids):
     with torch.no_grad():
@@ -221,7 +240,7 @@ def cross_block_quantization(
                 qlayer = copy.deepcopy(layer)
                 for name, module in qlayer.named_modules():
                     if isinstance(module,torch.nn.Linear):
-                        quantlinear = int_linear_fake.QuantLinear(module, args.wbits, args.group_size)
+                        quantlinear = int_linear_fake.QuantLinear(module, args.wbits, args.group_size,args)
                         set_op_by_name(qlayer, name, quantlinear)  
                         del module  
                 qlayer.to(dev)
@@ -283,6 +302,7 @@ def cross_block_quantization(
             best_val_loss = 1e6
             early_stop_flag = 0
 
+            dataset = QuantFPDataset(quant_train_inps, fp_train_inps)
             for epoch in range(args.epochs):
                 # step: 6.4 training
                 loss_list = []
@@ -290,11 +310,16 @@ def cross_block_quantization(
                 start_time = time.time()
                 # used for debug
                 torch.autograd.set_detect_anomaly(True)
-                for index, (quant_inps, fp_inps) in enumerate(zip(quant_train_inps, fp_train_inps)):    
+                dataloader = DataLoader(dataset, batch_size=1, shuffle=True) 
+                for index, (quant_inps, fp_inps) in enumerate(dataloader):    
                     # obtain output of quantization model
                     with torch.autocast(device_type="cuda",enabled=amp_enabled,dtype=torch.bfloat16):
                         hidden_states = quant_inps.to(dev)
                         label = fp_inps.to(dev)
+                        if len(hidden_states.shape)==4:
+                            hidden_states = hidden_states.squeeze(0)
+                            label = label.squeeze(0)
+
                         for block_index in range(start_idx, end_idx):
                             if not math.isfinite(hidden_states.sum().item()):
                                 logger.info("hidden_states is NAN, stopping training")

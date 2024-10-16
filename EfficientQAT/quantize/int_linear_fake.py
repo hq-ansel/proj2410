@@ -16,7 +16,8 @@ class QuantLinear(nn.Module):
         self,
         org_module: nn.Linear,
         wbits=4,
-        group_size=64
+        group_size=64,
+        args=None,
     ):
         super().__init__()
         self.fwd_kwargs = dict()
@@ -31,7 +32,7 @@ class QuantLinear(nn.Module):
         # de-activate the quantized forward default
         self.use_weight_quant = False
         # initialize quantizer
-        self.weight_quantizer = UniformAffineQuantizer(wbits, group_size, weight=org_module.weight)
+        self.weight_quantizer = UniformAffineQuantizer(wbits, group_size, weight=org_module.weight,args=args)
         self.use_temporary_parameter = False
 
     

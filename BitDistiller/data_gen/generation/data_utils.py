@@ -110,7 +110,7 @@ def get_wiki_dataset(max_sample):
 
 def get_redpajama_dataset(max_sample):
     # wiki_dataset = load_dataset("wikitext", 'wikitext-2-raw-v1', split='train')
-    wiki_dataset = load_dataset('/root/model/datasets/RedPajama-Data-1T-Sample', split='train')
+    wiki_dataset = load_dataset("togethercomputer/RedPajama-Data-1T-Sample", split='train')
 
     wiki_long = []
     for text in wiki_dataset['text']:

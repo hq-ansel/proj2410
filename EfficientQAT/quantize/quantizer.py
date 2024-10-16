@@ -58,6 +58,7 @@ class UniformAffineQuantizer(nn.Module):
         n_bits: int = 8,
         group_size=None,
         weight=None,
+        args=None,
     ):
         super().__init__()
         assert 2 <= n_bits <= 16, "bitwidth not supported"
@@ -67,7 +68,8 @@ class UniformAffineQuantizer(nn.Module):
         self.group_size = group_size if group_size != -1 else weight.shape[-1]
         assert weight.shape[-1] % group_size == 0
         self.enable = True
-        
+        self.clamp_method = args.clamp_method
+
         # init scale and zero point through Max-Min quantization
         with torch.no_grad():
             if weight is not None:
@@ -76,8 +78,10 @@ class UniformAffineQuantizer(nn.Module):
                 xmax =  x.amax([-1], keepdim=True)
                 range = xmax - xmin
                 scale = range / (2**self.n_bits-1)
-                scale = scale.clamp(min=1e-4, max=1e4)
-                # scale = clamp_mad(scale, 1e-4, 1e4)
+                if self.clamp_method == "STE":
+                    scale = scale.clamp(min=1e-4, max=1e4)
+                elif self.clamp_method == "MAD":
+                    scale = clamp_mad(scale, 1e-4, 1e4)
                 zero_point = -(xmin/scale).clamp(min=-1e4, max=1e4) 
                 self.scale = nn.Parameter(scale)
                 self.zero_point = nn.Parameter(zero_point.round())
@@ -89,10 +93,13 @@ class UniformAffineQuantizer(nn.Module):
         self.qmax = int(2 ** (n_bits) - 1)
         
     def fake_quant(self, x):
-        scale = clamp_ste(self.scale,1e-4, 1e4)
-        round_zero_point = clamp_ste(round_ste(self.zero_point), self.qmin, self.qmax)
-        # scale = clamp_mad(self.scale, 1e-4, 1e4)
-        # round_zero_point = clamp_mad(round_ste(self.zero_point), self.qmin, self.qmax)
+        
+        if self.clamp_method == "STE":
+            scale = clamp_ste(self.scale,1e-4, 1e4)
+            round_zero_point = clamp_ste(round_ste(self.zero_point), self.qmin, self.qmax)
+        elif self.clamp_method == "MAD":
+            scale = clamp_mad(self.scale, 1e-4, 1e4)
+            round_zero_point = clamp_mad(round_ste(self.zero_point), self.qmin, self.qmax)
 
         dim1, dim2 = x.shape
         x = x.reshape(-1, self.group_size)

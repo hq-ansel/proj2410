@@ -35,7 +35,7 @@
     export DATASET_PATH=pajama
     export AMP_ENABLED=True
     export SAVE_PATH=/home/ubuntu/data/exp/proj2410/quant_model/EfficientQAT/w4gs128/Llama2-7b
-    export CONFIG_PATH=/home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/b4gs128-crossblock2.yaml
+    export CONFIG_PATH=/home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/b2gs128-mad.yaml
 
     python -m EfficientQAT.main_block_ap  \
     --config_path $CONFIG_PATH \

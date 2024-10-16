@@ -152,6 +152,8 @@ def main():
                         choices=["MSE", "FKLD" , "RKLD", "FKLD_RKLD" ,"MSE_FKLD", "MSE_RKLD", "MSE_FKLD_RKLD"],
                           default="MSE", help="loss function for training")
     
+    parser.add_argument("--clamp_method", type=str, default="STE", help="clamp method for training")
+
     os.environ['TOKENIZERS_PARALLELISM'] = 'false'
     args = parser.parse_args()
     config = load_config(args.config_path)

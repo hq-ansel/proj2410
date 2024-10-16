@@ -1,5 +1,5 @@
 # basic quantization settings
-wbits: 4
+wbits: 2
 group_size: 128
 # training settings
 epochs: 5
@@ -11,6 +11,7 @@ loss_func: MSE # "MSE", "FKLD" , "RKLD", "FKLD_RKLD" ,"MSE_FKLD", "MSE_RKLD", "M
 crossblock_window_size: 1
 
 # save settings
-log_loss: /home/ubuntu/data/exp/proj2410/logs/Llama2-7b-efficientqat-w4gs128-mad.csv
-save_quant_dir: /home/ubuntu/data/exp/proj2410/quant_model/Llama2-7b/EfficientQAT/w4gs128-mad/
+log_loss: /home/ubuntu/data/exp/proj2410/logs/Llama2-7b-efficientqat-w2gs128-mad.csv
+save_quant_dir: /home/ubuntu/data/exp/proj2410/quant_model/Llama2-7b/EfficientQAT/w2gs128-mad/
+
 clamp_method: MAD

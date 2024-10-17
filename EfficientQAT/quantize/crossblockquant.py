@@ -346,7 +346,7 @@ def cross_block_quantization(
                     #     if param.grad is not None:
                     #         print(f"Param grad dtype: {param.grad.dtype}")
 
-                    norm = loss_scaler(loss, optimizer,clip_grad=1.0,parameters=trainable_parameters(qlayers[start_idx:end_idx])).cpu()
+                    norm = loss_scaler(loss, optimizer,clip_grad=args.clip_grad,parameters=trainable_parameters(qlayers[start_idx:end_idx])).cpu()
                     norm_list.append(norm.data)
 
                     # adjust lr

@@ -6,7 +6,7 @@ export GLOO_SOCKET_IFNAME="lo"
 export NCCL_SOCKET_IFNAME="lo"
 export WANDB_DISABLED=true  
 
-deepspeed --num_gpus=8 train.py \
+deepspeed --include "localhost:1,4,5,6,7" train.py \
     --model_name_or_path $MODEL_PATH \
     --data_path $1 \
     --model_max_length 1024 \
@@ -37,4 +37,4 @@ deepspeed --num_gpus=8 train.py \
     --train_kd True \
     --kd_loss_type "cakld" \
     --max_train_samples 999999 \
-    --clip BitDistiller/quantization/clip_cache/WizardCoder-7B/7b-int2-g128-twoclip.pt
+    --clip $2

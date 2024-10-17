@@ -7,6 +7,6 @@
 
     bash /home/ubuntu/data/exp/proj2410/BitDistiller/train/train.sh \
     /home/ubuntu/data/exp/proj2410/BitDistiller/data_gen/datasets/hf-llama-2-7b/mix_wiki_alpaca_8000.json \
-    /home/ubuntu/data/exp/proj2410/BitDistiller/cache/hf-llama2-7b/int2-g128.pt \
-    /home/ubuntu/data/exp/proj2410/BitDistiller/logs/hf-llama-2-7b/int2-g128/ 4
+    /home/ubuntu/data/exp/proj2410/quant_model/Llama-2-7B/bitdistiller \
+    /home/ubuntu/data/exp/proj2410/BitDistiller/logs 4
 )

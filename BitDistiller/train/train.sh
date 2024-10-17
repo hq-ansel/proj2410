@@ -19,8 +19,8 @@ deepspeed --num_gpus=8 train.py \
     --num_train_epochs $4 \
     --bf16 True \
     --seed 42 \
-    --per_device_train_batch_size 16 \
-    --per_device_eval_batch_size 16 \
+    --per_device_train_batch_size 4 \
+    --per_device_eval_batch_size 4 \
     --gradient_accumulation_steps 1 \
     --gradient_checkpointing True \
     --evaluation_strategy "steps" \

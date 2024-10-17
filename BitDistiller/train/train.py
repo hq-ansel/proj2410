@@ -13,7 +13,7 @@ import torch
 import torch.nn as nn
 import transformers
 from torch.utils.data import Dataset, DataLoader
-from transformers import Trainer,BitsAndBytesConfig,default_data_collator
+from transformers import Trainer,BitsAndBytesConfig,default_data_collator,TrainerCallback
 from datasets import load_dataset
 import json
 import glob
@@ -23,7 +23,7 @@ from accelerate import init_empty_weights, infer_auto_device_map, dispatch_model
 from mytrainer import KDTrainer
 import random
 from tqdm import tqdm
-
+from torch.profiler import profile, record_function, ProfilerActivity
 
 
 def _make_r_io_base(f, mode: str):
@@ -259,6 +259,34 @@ def make_supervised_data_module(tokenizer: transformers.PreTrainedTokenizer, dat
     return dict(train_dataset=train_dataset, eval_dataset=eval_dataset, data_collator=data_collator)
 
 
+class PyTorchProfilerCallback(TrainerCallback):
+    def __init__(self, output_dir, schedule=None, activities=None):
+        self.output_dir = output_dir
+        self.schedule = schedule if schedule else torch.profiler.schedule(
+            wait=1, warmup=1, active=3, repeat=2)
+        self.activities = activities if activities else [ProfilerActivity.CPU, ProfilerActivity.CUDA]
+        
+        os.makedirs(output_dir, exist_ok=True)
+        
+        self.profiler = None
+
+    def on_train_begin(self, args, state, control, **kwargs):
+        self.profiler = profile(
+            activities=self.activities,
+            schedule=self.schedule,
+            on_trace_ready=torch.profiler.tensorboard_trace_handler(self.output_dir),
+            with_stack=True
+        )
+        self.profiler.start()
+
+    def on_step_end(self, args, state, control, **kwargs):
+        self.profiler.step()
+
+    def on_train_end(self, args, state, control, **kwargs):
+        if self.profiler:
+            self.profiler.stop()
+
+
 def train():
     parser = transformers.HfArgumentParser((ModelArguments, DataArguments, TrainingArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
@@ -282,9 +310,10 @@ def train():
     model = transformers.AutoModelForCausalLM.from_pretrained(
         model_args.model_name_or_path,
         torch_dtype=torch.bfloat16,
-        device_map=device_map,
+        use_cache=False,
+        # device_map=device_map,
     )
-
+    model=model.cuda()
     tokenizer = transformers.AutoTokenizer.from_pretrained(
         model_args.model_name_or_path,
         cache_dir=training_args.cache_dir,
@@ -334,11 +363,11 @@ def train():
             load_in_4bit=False,
             load_in_8bit=False,
             torch_dtype=torch.bfloat16,
-            device_map=device_map,
-            max_memory=max_memory,
+            # device_map=device_map,
+            # max_memory=max_memory,
         )
         teacher_model.eval()
-        teacher_model.cuda()
+        teacher_model= teacher_model.cuda()
         for param in teacher_model.parameters():
             param.requires_grad = False
         teacher_model.config.use_cache = False
@@ -379,11 +408,22 @@ def train():
         mean_prob = mean_prob / dist.get_world_size()
         print(f"Get the coefficient: {mean_prob}")
 
-
+    profiler_callback = PyTorchProfilerCallback(output_dir="./logs/profiler")
     if training_args.train_kd:
-        trainer = KDTrainer(model=model, tokenizer=tokenizer, teacher_model=teacher_model, loss_type=training_args.kd_loss_type, mean_prob=mean_prob, args=training_args, **data_module)
+        trainer = KDTrainer(model=model,
+                             tokenizer=tokenizer, 
+                             teacher_model=teacher_model, 
+                             loss_type=training_args.kd_loss_type,
+                               mean_prob=mean_prob,
+                               args=training_args,
+                               callbacks=[profiler_callback],
+                                 **data_module)
     else:
-        trainer = Trainer(model=model, tokenizer=tokenizer, args=training_args, **data_module)
+        trainer = Trainer(model=model,
+                           tokenizer=tokenizer,
+                             args=training_args,
+                             callbacks=[profiler_callback],
+                               **data_module)
     trainer.train()
     trainer.save_state()
     safe_save_model_for_hf_trainer(trainer=trainer, output_dir=training_args.output_dir)

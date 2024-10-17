@@ -106,7 +106,8 @@ def update_config_with_args(config, args):
         elif value is None and key not in config:
             # 如果 config 中没有该 key，则在 config 中加入该 key 的 None 值
             config[key] = value
-
+    if "cuda_ids" in config:
+        os.environ["CUDA_VISIBLE_DEVICES"]=config.cuda_ids
     return config
 
 

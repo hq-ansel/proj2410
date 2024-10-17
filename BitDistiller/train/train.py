@@ -265,7 +265,7 @@ def train():
 
     random.seed(TrainingArguments.seed)
     n_gpus = torch.cuda.device_count()
-    max_memory = f'80000MB'
+    max_memory = f'48000MB'
     max_memory = {i: max_memory for i in range(n_gpus)}
     device_map = "auto"
 

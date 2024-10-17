@@ -1,12 +1,12 @@
 export MODEL_PATH='/home/ubuntu/data/exp/proj2410/model/Llama2-7b'
 export SAVE_PATH=$2
 export MASTER_ADDR="localhost"
-export MASTER_PORT="1321"
+export MASTER_PORT="44444"
 export GLOO_SOCKET_IFNAME="lo"
 export NCCL_SOCKET_IFNAME="lo"
 export WANDB_DISABLED=true  
 
-deepspeed --include "localhost:1,4,5,6,7" train.py \
+deepspeed --num_gpus=4 train.py \
     --model_name_or_path $MODEL_PATH \
     --data_path $1 \
     --model_max_length 1024 \

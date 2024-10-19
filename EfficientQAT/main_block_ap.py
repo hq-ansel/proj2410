@@ -19,6 +19,7 @@ from .datautils_block import get_loaders, test_ppl
 from .quantize.int_linear_real import load_quantized_model
 from .quantize.block_ap import block_ap
 from .quantize.crossblockquant import cross_block_quantization
+from .quantize.greedy_trainer import greedy_local_train
 
 
 
@@ -154,6 +155,8 @@ def main():
                           default="MSE", help="loss function for training")
     
     parser.add_argument("--clamp_method", type=str, default="STE", help="clamp method for training")
+    parser.add_argument("--quant_shedule_type", type=str, default="partial", help="quantization shedule type")
+    parser.add_argument("--train_shedule_type", type=str, default="start2end", help="train shedule type")
 
     os.environ['TOKENIZERS_PARALLELISM'] = 'false'
     args = parser.parse_args()
@@ -216,7 +219,8 @@ def main():
                 torch.save(trainloader, cache_trainloader)    
                 torch.save(valloader, cache_valloader)    
             # block_ap(
-            cross_block_quantization(
+            # cross_block_quantization(
+            greedy_local_train(
                 model,
                 args,
                 trainloader,

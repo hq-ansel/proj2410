@@ -35,22 +35,15 @@
     export DATASET_PATH=pajama
     export AMP_ENABLED=True
     export SAVE_PATH=/home/ubuntu/data/exp/proj2410/quant_model/EfficientQAT/w4gs128/Llama2-7b
-    export CONFIG_PATH=/home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/b4gs128.yaml
+    export CONFIG_PATH=/home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/b2gs128.yaml
 
     python -m EfficientQAT.main_block_ap  \
     --config_path $CONFIG_PATH \
     --model $MODEL_PATH \
-    --output_dir /home/ubuntu/data/exp/proj2410/EfficientQAT/output/block_ap_log/Llama-2-7b-w4g128 \
     --net Llama-2 \
-    --wbits 4 \
-    --group_size 128 \
-    --quant_lr 1e-5 \
-    --weight_lr 1e-5 \
-    --batch_size 8\
     --real_quant \
     --eval_ppl \
-    --epochs 5 \
-    --save_quant_dir $SAVE_PATH 
+    --epochs 5 
 )
 # --loss_func MSE \
     # --log_loss \

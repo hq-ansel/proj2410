@@ -4,6 +4,59 @@ import torch
 from torch import nn
 from typing  import Optional
 
+class Catcher(nn.Module):
+    """
+    Args:
+        module: nn.Module 需要包装的module
+        dataset: Dataset 用于更新输入数据的dataset
+        index: int 输入数据的索引
+        attention_mask: Optional[torch.Tensor] 用于存储attention mask
+        position_ids: Optional[torch.LongTensor] 用于存储位置id
+        stop_forward: bool 控制前向传播的标志
+        inps: dict 用于存储输入以及参数
+        outs: dict 用于存储输出，Tuple类型
+    """
+    def __init__(self, module):
+        super().__init__()
+        self.module = module  # 包装的原始module
+        self.index = 0  # 输入数据的索引
+        self.attention_mask = None  # 用于存储attention mask
+        self.position_ids = None  # 用于存储位置id
+        self.stop_forward = False  # 控制前向传播的标志
+        self.inps = {}  # 用于存储输入
+        self.outs=None
+    def forward(self, inp, **kwargs):
+        # 存储输入和 kwargs 的内容
+        # combined_input = {"input": inp.clone().detach().to('cpu')}
+        # combined_input.update({k: v.to('cpu') if isinstance(v, torch.Tensor) else v for k, v in kwargs.items()})
+        
+        # # 将数据存入inps
+        # self.inps = combined_input  # 存储输入和 kwargs
+
+        # # 更新索引
+        # self.index += 1
+
+        # # 存储 attention_mask 和 position_ids
+        # if self.attention_mask is None:
+        #     self.attention_mask = kwargs.get("attention_mask", None)
+        # if self.position_ids is None:
+        #     self.position_ids = kwargs.get("position_ids", None)
+
+        # 如果停止前向传播，抛出 ValueError（如果这是调试用途，可以移除）
+        if self.stop_forward:
+            raise ValueError
+        # 前向传播，并存储输出
+        output = self.module(inp, **kwargs)
+        self.outs = output  # 存储输出
+        raise ValueError  # 调试用，可以移除
+
+    def start_forward(self):
+        # 允许前向传播
+        self.stop_forward = False
+
+    def stop_forward(self):
+        # 阻止前向传播
+        self.stop_forward = True
 
 class MultiBlock(nn.Module):
     def __init__(self, *args, **kwargs) -> None:

@@ -5,6 +5,7 @@ import copy
 import pdb
 import gc
 import math
+from typing import List, Tuple, Dict, Union
 
 import torch
 import torch.nn as nn
@@ -13,6 +14,8 @@ from torch.amp import autocast, GradScaler
 import torch.nn.functional as F
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from torch.utils.data import DataLoader
+from transformers import PreTrainedModel
+import logging
 
 from .. import utils
 from . import int_linear_fake, int_linear_real
@@ -61,11 +64,11 @@ def update_dataset(layers, dataset, dev, attention_mask, position_ids):
 
                     
 def cross_block_quantization(
-    model,
+    model: PreTrainedModel,
     args,
-    trainloader,
-    valloader,
-    logger=None,
+    trainloader: List[Tuple[torch.Tensor, torch.Tensor]],
+    valloader: List[Tuple[torch.Tensor, torch.Tensor]],
+    logger: logging.Logger=None,
 ):
     logger.info("Starting ...")
     if args.off_load_to_disk:
@@ -104,10 +107,6 @@ def cross_block_quantization(
                                 model.config.hidden_size, args.batch_size, dtype, cache_path=fp_train_cache_path,off_load_to_disk=args.off_load_to_disk)
     fp_val_inps = BlockTrainDataset(args.val_size, args.training_seqlen, 
                                 model.config.hidden_size, args.batch_size, dtype, cache_path=fp_val_cache_path,off_load_to_disk=args.off_load_to_disk)
-    # fp_train_inps = OptimBlockTrainDataset(args.train_size, args.training_seqlen, 
-    #                                 model.config.hidden_size, args.batch_size, dtype, cache_path=fp_train_cache_path,off_load_to_disk=args.off_load_to_disk)
-    # fp_val_inps = OptimBlockTrainDataset(args.val_size, args.training_seqlen, 
-    #                                 model.config.hidden_size, args.batch_size, dtype, cache_path=fp_val_cache_path,off_load_to_disk=args.off_load_to_disk)
 
     # step 3: catch the input of thefirst layer 
     class Catcher(nn.Module):
@@ -180,19 +179,11 @@ def cross_block_quantization(
                                     model.config.hidden_size, args.batch_size, dtype, cache_path=quant_train_cache_path,off_load_to_disk=args.off_load_to_disk)
         quant_val_inps = BlockTrainDataset(args.val_size, args.training_seqlen, 
                                     model.config.hidden_size, args.batch_size, dtype, cache_path=quant_val_cache_path,off_load_to_disk=args.off_load_to_disk)
-        # quant_train_inps = OptimBlockTrainDataset(args.train_size, args.training_seqlen, 
-        #                             model.config.hidden_size, args.batch_size, dtype, cache_path=quant_train_cache_path,off_load_to_disk=args.off_load_to_disk)
-        # quant_val_inps = OptimBlockTrainDataset(args.val_size, args.training_seqlen, 
-                                    # model.config.hidden_size, args.batch_size, dtype, cache_path=quant_val_cache_path,off_load_to_disk=args.off_load_to_disk)
     else:
         quant_train_inps = BlockTrainDataset(args.train_size, args.training_seqlen, 
                                     model.config.hidden_size, args.batch_size, dtype, cache_path=quant_train_cache_path,off_load_to_disk=args.off_load_to_disk)
         quant_val_inps = BlockTrainDataset(args.val_size, args.training_seqlen, 
                                     model.config.hidden_size, args.batch_size, dtype, cache_path=quant_val_cache_path,off_load_to_disk=args.off_load_to_disk)
-        # quant_train_inps = OptimBlockTrainDataset(args.train_size, args.training_seqlen, 
-        #                             model.config.hidden_size, args.batch_size, dtype, cache_path=quant_train_cache_path,off_load_to_disk=args.off_load_to_disk)
-        # quant_val_inps = OptimBlockTrainDataset(args.val_size, args.training_seqlen, 
-        #                             model.config.hidden_size, args.batch_size, dtype, cache_path=quant_val_cache_path,off_load_to_disk=args.off_load_to_disk)
         for index,data in enumerate(fp_train_inps):
             quant_train_inps.update_data(index, data)
         for index,data in enumerate(fp_val_inps):
@@ -228,11 +219,6 @@ def cross_block_quantization(
         step = 1
         logger.info(f"=== Start quantize blocks {start_idx} to {end_idx - 1} ===")
         
-        # if args.epochs > 0:
-        #     fp_train_inps_before = copy.deepcopy(fp_train_inps)
-        #     fp_val_inps_before = copy.deepcopy(fp_val_inps)
-
-
         # step 6.1.2: replace torch.nn.Linear with QuantLinear for QAT
         for block_index in range(start_idx, end_idx):
             if not is_quant_layer[block_index]:
@@ -393,18 +379,14 @@ def cross_block_quantization(
 
         # step 6.7: update inputs of quantization model
         if args.epochs>0:
-            # fp_train_inps=fp_train_inps_before
-            # fp_val_inps=fp_val_inps_before
+           
             update_dataset(qlayers[start_idx:start_idx+slide_step],quant_train_inps,dev,attention_mask,position_ids)
             update_dataset(qlayers[start_idx:start_idx+slide_step],quant_val_inps,dev,attention_mask,position_ids)
-            # update_dataset(qlayers[start_idx:start_idx+slide_step],fp_train_inps,dev,attention_mask,position_ids)
-            # update_dataset(qlayers[start_idx:start_idx+slide_step],fp_val_inps,dev,attention_mask,position_ids)
+            
 
         ori_layers = layers[start_idx:end_idx]
         for block_index in range(start_idx, end_idx):
             layers[block_index] = qlayers[block_index].to("cpu")
-        if args.log_loss:
-            loss_recorder.save_to_file()
         # step 7: pack quantized weights into low-bits format, note that this process is slow on poor CPU or busy CPU
         if args.real_quant:
             for qlayer in qlayers[start_idx:start_idx+slide_step]:
@@ -424,6 +406,8 @@ def cross_block_quantization(
         del ori_layers
         torch.cuda.empty_cache()
 
+    if args.log_loss:
+        loss_recorder.save_to_file()
     # delete cached dataset
     if args.off_load_to_disk:
         for path in [fp_train_cache_path,fp_val_cache_path,quant_train_cache_path,quant_val_cache_path]:

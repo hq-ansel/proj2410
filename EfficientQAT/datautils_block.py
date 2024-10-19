@@ -1,72 +1,137 @@
-from transformers import AutoTokenizer
+from transformers import AutoTokenizer,PreTrainedTokenizer
 from datasets import load_dataset
 import numpy as np
 import torch
 import random
 from tqdm import tqdm
 import torch.nn as nn
+from typing import List, Tuple,Union,Dict
 
 import torch
 from torch.utils.data import Dataset
 import os
 
-def get_wikitext2(tokenizer, train_size, val_size, seed, seqlen, test_only):
-    print("get_wikitext2")
+def get_wikitext2(
+    tokenizer: PreTrainedTokenizer, 
+    train_size: int, 
+    val_size: int, 
+    seed: int, 
+    seqlen: int, 
+    test_only: bool
+) -> Union[Tuple[List[Tuple[torch.Tensor, torch.Tensor]], List[Tuple[torch.Tensor, torch.Tensor]]], Dict[str, torch.Tensor]]:
+    """
+    Load and preprocess the Wikitext-2 dataset, returning train and validation data.
+
+    Args:
+        tokenizer (PreTrainedTokenizer): Tokenizer for encoding the text data.
+        train_size (int): Number of training samples to generate.
+        val_size (int): Number of validation samples to generate.
+        seed (int): Seed for random number generator to ensure reproducibility.
+        seqlen (int): Length of the input sequences.
+        test_only (bool): If True, only return the tokenized test data.
+
+    Returns:
+        Tuple[List[Tuple[torch.Tensor, torch.Tensor]], List[Tuple[torch.Tensor, torch.Tensor]]]:
+            A tuple of two lists, each containing tuples of input and target tensors for 
+            the training and validation datasets.
+    """
+    
+    print("Loading Wikitext-2 dataset...")
+    
+    # Load datasets
     traindata = load_dataset('wikitext', 'wikitext-2-raw-v1', split='train')
     testdata = load_dataset('wikitext', 'wikitext-2-raw-v1', split='test')
 
+    # Tokenize test data
     testenc = tokenizer("\n\n".join(testdata['text']), return_tensors='pt')
+
     if test_only:
         return testenc
+
+    # Tokenize training data
     trainenc = tokenizer("\n\n".join(traindata['text']), return_tensors='pt')
 
-    
+    # Set random seed for reproducibility
     random.seed(seed)
-    trainloader = []
-    val_sample_ratio = 0.9  # sample train from [0:0.9] and val from [0.9:1.0] to avoid overlap
+    
+    # Prepare training and validation data loaders
+    trainloader: List[Tuple[torch.Tensor, torch.Tensor]] = []
+    val_sample_ratio = 0.9  # 90% for training, 10% for validation to avoid overlap
+
+    # Generate training samples
     for _ in range(train_size):
-        i = random.randint(0, int(trainenc.input_ids.shape[1]*val_sample_ratio) - seqlen - 1)
+        i = random.randint(0, int(trainenc.input_ids.shape[1] * val_sample_ratio) - seqlen - 1)
         j = i + seqlen
         inp = trainenc.input_ids[:, i:j]
         tar = inp.clone()
-        tar[:, :-1] = -100
+        tar[:, :-1] = -100  # Shift target for language modeling
         trainloader.append((inp, tar))
-    valloader = []
+
+    # Generate validation samples
+    valloader: List[Tuple[torch.Tensor, torch.Tensor]] = []
     for _ in range(val_size):
-        i = random.randint(int(trainenc.input_ids.shape[1]*val_sample_ratio) - seqlen - 1, trainenc.input_ids.shape[1] - seqlen - 1)
+        i = random.randint(
+            int(trainenc.input_ids.shape[1] * val_sample_ratio) - seqlen - 1,
+            trainenc.input_ids.shape[1] - seqlen - 1
+        )
         j = i + seqlen
         inp = trainenc.input_ids[:, i:j]
         tar = inp.clone()
-        tar[:, :-1] = -100
+        tar[:, :-1] = -100  # Shift target for language modeling
         valloader.append((inp, tar))
+
     return trainloader, valloader
 
 
-def get_c4(tokenizer, train_size, val_size, seed, seqlen, test_only):
+def get_c4(
+    tokenizer: PreTrainedTokenizer, 
+    train_size: int, 
+    val_size: int, 
+    seed: int, 
+    seqlen: int, 
+    test_only: bool
+) -> Union[torch.Tensor, Tuple[List[Tuple[torch.Tensor, torch.Tensor]], List[Tuple[torch.Tensor, torch.Tensor]]],Dict[str, torch.Tensor]]:
+    """
+    Load and preprocess the C4 dataset, returning train and validation data or just the validation set if test_only is True.
+
+    Args:
+        tokenizer (PreTrainedTokenizer): Tokenizer for encoding the text data.
+        train_size (int): Number of training samples to generate.
+        val_size (int): Number of validation samples to generate.
+        seed (int): Seed for random number generator to ensure reproducibility.
+        seqlen (int): Length of the input sequences.
+        test_only (bool): If True, only return the tokenized validation data.
+
+    Returns:
+        Union[torch.Tensor, Tuple[List[Tuple[torch.Tensor, torch.Tensor]], List[Tuple[torch.Tensor, torch.Tensor]]]]:
+            Either the validation tensor if test_only is True, or a tuple containing two lists for train and validation data.
+    """
     print("get_c4")
+    
+    # Attempt to load dataset from local path for faster loading
     try:
-        # set local path for faster loading
-        traindata = load_dataset("arrow",
-                    data_files={
-                        "train": "/cpfs01/user/chenmengzhao/huggingface/datasets/allenai___json/allenai--c4-6fbe877195f42de5/0.0.0/0f7e3662623656454fcd2b650f34e886a7db4b9104504885bd462096cc7a9f51/json-train-00000-of-00002.arrow",
-                        "validation": "/cpfs01/user/chenmengzhao/huggingface/datasets/allenai___json/allenai--c4-efc3d4f4606f44bd/0.0.0/fe5dd6ea2639a6df622901539cb550cf8797e5a6b2dd7af1cf934bed8e233e6e/json-validation.arrow",
-                    },split='train'
-                    )
-        valdata = load_dataset("arrow",
-                    data_files={
-                        "validation": "/cpfs01/user/chenmengzhao/huggingface/datasets/allenai___json/allenai--c4-efc3d4f4606f44bd/0.0.0/fe5dd6ea2639a6df622901539cb550cf8797e5a6b2dd7af1cf934bed8e233e6e/json-validation.arrow",
-                    },split='validation'
-                    )
-    except:
         traindata = load_dataset(
-            'allenai/c4',  data_files={'train': 'en/c4-train.00000-of-01024.json.gz'}, split='train'
+            "arrow",
+            data_files={
+                "train": "/path/to/local/train.arrow",
+                "validation": "/path/to/local/validation.arrow",
+            },
+            split='train'
         )
         valdata = load_dataset(
-            'allenai/c4',  data_files={'validation': 'en/c4-validation.00000-of-00008.json.gz'}, split='validation'
+            "arrow",
+            data_files={"validation": "/path/to/local/validation.arrow"},
+            split='validation'
         )
+    except:
+        # Fallback to remote dataset
+        traindata = load_dataset('allenai/c4', data_files={'train': 'en/c4-train.00000-of-01024.json.gz'}, split='train')
+        valdata = load_dataset('allenai/c4', data_files={'validation': 'en/c4-validation.00000-of-00008.json.gz'}, split='validation')
 
     random.seed(0)
     valenc = []
+
+    # Generate validation data
     for _ in range(256):
         while True:
             i = random.randint(0, len(valdata) - 1)
@@ -76,103 +141,175 @@ def get_c4(tokenizer, train_size, val_size, seed, seqlen, test_only):
         i = random.randint(0, tmp.input_ids.shape[1] - seqlen - 1)
         j = i + seqlen
         valenc.append(tmp.input_ids[:, i:j])
+
     valenc = torch.hstack(valenc)
+
     if test_only:
-        return valenc 
+        return valenc  # Return validation data if test_only is True
 
+    # Prepare train data
     random.seed(seed)
     trainloader = []
-    val_sample_ratio = 0.9  # sample train from [0:0.9] and val from [0.9:1.0] to avoid overlap
+    val_sample_ratio = 0.9  # Avoid overlap between training and validation samples
+
+    # Generate training samples
     for _ in range(train_size):
         while True:
-            i = random.randint(0, int(len(traindata)*val_sample_ratio) - 1)
+            i = random.randint(0, int(len(traindata) * val_sample_ratio) - 1)
             trainenc = tokenizer(traindata[i]['text'], return_tensors='pt')
-            if trainenc.input_ids.shape[1] >= seqlen+1:
+            if trainenc.input_ids.shape[1] >= seqlen + 1:
                 break
         i = random.randint(0, trainenc.input_ids.shape[1] - seqlen - 1)
         j = i + seqlen
         inp = trainenc.input_ids[:, i:j]
         tar = inp.clone()
-        tar[:, :-1] = -100
-        trainloader.append((inp, tar))
-    
-    valloader = []
-    for _ in range(val_size):
-        while True:
-            i = random.randint(int(len(traindata)*val_sample_ratio),len(traindata)-1)
-            trainenc = tokenizer(traindata[i]['text'], return_tensors='pt')
-            if trainenc.input_ids.shape[1] >= seqlen+1:
-                break
-        i = random.randint(0, trainenc.input_ids.shape[1] - seqlen - 1)
-        j = i + seqlen
-        inp = trainenc.input_ids[:, i:j]
-        tar = inp.clone()
-        tar[:, :-1] = -100
-        valloader.append((inp, tar))
-
-
-
-    return trainloader, valloader 
-
-def get_redpajama(tokenizer, train_size, val_size, seed, seqlen):
-    print("get_redpajama")
-    try:
-        loacal_dataset = "/cpfs01/user/chenmengzhao/huggingface/datasets/togethercomputer___red_pajama-data-1_t-sample"
-        traindata = load_dataset(loacal_dataset,split='train')   
-    except:
-        traindata = load_dataset("togethercomputer/RedPajama-Data-1T-Sample",split='train')   
-    random.seed(seed)
-    traindata = traindata.shuffle(seed=seed) 
-    trainloader = []
-    val_sample_ratio = 0.9
-    for _ in range(train_size):
-        while True:
-            i = random.randint(0, int(len(traindata)*val_sample_ratio) - 1)
-            trainenc = tokenizer(traindata[i]['text'], return_tensors='pt')
-            if trainenc.input_ids.shape[1] >= seqlen+1:
-                break
-        i = random.randint(0, trainenc.input_ids.shape[1] - seqlen - 1)
-        j = i + seqlen
-        inp = trainenc.input_ids[:, i:j]
-        tar = inp.clone()
-        tar[:, :-1] = -100
+        tar[:, :-1] = -100  # Shift target for language modeling
         trainloader.append((inp, tar))
 
     valloader = []
+
+    # Generate validation samples
     for _ in range(val_size):
         while True:
-            i = random.randint(int(len(traindata)*val_sample_ratio),len(traindata)-1)
+            i = random.randint(int(len(traindata) * val_sample_ratio), len(traindata) - 1)
             trainenc = tokenizer(traindata[i]['text'], return_tensors='pt')
-            if trainenc.input_ids.shape[1] >= seqlen+1:
+            if trainenc.input_ids.shape[1] >= seqlen + 1:
                 break
         i = random.randint(0, trainenc.input_ids.shape[1] - seqlen - 1)
         j = i + seqlen
         inp = trainenc.input_ids[:, i:j]
         tar = inp.clone()
-        tar[:, :-1] = -100
+        tar[:, :-1] = -100  # Shift target for language modeling
         valloader.append((inp, tar))
+
     return trainloader, valloader
 
 
+def get_redpajama(
+    tokenizer: PreTrainedTokenizer, 
+    train_size: int, 
+    val_size: int, 
+    seed: int, 
+    seqlen: int
+) -> Tuple[List[Tuple[torch.Tensor, torch.Tensor]], List[Tuple[torch.Tensor, torch.Tensor]]]:
+    """
+    Load and preprocess the RedPajama dataset, returning train and validation data.
+
+    Args:
+        tokenizer (PreTrainedTokenizer): Tokenizer for encoding the text data.
+        train_size (int): Number of training samples to generate.
+        val_size (int): Number of validation samples to generate.
+        seed (int): Seed for random number generator to ensure reproducibility.
+        seqlen (int): Length of the input sequences.
+
+    Returns:
+        Tuple[List[Tuple[torch.Tensor, torch.Tensor]], List[Tuple[torch.Tensor, torch.Tensor]]]:
+            A tuple of two lists, each containing tuples of input and target tensors for 
+            the training and validation datasets.
+    """
+    print("get_redpajama")
+    try:
+        loacal_dataset = "/path/to/local/redpajama-dataset"
+        traindata = load_dataset(loacal_dataset, split='train')
+    except:
+        traindata = load_dataset("togethercomputer/RedPajama-Data-1T-Sample", split='train')
+
+    random.seed(seed)
+    traindata = traindata.shuffle(seed=seed)
+
+    trainloader = []
+    val_sample_ratio = 0.9  # 90% for training, 10% for validation
+
+    # Generate training samples
+    for _ in range(train_size):
+        while True:
+            i = random.randint(0, int(len(traindata) * val_sample_ratio) - 1)
+            trainenc = tokenizer(traindata[i]['text'], return_tensors='pt')
+            if trainenc.input_ids.shape[1] >= seqlen + 1:
+                break
+        i = random.randint(0, trainenc.input_ids.shape[1] - seqlen - 1)
+        j = i + seqlen
+        inp = trainenc.input_ids[:, i:j]
+        tar = inp.clone()
+        tar[:, :-1] = -100  # Shift target for language modeling
+        trainloader.append((inp, tar))
+
+    valloader = []
+
+    # Generate validation samples
+    for _ in range(val_size):
+        while True:
+            i = random.randint(int(len(traindata) * val_sample_ratio), len(traindata) - 1)
+            trainenc = tokenizer(traindata[i]['text'], return_tensors='pt')
+            if trainenc.input_ids.shape[1] >= seqlen + 1:
+                break
+        i = random.randint(0, trainenc.input_ids.shape[1] - seqlen - 1)
+        j = i + seqlen
+        inp = trainenc.input_ids[:, i:j]
+        tar = inp.clone()
+        tar[:, :-1] = -100  # Shift target for language modeling
+        valloader.append((inp, tar))
+
+    return trainloader, valloader
+
 
 def get_loaders(
-    name, tokenizer, train_size=128, val_size=64,seed=0, seqlen=2048, test_only=False
-):
-    if 'wikitext2' in name:
-        return get_wikitext2(tokenizer,train_size,val_size,seed,seqlen,test_only)
-    elif 'c4' in name:
-        return get_c4(tokenizer,train_size,val_size,seed,seqlen,test_only)
-    elif 'redpajama' in name:
-        return get_redpajama(tokenizer,train_size,val_size,seed,seqlen)
-    else:
-        raise NotImplementedError
+    name: str, 
+    tokenizer: PreTrainedTokenizer, 
+    train_size: int = 128, 
+    val_size: int = 64, 
+    seed: int = 0, 
+    seqlen: int = 2048, 
+    test_only: bool = False
+) -> Union[torch.Tensor, Tuple[List[Tuple[torch.Tensor, torch.Tensor]], List[Tuple[torch.Tensor, torch.Tensor]]]]:
+    """
+    Return appropriate dataset loaders based on the dataset name provided.
 
+    Args:
+        name (str): The name of the dataset (e.g., 'wikitext2', 'c4', 'redpajama').
+        tokenizer (PreTrainedTokenizer): Tokenizer for encoding the text data.
+        train_size (int, optional): Number of training samples. Defaults to 128.
+        val_size (int, optional): Number of validation samples. Defaults to 64.
+        seed (int, optional): Seed for random number generation. Defaults to 0.
+        seqlen (int, optional): Sequence length for the inputs. Defaults to 2048.
+        test_only (bool, optional): Whether to load only test data. Defaults to False.
+
+    Returns:
+        Union[torch.Tensor, Tuple[List[Tuple[torch.Tensor, torch.Tensor]], List[Tuple[torch.Tensor, torch.Tensor]]]]:
+            Dataset loaders or validation data depending on the input parameters.
+    """
+    if 'wikitext2' in name:
+        return get_wikitext2(tokenizer, train_size, val_size, seed, seqlen, test_only)
+    elif 'c4' in name:
+        return get_c4(tokenizer, train_size, val_size, seed, seqlen, test_only)
+    elif 'redpajama' in name:
+        return get_redpajama(tokenizer, train_size, val_size, seed, seqlen)
+    else:
+        raise NotImplementedError(f"Dataset {name} is not supported.")
 
 
 @torch.no_grad()
-def test_ppl(model, tokenizer, datasets=['wikitext2'],ppl_seqlen=2048):
+def test_ppl(
+    model: nn.Module, 
+    tokenizer, 
+    datasets: List[str] = ['wikitext2'], 
+    ppl_seqlen: int = 2048
+) -> Dict[str, float]:
+    """
+    Test the perplexity (PPL) of the model on the specified datasets.
+
+    Args:
+        model (nn.Module): The language model to test.
+        tokenizer: The tokenizer for encoding the datasets.
+        datasets (List[str]): List of dataset names to test on.
+        ppl_seqlen (int): Sequence length for perplexity calculation.
+
+    Returns:
+        Dict[str, float]: A dictionary mapping dataset names to their calculated perplexity.
+    """
     results = {}
     for dataset in datasets:
+        # Load the dataset
         testloader = get_loaders(
             dataset,
             tokenizer,
@@ -180,6 +317,8 @@ def test_ppl(model, tokenizer, datasets=['wikitext2'],ppl_seqlen=2048):
             seqlen=ppl_seqlen,
             test_only=True
         )
+        
+        # Prepare the input data
         if "c4" in dataset:
             testenc = testloader
         else:
@@ -187,48 +326,80 @@ def test_ppl(model, tokenizer, datasets=['wikitext2'],ppl_seqlen=2048):
 
         seqlen = ppl_seqlen
         nsamples = testenc.numel() // seqlen
+
+        # Disable caching for evaluation
         use_cache = model.config.use_cache
         model.config.use_cache = False
         model.eval()
+
         nlls = []
-        if hasattr(model,'lm_head') and isinstance(model.lm_head, nn.Linear):
+
+        # Select the classifier for the model
+        if hasattr(model, 'lm_head') and isinstance(model.lm_head, nn.Linear):
             classifier = model.lm_head
-        elif hasattr(model.model,'lm_head'):
-            # for gptqmodels
+        elif hasattr(model.model, 'lm_head'):
+            # For GPTQ models
             classifier = None
-        elif hasattr(model,'output'):
-            # for internlm
+        elif hasattr(model, 'output'):
+            # For InternLM models
             classifier = model.output
         else:
-            raise NotImplementedError
+            raise NotImplementedError("Model head not implemented.")
+
+        # Evaluate on the test set
         for i in tqdm(range(nsamples)):
-            batch = testenc[:, (i * seqlen) : ((i + 1) * seqlen)].to(model.device)
+            batch = testenc[:, (i * seqlen): ((i + 1) * seqlen)].to(model.device)
             outputs = model.model(batch)
+            
+            # Apply the classifier if available
             if classifier is not None:
                 hidden_states = outputs[0]
                 logits = classifier(hidden_states.to(classifier.weight.dtype))
             else:
                 logits = outputs[0]
-            shift_logits = logits[:, :-1, :]
-            shift_labels = testenc[:, (i * seqlen) : ((i + 1) * seqlen)][
-                :, 1:
-            ].to(shift_logits.device)
+
+            shift_logits = logits[:, :-1, :]  # Shift for next token prediction
+            shift_labels = testenc[:, (i * seqlen): ((i + 1) * seqlen)][:, 1:].to(shift_logits.device)
+
+            # CrossEntropyLoss for language modeling
             loss_fct = nn.CrossEntropyLoss()
-            loss = loss_fct(
-                shift_logits.view(-1, shift_logits.size(-1)),
-                shift_labels.view(-1),
-            )
+            loss = loss_fct(shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1))
             neg_log_likelihood = loss.float() * seqlen
             nlls.append(neg_log_likelihood)
 
-
+        # Calculate perplexity
         ppl = torch.exp(torch.stack(nlls).sum() / (nsamples * seqlen))
-        print(f'{dataset}:{ppl}')
+        print(f'{dataset}: {ppl}')
         results[dataset] = ppl.item()
+
+    # Restore the original cache setting
     model.config.use_cache = use_cache
     return results
+
+
 class BlockTrainDataset(Dataset):
-    def __init__(self, size, seqlen, hidden_size, batch_size, dtype, cache_path='./cache/block_training_data', off_load_to_disk=False):
+    def __init__(
+        self, 
+        size: int, 
+        seqlen: int, 
+        hidden_size: int, 
+        batch_size: int, 
+        dtype: torch.dtype, 
+        cache_path: str = './cache/block_training_data', 
+        off_load_to_disk: bool = False
+    ):
+        """
+        Initialize the BlockTrainDataset for block-wise training data.
+
+        Args:
+            size (int): Total size of the dataset.
+            seqlen (int): Sequence length for each batch.
+            hidden_size (int): Hidden size for each sequence.
+            batch_size (int): Number of samples per batch.
+            dtype (torch.dtype): Data type for the tensors.
+            cache_path (str): Path to store cache files if off_load_to_disk is True.
+            off_load_to_disk (bool): If True, data is stored on disk rather than in memory.
+        """
         self.size = size
         self.seqlen = seqlen
         self.hidden_size = hidden_size
@@ -236,44 +407,68 @@ class BlockTrainDataset(Dataset):
         self.cache_path = cache_path
         self.off_load_to_disk = off_load_to_disk
         self.batch_size = batch_size
-        assert size%batch_size == 0
-         
+        assert size % batch_size == 0, "Size must be divisible by batch_size"
+
+        # Initialize data storage either in-memory or on disk
         if self.off_load_to_disk:
             if not os.path.exists(self.cache_path):
                 os.makedirs(self.cache_path)
                 self._initialize_data_on_disk()
         else:
-            self.data = torch.zeros((self.size//self.batch_size, self.batch_size, self.seqlen, self.hidden_size), dtype=self.dtype)
+            self.data = torch.zeros(
+                (self.size // self.batch_size, self.batch_size, self.seqlen, self.hidden_size), 
+                dtype=self.dtype
+            )
 
-    def _initialize_data_on_disk(self):
-        for idx in range(self.size//self.batch_size):
+    def _initialize_data_on_disk(self) -> None:
+        """Initialize data files on disk for storing block training data."""
+        for idx in range(self.size // self.batch_size):
             tensor = torch.zeros((self.batch_size, self.seqlen, self.hidden_size), dtype=self.dtype)
             filepath = self._get_file_path(idx)
             torch.save(tensor, filepath)
 
-    def _get_file_path(self, idx):
+    def _get_file_path(self, idx: int) -> str:
+        """Get the file path for the cached data block."""
         return os.path.join(self.cache_path, f"data_{idx}.pt")
 
-    def __len__(self):
-        return self.size//self.batch_size
+    def __len__(self) -> int:
+        """Return the total number of batches in the dataset."""
+        return self.size // self.batch_size
 
-    def __getitem__(self, idx):
+    def __getitem__(self, idx: int) -> torch.Tensor:
+        """
+        Retrieve a batch of data from the dataset.
+
+        Args:
+            idx (int): Index of the batch.
+
+        Returns:
+            torch.Tensor: The tensor data for the batch.
+        """
         if idx >= self.__len__():
             raise IndexError("Index out of range")
+        
         if self.off_load_to_disk:
             filepath = self._get_file_path(idx)
             tensor = torch.load(filepath)
         else:
             tensor = self.data[idx]
+        
         return tensor
 
-    def update_data(self, idx, new_data):
+    def update_data(self, idx: int, new_data: torch.Tensor) -> None:
+        """
+        Update a specific batch of data in the dataset.
+
+        Args:
+            idx (int): Index of the batch to update.
+            new_data (torch.Tensor): New data to update.
+        """
         if self.off_load_to_disk:
             filepath = self._get_file_path(idx)
             torch.save(new_data.to(self.dtype), filepath)
         else:
             self.data[idx] = new_data
-
 
 import os
 import torch

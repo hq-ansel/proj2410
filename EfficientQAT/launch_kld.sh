@@ -10,8 +10,7 @@
 #     "EfficientQAT/yaml/b4gs128-rkld.yaml"
 # )
 config_files=(
-    "EfficientQAT/yaml/b2gs128-crossblock2.yaml"
-    "EfficientQAT/yaml/b2gs128.yaml"
+    "EfficientQAT/yaml/b2gs128-end2front.yaml"
 )
 # 循环遍历每个配置文件并执行 Python 命令
 for config_path in "${config_files[@]}"; do

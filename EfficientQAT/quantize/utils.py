@@ -26,28 +26,12 @@ class Catcher(nn.Module):
         self.inps = {}  # 用于存储输入
         self.outs=None
     def forward(self, inp, **kwargs):
-        # 存储输入和 kwargs 的内容
-        # combined_input = {"input": inp.clone().detach().to('cpu')}
-        # combined_input.update({k: v.to('cpu') if isinstance(v, torch.Tensor) else v for k, v in kwargs.items()})
-        
-        # # 将数据存入inps
-        # self.inps = combined_input  # 存储输入和 kwargs
-
-        # # 更新索引
-        # self.index += 1
-
-        # # 存储 attention_mask 和 position_ids
-        # if self.attention_mask is None:
-        #     self.attention_mask = kwargs.get("attention_mask", None)
-        # if self.position_ids is None:
-        #     self.position_ids = kwargs.get("position_ids", None)
         
         
         # 前向传播，并存储输出
         output = self.module(inp, **kwargs)
         self.outs = output  # 存储输出
         if self.stop_forward_flag:
-            print(f"stop forward shape: {output[0].shape}")
             raise ValueError(f"stop forward shape: {output[0].shape}")
         return output
 

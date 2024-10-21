@@ -167,7 +167,6 @@ def train_units_layers(model: PreTrainedModel,
             norm_list = []
             start_time = time.time()
             # used for debug
-            torch.autograd.set_detect_anomaly(True)
             dataloader = DataLoader(train_dataset,
                                     batch_size=args.batch_size,
                                     shuffle=True

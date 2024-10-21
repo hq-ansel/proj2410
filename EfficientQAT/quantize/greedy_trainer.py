@@ -11,6 +11,7 @@ from typing import List, Tuple, Dict, Union, Callable
 
 import torch
 import torch.nn as nn
+import torch.amp
 from torch.utils.data import Dataset
 import torch.utils.checkpoint as checkpoint
 from torch.amp import autocast, GradScaler
@@ -49,7 +50,7 @@ def timer(func):
 
 def examine_parameters_grad(model:nn.Module,logger:logging.Logger):
     for n, m in model.named_parameters():
-        if m.requires_grad:
+        if m.requires_grad and m.grad is not None:
             grad_max = m.grad.abs().max().item()
             if grad_max > 1:
                 logger.info(f"{n} grad_max: {grad_max:.4f}.")
@@ -97,6 +98,7 @@ def train_units_layers(model: PreTrainedModel,
                         args):
     # 解冻当前层，并冻结其它层
     model.to(args.dev)
+    target_model.to("cuda:1")
     total_training_iteration = args.epochs * args.train_size / args.batch_size
     layer_idx_set = set(trainable_layer_idx_list)
     step = 0
@@ -122,6 +124,10 @@ def train_units_layers(model: PreTrainedModel,
         qlayers[align_index].set_forward_state(stop_forward=True)
         fp_layers[align_index].set_forward_state(stop_forward=True)
         
+        if trainable_layer_idx_list in ([31],):
+            args.epochs = 20
+            total_training_iteration = args.epochs * args.train_size / args.batch_size
+
         for name, param in model.named_parameters():
             param.requires_grad = False
         for layer_idx in trainable_layer_idx_list:
@@ -158,7 +164,8 @@ def train_units_layers(model: PreTrainedModel,
                                     weight_decay=args.wd,
                                     foreach=True)
         qlayers = model.model.layers
-        loss_scaler = utils.NativeScalerWithGradNormCount(use_amp=amp_enabled)
+        # loss_scaler = utils.NativeScalerWithGradNormCount(use_amp=amp_enabled)
+        loss_scaler= torch.amp.GradScaler(device=args.dev)
         trainable_number = trainable_parameters_num(selected_layers)
         print(f"trainable parameter number: {trainable_number/1e6}M")
         # 参数内存（float32），每个参数 4 字节
@@ -184,10 +191,6 @@ def train_units_layers(model: PreTrainedModel,
                                     enabled=amp_enabled,
                                     dtype=args.dtype):
                     
-                    # debug 检查grad
-                    if trainable_layer_idx_list in ([0], [1], [8],[19]):
-                        examine_parameters_grad(model,logger)
-
                     try:
                         output = model(input_data.to(args.dev))
                     except ValueError as e:
@@ -195,10 +198,10 @@ def train_units_layers(model: PreTrainedModel,
                     output = qlayers[align_index].outs[0] # outs[0] is out tensor
                     with torch.no_grad():
                         try:
-                            target_output = target_model(input_data.to(args.dev))[0]
+                            target_output = target_model(input_data.to("cuda:1"))[0]
                         except ValueError as e:
                             pass
-                        target_output = fp_layers[align_index].outs[0]
+                        target_output = fp_layers[align_index].outs[0].to(args.dev)
 
                 # 获取当前层的自定义损失
                     loss = loss_func(output, target_output)
@@ -212,10 +215,22 @@ def train_units_layers(model: PreTrainedModel,
                 loss_list.append(loss.detach().cpu())
                 # 反向传播和优化
                 optimizer.zero_grad()
-                norm = loss_scaler(loss,
-                        optimizer,
-                        clip_grad=args.clip_grad,
-                        parameters=trainable_parameters(selected_layers)).cpu()
+                # norm = loss_scaler(loss,
+                #         optimizer,
+                #         clip_grad=args.clip_grad,
+                #         parameters=trainable_parameters(selected_layers)).cpu()
+                loss_scaler.scale(loss).backward() if amp_enabled else loss.backward()
+                # debug 检查grad
+                if None and trainable_layer_idx_list in ([1], [8],[19]):
+                    examine_parameters_grad(model,logger)
+                loss_scaler.unscale_(optimizer)
+                if args.clip_grad > 0:
+                        norm = torch.nn.utils.clip_grad_norm_(trainable_parameters(selected_layers), args.clip_grad).cpu()
+                if amp_enabled:
+                    loss_scaler.step(optimizer)
+                    loss_scaler.update()
+                else:
+                    optimizer.step()
                 norm_list.append(norm.data)
                 
                 # adjust lr
@@ -226,12 +241,17 @@ def train_units_layers(model: PreTrainedModel,
                     weight_scheduler.step()
                     optimizer.param_groups[weight_index]['lr'] = weight_scheduler.get_lr()[0]
                 step += 1
+
+
             # step 6.5: calculate validation loss
             val_loss_list = []
+            final_val_list = []
             dataloader = DataLoader(val_dataset,
                                     batch_size=args.batch_size,
                                     shuffle=False
                                     )
+            qlayers[align_index].set_forward_state(stop_forward=False)
+            fp_layers[align_index].set_forward_state(stop_forward=False)
             for index, input_data in enumerate(dataloader):  
                 # obtain output of quantization model
                 with torch.no_grad():
@@ -243,20 +263,28 @@ def train_units_layers(model: PreTrainedModel,
                         except ValueError:
                             pass
                         output = qlayers[align_index].outs[0] # outs[0] is out tensor
+                        final_output = qlayers[last_block_idx].outs[0]
                         try:
-                            target_output = target_model(input_data.to(args.dev))[0]
+                            target_output = target_model(input_data.to("cuda:1"))[0]
                         except ValueError:
                             pass
-                        target_output = fp_layers[align_index].outs[0].to(torch.float32)
+                        target_output = fp_layers[align_index].outs[0].to(dtype=torch.float32,device=args.dev)
+                        final_target_output = fp_layers[last_block_idx].outs[0].to(dtype=torch.float32,device=args.dev)
                         loss = loss_func(output, target_output)
+                        final_loss = loss_func(final_output, final_target_output)
                 val_loss_list.append(loss.cpu())
-                
+                final_val_list.append(final_loss.cpu())
+
+            qlayers[align_index].set_forward_state(stop_forward=True)
+            fp_layers[align_index].set_forward_state(stop_forward=True)
+
             train_mean_num = min(len(loss_list),64) 
             # calculate the average training loss of last train_mean_num samples
             loss_mean = torch.stack(loss_list)[-(train_mean_num-1):].mean()
             val_loss_mean = torch.stack(val_loss_list).mean()
             norm_mean = torch.stack(norm_list).mean()
             logger.info(f"blocks {trainable_layer_idx_list} epoch {epoch} recon_loss:{loss_mean} val_loss:{val_loss_mean} quant_lr:{quant_scheduler.get_lr()[0]} norm:{norm_mean:.8f} max memory_allocated {torch.cuda.max_memory_allocated(args.dev) / 1024**2} time {time.time()-start_time} ")
+            logger.info(f"blocks {trainable_layer_idx_list} epoch {epoch} final_loss:{torch.stack(final_val_list).mean()}")
             if val_loss_mean < best_val_loss:
                 best_val_loss = val_loss_mean
             else:
@@ -377,7 +405,6 @@ def greedy_local_train(
     args.dtype = dtype
     use_cache = model.config.use_cache
     model.config.use_cache = False
-    model.to(dev)
 
     # step 2: init dataset
 

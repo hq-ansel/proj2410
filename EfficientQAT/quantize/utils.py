@@ -16,13 +16,13 @@ class Catcher(nn.Module):
         inps: dict 用于存储输入以及参数
         outs: dict 用于存储输出，Tuple类型
     """
-    def __init__(self, module):
+    def __init__(self, module,stop_forward_flag=False):
         super().__init__()
         self.module = module  # 包装的原始module
         self.index = 0  # 输入数据的索引
         self.attention_mask = None  # 用于存储attention mask
         self.position_ids = None  # 用于存储位置id
-        self.stop_forward = False  # 控制前向传播的标志
+        self.stop_forward_flag = stop_forward_flag  # 控制前向传播的标志
         self.inps = {}  # 用于存储输入
         self.outs=None
     def forward(self, inp, **kwargs):
@@ -41,22 +41,19 @@ class Catcher(nn.Module):
         #     self.attention_mask = kwargs.get("attention_mask", None)
         # if self.position_ids is None:
         #     self.position_ids = kwargs.get("position_ids", None)
-
-        # 如果停止前向传播，抛出 ValueError（如果这是调试用途，可以移除）
-        if self.stop_forward:
-            raise ValueError
+        
+        
         # 前向传播，并存储输出
         output = self.module(inp, **kwargs)
         self.outs = output  # 存储输出
-        raise ValueError  # 调试用，可以移除
+        if self.stop_forward_flag:
+            print(f"stop forward shape: {output[0].shape}")
+            raise ValueError(f"stop forward shape: {output[0].shape}")
+        return output
 
-    def start_forward(self):
-        # 允许前向传播
-        self.stop_forward = False
+    def set_forward_state(self, stop_forward: bool):
+        self.stop_forward_flag = stop_forward
 
-    def stop_forward(self):
-        # 阻止前向传播
-        self.stop_forward = True
 
 class MultiBlock(nn.Module):
     def __init__(self, *args, **kwargs) -> None:

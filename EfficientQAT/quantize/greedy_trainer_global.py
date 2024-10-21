@@ -47,12 +47,6 @@ def timer(func):
     return wrapper
 
 
-def examine_parameters_grad(model:nn.Module,logger:logging.Logger):
-    for n, m in model.named_parameters():
-        if m.requires_grad:
-            grad_max = m.grad.abs().max().item()
-            if grad_max > 1:
-                logger.info(f"{n} grad_max: {grad_max:.4f}.")
 
 class CatcherManager:
     def __init__(self, layers, indices):
@@ -119,8 +113,8 @@ def train_units_layers(model: PreTrainedModel,
     align_index = trainable_layer_idx_list[-1]
     last_block_idx = len(model.model.layers) - 1
     with CatcherManager(qlayers, [align_index,last_block_idx]),CatcherManager(fp_layers, [align_index,last_block_idx]):
-        qlayers[align_index].set_forward_state(stop_forward=True)
-        fp_layers[align_index].set_forward_state(stop_forward=True)
+        qlayers[last_block_idx].set_forward_state(stop_forward=True)
+        fp_layers[last_block_idx].set_forward_state(stop_forward=True)
         
         for name, param in model.named_parameters():
             param.requires_grad = False
@@ -183,25 +177,23 @@ def train_units_layers(model: PreTrainedModel,
                 with torch.autocast(device_type=args.dev,
                                     enabled=amp_enabled,
                                     dtype=args.dtype):
-                    
-                    # debug 检查grad
-                    if trainable_layer_idx_list in ([0], [1], [8],[19]):
-                        examine_parameters_grad(model,logger)
-
                     try:
                         output = model(input_data.to(args.dev))
                     except ValueError as e:
                             pass
                     output = qlayers[align_index].outs[0] # outs[0] is out tensor
+                    final_output = qlayers[last_block_idx].outs[0].to(torch.float32)
                     with torch.no_grad():
                         try:
                             target_output = target_model(input_data.to(args.dev))[0]
                         except ValueError as e:
                             pass
                         target_output = fp_layers[align_index].outs[0]
+                        final_target_output = fp_layers[last_block_idx].outs[0].to(torch.float32)
 
                 # 获取当前层的自定义损失
-                    loss = loss_func(output, target_output)
+                    loss = loss_func(output, target_output)*0.5
+                    loss+=loss_func(final_output, final_target_output)
                 if not math.isfinite(loss.item()) or loss.item()==0:
                     logger.info("Loss is NAN, stopping training")
                     pdb.set_trace()

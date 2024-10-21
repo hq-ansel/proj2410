@@ -54,6 +54,9 @@ class QuantLinear(nn.Module):
     def set_quant_state(self, weight_quant: bool = False):
         self.use_weight_quant = weight_quant
 
-
+    def get_quant_weight_bias(self):
+        weight = self.weight_quantizer(self.weight)
+        bias = self.bias
+        return weight, bias
 
 

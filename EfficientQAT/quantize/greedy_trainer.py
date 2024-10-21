@@ -35,6 +35,9 @@ from ..loss_utils import get_loss_func
 amp_enabled = os.environ.get("AMP_ENABLED", "False").lower() == "true"
 print(f"AMP enabled: {amp_enabled}")
 
+class StopException(Exception):
+    pass
+
 def timer(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
@@ -97,6 +100,7 @@ def train_units_layers(model: PreTrainedModel,
                         args):
     # 解冻当前层，并冻结其它层
     model.to(args.dev)
+    target_model.cpu()
     total_training_iteration = args.epochs * args.train_size / args.batch_size
     layer_idx_set = set(trainable_layer_idx_list)
     step = 0
@@ -187,18 +191,27 @@ def train_units_layers(model: PreTrainedModel,
                     # debug 检查grad
                     if trainable_layer_idx_list in ([0], [1], [8],[19]):
                         examine_parameters_grad(model,logger)
+                    
+                    with torch.no_grad():
+                        model.cpu()
+                        target_model = target_model.to(args.dev)
+                        try:
+                            target_output = target_model(input_data.to(args.dev))
+                        except StopException:
+                            pass
+                        except Exception as e:
+                            raise e
+                        target_output = fp_layers[align_index].outs[0]
+                        target_model = target_model.cpu()
+                        model.to(args.dev)
 
                     try:
                         output = model(input_data.to(args.dev))
-                    except ValueError as e:
-                            pass
+                    except StopException:
+                        pass
+                    except Exception as e:
+                        raise e
                     output = qlayers[align_index].outs[0] # outs[0] is out tensor
-                    with torch.no_grad():
-                        try:
-                            target_output = target_model(input_data.to(args.dev))[0]
-                        except ValueError as e:
-                            pass
-                        target_output = fp_layers[align_index].outs[0]
 
                 # 获取当前层的自定义损失
                     loss = loss_func(output, target_output)
@@ -377,8 +390,7 @@ def greedy_local_train(
     args.dtype = dtype
     use_cache = model.config.use_cache
     model.config.use_cache = False
-    model.to(dev)
-
+    
     # step 2: init dataset
 
     common_train_inps = CommonInputDataset(list(map(lambda x: x[0], trainloader)))

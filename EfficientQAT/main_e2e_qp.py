@@ -18,12 +18,12 @@ from transformers import (
 )
 
 
-from datautils_block import test_ppl
-from datautils_e2e import make_data_module
+from .datautils_block import test_ppl
+from .datautils_e2e import make_data_module
 from bitsandbytes.optim import AdamW
 import os
-import utils
-from quantize.int_linear_real import load_quantized_model,QuantLinear
+from .utils import create_logger
+from .quantize.int_linear_real import load_quantized_model,QuantLinear
 from pathlib import Path
 
 
@@ -278,11 +278,12 @@ def get_accelerate_model(args, checkpoint_dir):
         # Note that these are present in the vocabulary.
         # Note also that `model.config.pad_token_id` is 0 which corresponds to `<unk>` token.
         print('Adding special tokens.')
+        print(f"{tokenizer.bos_token} {tokenizer.eos_token} {tokenizer.unk_token} {tokenizer.pad_token_id} {model.config.pad_token_id}")
         tokenizer.add_special_tokens({
                 "eos_token": tokenizer.convert_ids_to_tokens(model.config.eos_token_id),
                 "bos_token": tokenizer.convert_ids_to_tokens(model.config.bos_token_id),
                 "unk_token": tokenizer.convert_ids_to_tokens(
-                    model.config.pad_token_id if model.config.pad_token_id != -1 else tokenizer.pad_token_id
+                    model.config.pad_token_id if model.config.pad_token_id  else tokenizer.pad_token_id
                 ),
         })
 
@@ -394,7 +395,7 @@ def train():
     )
 
     Path(args.output_dir).mkdir(parents=True, exist_ok=True)
-    logger = utils.create_logger(args.output_dir)
+    logger = create_logger(args.output_dir)
     logger.info(args)
     
     checkpoint_dir, completed_training = get_last_checkpoint(args.output_dir)

@@ -27,7 +27,7 @@ from .utils import (
     quant_parameters,weight_parameters,trainable_parameters,
     set_quant_state,quant_inplace,set_quant_parameters,
     set_weight_parameters,trainable_parameters_num,get_named_linears,set_op_by_name,
-    Catcher
+    Catcher,StopException
     )
 from ..datautils_block import BlockTrainDataset,OptimBlockTrainDataset
 from ..loss_utils import get_loss_func
@@ -36,8 +36,6 @@ from ..loss_utils import get_loss_func
 amp_enabled = os.environ.get("AMP_ENABLED", "False").lower() == "true"
 print(f"AMP enabled: {amp_enabled}")
 
-class StopException(Exception):
-    pass
 
 def timer(func):
     @wraps(func)
@@ -127,9 +125,6 @@ def train_units_layers(model: PreTrainedModel,
         qlayers[align_index].set_forward_state(stop_forward=True)
         fp_layers[align_index].set_forward_state(stop_forward=True)
         
-        if trainable_layer_idx_list in ([31],):
-            args.epochs = 20
-            total_training_iteration = args.epochs * args.train_size / args.batch_size
 
         for name, param in model.named_parameters():
             param.requires_grad = False
@@ -199,16 +194,13 @@ def train_units_layers(model: PreTrainedModel,
                         examine_parameters_grad(model,logger)
                     
                     with torch.no_grad():
-                        model.cpu()
-                        target_model = target_model.to(args.dev)
                         try:
-                            target_output = target_model(input_data.to(args.dev))
+                            target_output = target_model(input_data.to("cuda:1"))
                         except StopException:
                             pass
                         except Exception as e:
                             raise e
                         target_output = fp_layers[align_index].outs[0]
-                        target_model = target_model.cpu()
                         model.to(args.dev)
 
                     try:
@@ -220,7 +212,7 @@ def train_units_layers(model: PreTrainedModel,
                     output = qlayers[align_index].outs[0] # outs[0] is out tensor
 
                 # 获取当前层的自定义损失
-                    loss = loss_func(output, target_output)
+                    loss = loss_func(output, target_output.to(args.dev))
                 if not math.isfinite(loss.item()) or loss.item()==0:
                     logger.info("Loss is NAN, stopping training")
                     pdb.set_trace()
@@ -350,7 +342,7 @@ def custom_shedule_train(model:PreTrainedModel,
                     target_model:PreTrainedModel,
                     logger: logging.Logger,
                     args):
-    target_model.to(args.dev)
+    target_model.to("cuda:1")
     shedule_list= []
     # 暂时调度的内容是直接平移一个
     # offset = 1

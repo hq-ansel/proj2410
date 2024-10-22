@@ -34,7 +34,7 @@
     export MODEL_PATH=/home/ubuntu/data/exp/proj2410/model/Llama2-7b
     export DATASET_PATH=pajama
     export AMP_ENABLED=True
-    export CONFIG_PATH=/home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/b2gs128-final_layer_denoise.yaml
+    export CONFIG_PATH=/home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/b2gs128.yaml
 
     python -m EfficientQAT.main_block_ap  \
     --config_path $CONFIG_PATH \
@@ -42,7 +42,7 @@
     --net Llama-2 \
     --real_quant \
     --eval_ppl \
-    --epochs 5 
+    --epochs 2 
 )
 # --loss_func MSE \
     # --log_loss \

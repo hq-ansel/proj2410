@@ -10,7 +10,7 @@
 #     "EfficientQAT/yaml/b4gs128-rkld.yaml"
 # )
 config_files=(
-    "EfficientQAT/yaml/b2gs128-fast-pd.yaml"
+    "EfficientQAT/yaml/b2gs128-end2front.yaml"
 )
 # 循环遍历每个配置文件并执行 Python 命令
 for config_path in "${config_files[@]}"; do
@@ -29,7 +29,7 @@ for config_path in "${config_files[@]}"; do
         export CONFIG_PATH="/home/ubuntu/data/exp/proj2410/$config_path"
         OUTPUT_DIR="/home/ubuntu/data/exp/proj2410/EfficientQAT/output/block_ap_log/Llama-2-7b-w4g128"
         export PYTHONPATH=$PYTHONPATH:/home/ubuntu/data/exp/proj2410/EfficientQAT
-
+        export AMP_ENABLED=True
         echo "Running with config: $CONFIG_PATH"
 
         # 执行 python 脚本
@@ -46,7 +46,7 @@ for config_path in "${config_files[@]}"; do
             --batch_size 8 \
             --real_quant \
             --eval_ppl \
-            --epochs 5 \
+            --epochs 2 \
             --save_quant_dir $SAVE_PATH
 
         echo "Finished running with config: $CONFIG_PATH"

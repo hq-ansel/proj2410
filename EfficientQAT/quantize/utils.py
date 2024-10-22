@@ -4,6 +4,9 @@ import torch
 from torch import nn
 from typing  import Optional
 
+class StopException(Exception):
+    pass
+
 class Catcher(nn.Module):
     """
     Args:
@@ -32,7 +35,7 @@ class Catcher(nn.Module):
         output = self.module(inp, **kwargs)
         self.outs = output  # 存储输出
         if self.stop_forward_flag:
-            raise ValueError(f"stop forward shape: {output[0].shape}")
+            raise StopException(f"stop forward shape: {output[0].shape}")
         return output
 
     def set_forward_state(self, stop_forward: bool):

@@ -2,7 +2,7 @@
 wbits: 2
 group_size: 128
 # training settings
-epochs: 5
+epochs: 2
 batch_size: 8
 quant_lr: 0.00002
 weight_lr: 0.00002

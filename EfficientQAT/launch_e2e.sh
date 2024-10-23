@@ -11,14 +11,14 @@
     export CONFIG_PATH=/home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/b2gs128-fast.yaml
 
     python -m EfficientQAT.main_e2e_qp  \
-    --quant_model_path /home/ubuntu/data/exp/proj2410/quant_model/Llama2-7b/EfficientQAT/w2gs128 \
+    --quant_model_path /home/ubuntu/data/exp/proj2410/quant_model/Llama2-7b/EfficientQAT/w2gs128-end2start \
     --model_family Llama-2 \
     --wbits 2 \
     --group_size 128 \
     --learning_rate 2e-5 \
     --dataset alpaca \
     --dataset_format alpaca \
-    --output_dir /home/ubuntu/data/exp/proj2410/quant_model/Llama2-7b/EfficientQAT/w2gs128-alpaca-4096 \
+    --output_dir /home/ubuntu/data/exp/proj2410/quant_model/Llama2-7b/EfficientQAT/w2gs128-end2start-alpaca-4096 \
     --do_train True \
     --do_mmlu_eval True \
     --source_max_len 384 \

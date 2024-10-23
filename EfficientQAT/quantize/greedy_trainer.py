@@ -327,6 +327,7 @@ def train_units_layers(model: PreTrainedModel,
                     set_op_by_name(qlayer, name, q_linear)       
                     logger.info(f"pack quantized {name} finished")
                     del module
+            qlayer.to(dtype=args.dtype)
     torch.cuda.empty_cache()
 def trans_quant_block(qlayer:nn.Module,args):
     for name, module in qlayer.named_modules():

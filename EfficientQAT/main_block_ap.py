@@ -218,9 +218,9 @@ def main():
                 )
                 torch.save(trainloader, cache_trainloader)    
                 torch.save(valloader, cache_valloader)    
-            # block_ap(
             # cross_block_quantization(
-            greedy_local_train(
+            # greedy_local_train(
+            block_ap(
                 model,
                 args,
                 trainloader,

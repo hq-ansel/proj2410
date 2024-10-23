@@ -10,7 +10,7 @@
 #     "EfficientQAT/yaml/b4gs128-rkld.yaml"
 # )
 config_files=(
-    "EfficientQAT/yaml/b2gs128-end2front.yaml"
+    "/home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/qwen2.5-0.5b-b2gs128-fast-slide2.yaml"
 )
 # 循环遍历每个配置文件并执行 Python 命令
 for config_path in "${config_files[@]}"; do
@@ -26,7 +26,7 @@ for config_path in "${config_files[@]}"; do
         export MODEL_PATH=/home/ubuntu/data/exp/proj2410/model/Llama2-7b
         export DATASET_PATH=pajama
         export SAVE_PATH=/home/ubuntu/data/exp/proj2410/quant_model/EfficientQAT/w4gs128/Llama2-7b
-        export CONFIG_PATH="/home/ubuntu/data/exp/proj2410/$config_path"
+        export CONFIG_PATH="$config_path"
         OUTPUT_DIR="/home/ubuntu/data/exp/proj2410/EfficientQAT/output/block_ap_log/Llama-2-7b-w4g128"
         export PYTHONPATH=$PYTHONPATH:/home/ubuntu/data/exp/proj2410/EfficientQAT
         export AMP_ENABLED=True

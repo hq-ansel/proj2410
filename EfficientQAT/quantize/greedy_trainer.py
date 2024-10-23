@@ -65,6 +65,8 @@ class CatcherManager:
     def __enter__(self):
         # 添加 Catcher 层并保存原始模块
         for idx in self.indices:
+            if isinstance(self.layers[idx], Catcher):
+                continue
             self.original_modules[idx] = self.layers[idx]
             self.layers[idx] = Catcher(self.layers[idx])
 
@@ -121,7 +123,7 @@ def train_units_layers(model: PreTrainedModel,
     # 暂时没有更好的假设，直接使用selected_layers 中的最后一个层作为对齐层
     align_index = trainable_layer_idx_list[-1]
     last_block_idx = len(model.model.layers) - 1
-    with CatcherManager(qlayers, [align_index,last_block_idx]),CatcherManager(fp_layers, [align_index,last_block_idx]):
+    with CatcherManager(qlayers, set(align_index,last_block_idx)),CatcherManager(fp_layers, set(align_index,last_block_idx)):
         qlayers[align_index].set_forward_state(stop_forward=True)
         fp_layers[align_index].set_forward_state(stop_forward=True)
         
@@ -190,8 +192,8 @@ def train_units_layers(model: PreTrainedModel,
                                     dtype=args.dtype):
                     
                     # debug 检查grad
-                    if trainable_layer_idx_list in ([0], [1], [8],[19]):
-                        examine_parameters_grad(model,logger)
+                    # if trainable_layer_idx_list in ([0], [1], [8],[19]):
+                    #     examine_parameters_grad(model,logger)
                     
                     with torch.no_grad():
                         try:
@@ -211,8 +213,9 @@ def train_units_layers(model: PreTrainedModel,
                         raise e
                     output = qlayers[align_index].outs[0] # outs[0] is out tensor
 
-                # 获取当前层的自定义损失
+                # 获取当前层的自定义损失 mse
                     loss = loss_func(output, target_output.to(args.dev))
+                    # 看看dlc与akl
                 if not math.isfinite(loss.item()) or loss.item()==0:
                     logger.info("Loss is NAN, stopping training")
                     pdb.set_trace()
@@ -342,6 +345,7 @@ def custom_shedule_train(model:PreTrainedModel,
                     target_model:PreTrainedModel,
                     logger: logging.Logger,
                     args):
+    model.to(args.dev)
     target_model.to("cuda:1")
     shedule_list= []
     # 暂时调度的内容是直接平移一个
@@ -353,12 +357,12 @@ def custom_shedule_train(model:PreTrainedModel,
     else: is_quant_layer = [False]*len(model.model.layers)
     if args.train_shedule_type == "start2end":
         num_layers = len(model.model.layers)
-        for start in range(num_layers):
+        for start in range(0,num_layers,args.slide_step):
             end = min(start + args.crossblock_window_size, num_layers)
             shedule_list.append(list(range(start, end)))
     elif args.train_shedule_type == "end2start":
         num_layers = len(model.model.layers)
-        for end in range(num_layers, 0, -1):
+        for end in range(num_layers, 0, -1*args.slide_step):
             start = max(end - args.crossblock_window_size, 0)
             shedule_list.append(list(range(start, end)))
     loss_func = get_loss_func(args.loss_func)
@@ -371,7 +375,7 @@ def custom_shedule_train(model:PreTrainedModel,
                     model.model.layers[layer_idx] = trans_quant_block(
                                             qlayer=model.model.layers[layer_idx],
                                                                       args=args)
-        if args.epochs > 0:
+        if args.epochs > 0 :
             logger.info(f"train blocks {train_layer_window}")
             train_units_layers(model,
                     trainable_layer_idx_list=train_layer_window,
@@ -413,7 +417,6 @@ def greedy_local_train(
     args.dtype = dtype
     use_cache = model.config.use_cache
     model.config.use_cache = False
-    model.to(dev)
 
     # step 2: init dataset
 

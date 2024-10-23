@@ -188,6 +188,7 @@ def load_quantized_model(model_path, wbits, group_size):
             set_op_by_name(layer, name, q_linear)
     torch.cuda.empty_cache()
     gc.collect()
+    print("Loading pre-computed quantized weights...",model)
     model.tie_weights()
     device_map = infer_auto_device_map(model)
     print("Loading pre-computed quantized weights...")

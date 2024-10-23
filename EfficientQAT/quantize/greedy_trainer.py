@@ -65,6 +65,8 @@ class CatcherManager:
     def __enter__(self):
         # 添加 Catcher 层并保存原始模块
         for idx in self.indices:
+            if isinstance(self.layers[idx], Catcher):
+                continue
             self.original_modules[idx] = self.layers[idx]
             self.layers[idx] = Catcher(self.layers[idx])
 
@@ -324,6 +326,7 @@ def train_units_layers(model: PreTrainedModel,
                     set_op_by_name(qlayer, name, q_linear)       
                     logger.info(f"pack quantized {name} finished")
                     del module
+            qlayer.to(dtype=args.dtype)
     torch.cuda.empty_cache()
 def trans_quant_block(qlayer:nn.Module,args):
     for name, module in qlayer.named_modules():

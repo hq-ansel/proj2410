@@ -28,7 +28,7 @@ def ampscaler_get_grad_norm(parameters, norm_type: float = 2.0) -> torch.Tensor:
 class NativeScalerWithGradNormCount:
     state_dict_key = "amp_scaler"
 
-    def __init__(self,use_amp=True):
+    def __init__(self,use_amp=False):
         # 根据 use_amp 参数决定是否创建 AMP Scaler
         self.use_amp = use_amp
         if self.use_amp:

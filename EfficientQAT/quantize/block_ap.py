@@ -10,7 +10,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.optim.lr_scheduler import CosineAnnealingLR
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader,Dataset
 
 from .. import utils
 from . import int_linear_real
@@ -20,7 +20,19 @@ from .utils import (
     set_quant_state,quant_inplace,set_quant_parameters,
     set_weight_parameters,trainable_parameters_num,get_named_linears,set_op_by_name)
 from ..datautils_block import BlockTrainDataset
+class CombinedDataset(Dataset):
+    def __init__(self, quant_dataset, fp_dataset):
+        assert len(quant_dataset) == len(fp_dataset), "Datasets must have the same length"
+        self.quant_dataset = quant_dataset
+        self.fp_dataset = fp_dataset
 
+    def __len__(self):
+        return len(self.quant_dataset)
+
+    def __getitem__(self, idx):
+        quant_data = self.quant_dataset[idx]
+        fp_data = self.fp_dataset[idx]
+        return quant_data, fp_data
 
 def update_dataset(layer, dataset, dev, attention_mask, position_ids):
     with torch.no_grad():
@@ -173,7 +185,7 @@ def block_ap(
         qlayer = copy.deepcopy(layer)
         for name, module in qlayer.named_modules():
             if isinstance(module,torch.nn.Linear):
-                quantlinear = int_linear_fake.QuantLinear(module, args.wbits, args.group_size)
+                quantlinear = int_linear_fake.QuantLinear(module, args.wbits, args.group_size,args)
                 set_op_by_name(qlayer, name, quantlinear)  
                 del module  
         qlayer.to(dev)
@@ -226,11 +238,19 @@ def block_ap(
                 loss_list = []
                 norm_list = []
                 start_time = time.time()
-                for index, (quant_inps, fp_inps) in enumerate(zip(quant_train_inps, fp_train_inps)):    
+                combined_dataset = CombinedDataset(quant_train_inps, fp_train_inps)
+                combined_loader = DataLoader(combined_dataset, batch_size=1, shuffle=True)
+
+                # for index, (quant_inps, fp_inps) in enumerate(zip(quant_train_inps, fp_train_inps)):    
+                for index, (quant_inps, fp_inps) in enumerate(combined_loader):
+                    # print(f"shape of quant_inps: {quant_inps.shape}, shape of fp_inps: {fp_inps.shape}")
+                    if len(quant_inps.shape)==4:
+                        quant_inps = quant_inps.squeeze(0)
+                        fp_inps = fp_inps.squeeze(0)
                     # obtain output of quantization model
-                    with torch.cuda.amp.autocast():
-                        input = quant_inps.to(dev)
-                        label = fp_inps.to(dev)
+                    with torch.cuda.amp.autocast(False):
+                        input = quant_inps.to(dev,dtype=torch.float32)
+                        label = fp_inps.to(dev,dtype=torch.float32)
                         quant_out = qlayer(input, attention_mask=attention_mask_batch,position_ids=position_ids)[0]
                         reconstruction_loss = loss_func(label, quant_out)
                         loss =  reconstruction_loss

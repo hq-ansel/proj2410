@@ -36,10 +36,10 @@ class QuantLinear(nn.Module, TritonModuleMixin):
         **kwargs
     ):
         super().__init__()
-        # if bits not in [2, 4, 8]:
-        #     raise NotImplementedError("Only 2,4,8 bits are supported.")
-        # if infeatures % 32 != 0 or outfeatures % 32 != 0:
-        #     raise NotImplementedError("in_feature and out_feature must be divisible by 32.")
+        if bits not in [2, 4, 8]:
+            raise NotImplementedError("Only 2,4,8 bits are supported.")
+        if infeatures % 32 != 0 or outfeatures % 32 != 0:
+            raise NotImplementedError("in_feature and out_feature must be divisible by 32.")
         self.infeatures = infeatures
         self.outfeatures = outfeatures
         self.bits = bits
@@ -96,6 +96,12 @@ class QuantLinear(nn.Module, TritonModuleMixin):
             del self.g_idx
         
     def pack(self, linear, scales, zeros, g_idx=None):
+        """
+        Args:
+            linear: nn.Linear 
+            scales: scales tensor of shape (infeatures//group_size, outfeatures)
+            zeros: zeros tensor of shape (infeatures//group_size, outfeatures)
+        """
         W = linear.weight.data.clone()
         if isinstance(linear, nn.Conv2d):
             W = W.flatten(1)
@@ -123,6 +129,8 @@ class QuantLinear(nn.Module, TritonModuleMixin):
 
         i = 0
         row = 0
+        # qweight (infeatures//(32//bits), outfeatures)
+        # intweight (infeatures, outfeatures)
         qweight = np.zeros((math.ceil(intweight.shape[0]/(32//self.bits)), intweight.shape[1]), dtype=np.uint32)
         while row < qweight.shape[0]:
             if self.bits in [2, 3, 4, 8]:
@@ -138,6 +146,7 @@ class QuantLinear(nn.Module, TritonModuleMixin):
 
         zeros = zeros.numpy().astype(np.uint32)
         self.zeros_dim0, self.zeros_dim1 = zeros.shape
+        # qzeros (infeatures//group_size, outfeatures//(32//bits))
         qzeros = np.zeros((zeros.shape[0], math.ceil(zeros.shape[1] / (32 // self.bits))), dtype=np.uint32)
         i = 0
         col = 0
@@ -165,7 +174,10 @@ class QuantLinear(nn.Module, TritonModuleMixin):
             zeros = dequant_dim1(self.qzeros, self.bits, self.maxq, self.zeros_dim0, self.zeros_dim1)
             weight = ((weight.view(-1, self.group_size, dim1) - zeros.view(-1, 1, dim1)) * self.scales.view(-1, 1, dim1)).reshape(dim0, dim1)
         # out = torch.matmul(x, weight)
+        torch.cuda.synchronize()
         out = torch.matmul(x, weight.to(x.dtype))
+        torch.cuda.synchronize()
+
         out = out + self.bias if self.bias is not None else out
         return out
 
@@ -188,7 +200,7 @@ def load_quantized_model(model_path, wbits, group_size):
             set_op_by_name(layer, name, q_linear)
     torch.cuda.empty_cache()
     gc.collect()
-    print("Loading pre-computed quantized weights...",model)
+    # print("Loading pre-computed quantized weights...",model)
     model.tie_weights()
     device_map = infer_auto_device_map(model)
     print("Loading pre-computed quantized weights...")

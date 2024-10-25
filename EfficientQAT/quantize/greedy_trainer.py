@@ -109,12 +109,16 @@ def train_units_layers(model: PreTrainedModel,
     param_group_index = 0
     assert args.quant_lr > 0 or args.weight_lr > 0
     # 使用amp仍然需要权重为float32
-    with torch.no_grad():
-        model.model.layers = nn.ModuleList(
-            [qlayer.float() 
-                   if index in layer_idx_set 
-                   else qlayer for index,
-                     qlayer in enumerate(model.model.layers)])
+    if amp_enabled:
+        model.to(args.dev, dtype=torch.float32)
+    else:
+        with torch.no_grad():
+            model.model.layers = nn.ModuleList(
+                [qlayer.float() 
+                    if index in layer_idx_set 
+                    else qlayer for index,
+                        qlayer in enumerate(model.model.layers)])
+        
     fp_layers = target_model.model.layers
     qlayers = model.model.layers
     selected_layers = [qlayers[i] for i in trainable_layer_idx_list]
@@ -123,10 +127,13 @@ def train_units_layers(model: PreTrainedModel,
     # 暂时没有更好的假设，直接使用selected_layers 中的最后一个层作为对齐层
     align_index = trainable_layer_idx_list[-1]
     last_block_idx = len(model.model.layers) - 1
-    with CatcherManager(qlayers, set(align_index,last_block_idx)),CatcherManager(fp_layers, set(align_index,last_block_idx)):
-        qlayers[align_index].set_forward_state(stop_forward=True)
-        fp_layers[align_index].set_forward_state(stop_forward=True)
-        
+    with CatcherManager(qlayers, [align_index,last_block_idx]),CatcherManager(fp_layers, [align_index,last_block_idx]):
+        if args.align_type == "tail":
+            qlayers[align_index].set_forward_state(stop_forward=True)
+            fp_layers[align_index].set_forward_state(stop_forward=True)
+        else:
+            qlayers[last_block_idx].set_forward_state(stop_forward=True)
+            fp_layers[last_block_idx].set_forward_state(stop_forward=True)
 
         for name, param in model.named_parameters():
             param.requires_grad = False
@@ -189,7 +196,7 @@ def train_units_layers(model: PreTrainedModel,
             for index, input_data in enumerate(dataloader):
                 with torch.autocast(device_type=args.dev,
                                     enabled=amp_enabled,
-                                    dtype=args.dtype):
+                                    dtype=args.dtype if amp_enabled else torch.float32):
                     
                     # debug 检查grad
                     # if trainable_layer_idx_list in ([0], [1], [8],[19]):
@@ -202,8 +209,10 @@ def train_units_layers(model: PreTrainedModel,
                             pass
                         except Exception as e:
                             raise e
-                        target_output = fp_layers[align_index].outs[0]
-                        model.to(args.dev)
+                        if args.align_type == "tail":
+                            target_output = fp_layers[align_index].outs[0]
+                        else:
+                            target_output = fp_layers[last_block_idx].outs[0]
 
                     try:
                         output = model(input_data.to(args.dev))
@@ -211,10 +220,13 @@ def train_units_layers(model: PreTrainedModel,
                         pass
                     except Exception as e:
                         raise e
-                    output = qlayers[align_index].outs[0] # outs[0] is out tensor
+                    if args.align_type == "tail":
+                        output = qlayers[align_index].outs[0] # outs[0] is out tensor
+                    else:
+                        output = qlayers[last_block_idx].outs[0]
 
                 # 获取当前层的自定义损失 mse
-                    loss = loss_func(output, target_output.to(args.dev))
+                    loss = loss_func(output, target_output.to(args.dev,dtype=torch.float32))
                     # 看看dlc与akl
                 if not math.isfinite(loss.item()) or loss.item()==0:
                     logger.info("Loss is NAN, stopping training")
@@ -234,7 +246,7 @@ def train_units_layers(model: PreTrainedModel,
                 # debug 检查grad
                 if None and trainable_layer_idx_list in ([1], [8],[19]):
                     examine_parameters_grad(model,logger)
-                loss_scaler.unscale_(optimizer)
+                if amp_enabled: loss_scaler.unscale_(optimizer)
                 if args.clip_grad > 0:
                         norm = torch.nn.utils.clip_grad_norm_(trainable_parameters(selected_layers), args.clip_grad).cpu()
                 if amp_enabled:
@@ -268,26 +280,40 @@ def train_units_layers(model: PreTrainedModel,
                 with torch.no_grad():
                     with torch.autocast(device_type=args.dev,
                                         enabled=amp_enabled,
-                                        dtype=args.dtype):
+                                        dtype=args.dtype if amp_enabled else torch.float32):
                         try:
                             output = model(input_data.to(args.dev))
-                        except ValueError:
+                        except StopException:
                             pass
-                        output = qlayers[align_index].outs[0] # outs[0] is out tensor
+                        except Exception as e:
+                            raise e
+                        
+                        if args.align_type == "tail":
+                            output = qlayers[align_index].outs[0].to(dtype=torch.float32,device=args.dev) # outs[0] is out tensor
+                        else:
+                            output = qlayers[last_block_idx].outs[0].to(dtype=torch.float32,device=args.dev)
+
                         final_output = qlayers[last_block_idx].outs[0]
                         try:
                             target_output = target_model(input_data.to("cuda:1"))[0]
-                        except ValueError:
+                        except StopException:
                             pass
-                        target_output = fp_layers[align_index].outs[0].to(dtype=torch.float32,device=args.dev)
+                        except Exception as e:
+                            raise e
+                        
+                        if args.align_type == "tail":
+                            target_output = fp_layers[align_index].outs[0].to(dtype=torch.float32,device=args.dev)
+                        else:
+                            target_output = fp_layers[last_block_idx].outs[0].to(dtype=torch.float32,device=args.dev)
+
                         final_target_output = fp_layers[last_block_idx].outs[0].to(dtype=torch.float32,device=args.dev)
                         loss = loss_func(output, target_output)
                         final_loss = loss_func(final_output, final_target_output)
                 val_loss_list.append(loss.cpu())
                 final_val_list.append(final_loss.cpu())
-
-            qlayers[align_index].set_forward_state(stop_forward=True)
-            fp_layers[align_index].set_forward_state(stop_forward=True)
+            if args.align_type == "tail":
+                qlayers[align_index].set_forward_state(stop_forward=True)
+                fp_layers[align_index].set_forward_state(stop_forward=True)
 
             train_mean_num = min(len(loss_list),64) 
             # calculate the average training loss of last train_mean_num samples
@@ -327,7 +353,8 @@ def train_units_layers(model: PreTrainedModel,
                     set_op_by_name(qlayer, name, q_linear)       
                     logger.info(f"pack quantized {name} finished")
                     del module
-            qlayer.to(dtype=args.dtype)
+            if amp_enabled:
+                qlayer.to(dtype=args.dtype)
     torch.cuda.empty_cache()
 def trans_quant_block(qlayer:nn.Module,args):
     for name, module in qlayer.named_modules():
@@ -413,7 +440,7 @@ def greedy_local_train(
         logger.info("offload the training dataset to disk, saving CPU memory, but may slowdown the training due to additional I/O...")
     
     dev ="cuda" if torch.cuda.is_available() else "cpu"
-    dtype = torch.float16
+    dtype = torch.float16 if amp_enabled else torch.float32
     args.dev = dev
     args.dtype = dtype
     use_cache = model.config.use_cache

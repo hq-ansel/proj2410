@@ -106,6 +106,11 @@ def dequant_kernel_dim0(
     offs_am = pid_m * BLOCK_SIZE_M + tl.arange(0, BLOCK_SIZE_M)
     offs_bn = pid_n * BLOCK_SIZE_N + tl.arange(0, BLOCK_SIZE_N)
 
+    tl.device_assert(BLOCK_SIZE_M % bits_per_feature == 0)
+    tl.device_assert(BLOCK_SIZE_N % bits_per_feature == 0)
+
+    tl.device_assert(M % BLOCK_SIZE_M == 0)
+    tl.device_assert(N % BLOCK_SIZE_N == 0)
 
     b_ptrs = b_ptr + ((offs_am[:, None] // bits_per_feature) * stride_bk + offs_bn[None, :] * stride_bn)
 
@@ -193,6 +198,12 @@ def dequant_kernel_dim1(
     offs_bn = pid_n * BLOCK_SIZE_N + tl.arange(0, BLOCK_SIZE_N)
 
 
+    tl.device_assert(BLOCK_SIZE_M % bits_per_feature == 0)
+    tl.device_assert(BLOCK_SIZE_N % bits_per_feature == 0)
+
+    tl.device_assert(M % BLOCK_SIZE_M == 0)
+    tl.device_assert(N % BLOCK_SIZE_N == 0)
+
     # b_ptrs = b_ptr + ((offs_am[:, None] // bits_per_feature) * stride_bk + offs_bn[None, :] * stride_bn)
     b_ptrs = b_ptr + (offs_am[:, None] * stride_bk + (offs_bn[None, :] // bits_per_feature) * stride_bn)
 
@@ -200,14 +211,14 @@ def dequant_kernel_dim1(
     shifter = (offs_bn[None, :] % bits_per_feature) * bits
 
 
+    c_mask = (offs_am[:, None] < M) & (offs_bn[None, :] < N)
 
-    b = tl.load(b_ptrs)
+    b = tl.load(b_ptrs,mask=c_mask)
     b = (b >> shifter) & maxq
   
     c = b
 
     c_ptrs = c_ptr + stride_cm * offs_am[:, None] + stride_cn * offs_bn[None, :]
-    c_mask = (offs_am[:, None] < M) & (offs_bn[None, :] < N)
     tl.store(c_ptrs, c, mask=c_mask)
     
     

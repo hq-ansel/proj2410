@@ -22,7 +22,7 @@ from .quantize.crossblockquant import cross_block_quantization
 from .quantize.greedy_trainer import greedy_local_train
 
 
-
+amp_enabled = os.environ.get("AMP_ENABLED", "False").lower() == "true"
 torch.backends.cudnn.benchmark = True
 
 @torch.no_grad()
@@ -191,7 +191,10 @@ def main():
         # load fp quantized model
         config = AutoConfig.from_pretrained(args.model)
         tokenizer = AutoTokenizer.from_pretrained(args.model, use_fast=False,legacy=False)
-        model = AutoModelForCausalLM.from_pretrained(args.model, config=config, device_map='cpu',torch_dtype=torch.float16)
+        model = AutoModelForCausalLM.from_pretrained(args.model,
+                                        config=config,
+                                        device_map='cpu',
+                                        torch_dtype=torch.float16 if amp_enabled else torch.float32)
         for param in model.parameters():
             param.requires_grad = False
 

@@ -10,7 +10,10 @@
 #     "EfficientQAT/yaml/b4gs128-rkld.yaml"
 # )
 config_files=(
-    "/home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/qwen2.5-0.5b-b2gs128-fast-slide2.yaml"
+    /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/qwen2.5-0.5b-b2gs128-fast-end2start-align-end.yaml
+    /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/qwen2.5-0.5b-b2gs128-fast-end2start.yaml
+    /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/qwen2.5-0.5b-b2gs128-fast-slide2-align-end.yaml
+    /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/qwen2.5-0.5b-b2gs128-fast-slide2.yaml
 )
 # 循环遍历每个配置文件并执行 Python 命令
 for config_path in "${config_files[@]}"; do
@@ -29,16 +32,13 @@ for config_path in "${config_files[@]}"; do
         export CONFIG_PATH="$config_path"
         OUTPUT_DIR="/home/ubuntu/data/exp/proj2410/EfficientQAT/output/block_ap_log/Llama-2-7b-w4g128"
         export PYTHONPATH=$PYTHONPATH:/home/ubuntu/data/exp/proj2410/EfficientQAT
-        export AMP_ENABLED=True
+        # export AMP_ENABLED=True
         echo "Running with config: $CONFIG_PATH"
 
         # 执行 python 脚本
         # python main_block_ap.py \
         python -m EfficientQAT.main_block_ap \
             --config_path $CONFIG_PATH \
-            --model $MODEL_PATH \
-            --output_dir $OUTPUT_DIR \
-            --net Llama-2 \
             --wbits 4 \
             --group_size 128 \
             --quant_lr 1e-5 \

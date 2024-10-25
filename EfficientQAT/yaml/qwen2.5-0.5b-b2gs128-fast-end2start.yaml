@@ -16,9 +16,9 @@ slide_step: 1
 
 model: /home/ubuntu/data/exp/proj2410/model/Qwen-2.5-0.5B
 # save settings
-output_dir: /home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-fast/
-log_loss: /home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-fast/loss.csv
-save_quant_dir: /home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-fast/
+output_dir: /home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-fast-end2start/
+log_loss: /home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-fast-end2start/loss.csv
+save_quant_dir: /home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-fast-end2start/
 clamp_method: STE
-
+train_shedule_type: end2start
 align_type: tail

@@ -34,6 +34,7 @@ class QuantLinear(nn.Module):
         # initialize quantizer
         self.weight_quantizer = UniformAffineQuantizer(wbits, group_size, weight=org_module.weight,args=args)
         self.use_temporary_parameter = False
+        self.clamp_input = args.get('clamp_input',False)
 
     
     
@@ -45,7 +46,8 @@ class QuantLinear(nn.Module):
             weight = self.weight
             bias = self.bias
 
-        
+        if self.clamp_input:
+            input = torch.clamp(input,-128,127)
         out = self.fwd_func(input, weight, bias, **self.fwd_kwargs)
 
 

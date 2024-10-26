@@ -70,6 +70,7 @@ class QuantLinear(nn.Module, TritonModuleMixin):
         self.trainable = trainable
         self.scales.requires_grad = True
         self.use_fake = False
+        self.clamp_input = kwargs.get("clamp_input", False)
 
     def post_init(self):
         pass
@@ -174,9 +175,11 @@ class QuantLinear(nn.Module, TritonModuleMixin):
             zeros = dequant_dim1(self.qzeros, self.bits, self.maxq, self.zeros_dim0, self.zeros_dim1)
             weight = ((weight.view(-1, self.group_size, dim1) - zeros.view(-1, 1, dim1)) * self.scales.view(-1, 1, dim1)).reshape(dim0, dim1)
         # out = torch.matmul(x, weight)
-        torch.cuda.synchronize()
+        # torch.cuda.synchronize()
+        if self.clamp_input:
+            x = torch.clamp(x, -128, 127)
         out = torch.matmul(x, weight.to(x.dtype))
-        torch.cuda.synchronize()
+        # torch.cuda.synchronize()
 
         out = out + self.bias if self.bias is not None else out
         return out

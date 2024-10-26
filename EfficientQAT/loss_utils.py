@@ -66,6 +66,21 @@ def MSE_MAX_ABS_ERROR(output, target):
     max_abs_error = torch.max(torch.abs(output - target))
     return mse + max_abs_error*0.01
 
+def low_frequency_loss(teacher_output, student_output, freq_cutoff=5):
+    # 计算傅里叶变换
+    teacher_freq = torch.fft.fft(teacher_output)
+    student_freq = torch.fft.fft(student_output)
+    
+    # 截取低频成分
+    teacher_low_freq = teacher_freq[:, :freq_cutoff]
+    student_low_freq = student_freq[:, :freq_cutoff]
+    
+    # 计算低频损失
+    # loss = torch.nn.functional.mse_loss(teacher_low_freq, student_low_freq)
+    loss = torch.nn.functional.mse_loss(teacher_low_freq.real, student_low_freq.real)
+
+    return loss
+
 def get_loss_func(loss_type: str):
     """
     Get the loss function based on the loss type.
@@ -86,5 +101,7 @@ def get_loss_func(loss_type: str):
         return MSE_FKLD_RKLD
     elif loss_type == 'MSE_MAX_ABS_ERROR':
         return MSE_MAX_ABS_ERROR
+    elif loss_type == 'LOW_FOURIER_LOSS':
+        return low_frequency_loss
     else:
         raise ValueError(f'Invalid loss type: {loss_type}')

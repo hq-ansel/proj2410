@@ -348,7 +348,8 @@ def train_units_layers(model: PreTrainedModel,
                                                 group_size,
                                                 module.in_features,
                                                 module.out_features,
-                                                not module.bias is None)
+                                                not module.bias is None,
+                                                clamp_input= args.get("clamp_input",False))
                     q_linear.pack(module.cpu(),  scales.float().cpu(), zeros.float().cpu())
                     set_op_by_name(qlayer, name, q_linear)       
                     logger.info(f"pack quantized {name} finished")

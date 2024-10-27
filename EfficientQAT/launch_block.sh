@@ -34,7 +34,7 @@
     export MODEL_PATH=/home/ubuntu/data/exp/proj2410/model/Llama2-7b
     export DATASET_PATH=pajama
     # export AMP_ENABLED=True
-    export CONFIG_PATH=/home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/qwen2.5-0.5b-b2gs128-fast-low-fourier-loss.yaml
+    export CONFIG_PATH=/home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/qwen2.5-0.5b-b4gs128-fast.yaml
 
     python -m EfficientQAT.main_block_ap  \
     --config_path $CONFIG_PATH \

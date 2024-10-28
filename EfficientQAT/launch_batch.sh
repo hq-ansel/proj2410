@@ -3,7 +3,8 @@
 # 定义配置文件列表
 # )
 config_files=(
-    /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/qwen2.5-0.5b-b2gs128-fast-clamp-input.yaml
+    /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/qwen2.5-0.5b-b2gs128-fast-KL-Divergence.yaml
+
 )
 # 循环遍历每个配置文件并执行 Python 命令
 for config_path in "${config_files[@]}"; do

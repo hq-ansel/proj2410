@@ -2,7 +2,7 @@
 wbits: 2
 group_size: 128
 # training settings
-cuda_ids: "0,1"
+cuda_ids: "1,0"
 epochs: 2
 net: Qwen2.5
 batch_size: 2
@@ -16,11 +16,11 @@ slide_step: 1
 
 model: /home/ubuntu/data/exp/proj2410/model/Qwen-2.5-0.5B
 # save settings
-output_dir: /home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-fast-clamp-input/
-log_loss: /home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-fast-clamp-input/loss.csv
-save_quant_dir: /home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-fast-clamp-input/
+output_dir: /home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-fast-constrain2raw/
+log_loss: /home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-fast-constrain2raw/loss.csv
+save_quant_dir: /home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-fast-constrain2raw/
 clamp_method: STE
 
-clamp_input: True
+constrain2raw: True
 
 align_type: tail

@@ -127,13 +127,21 @@ def train_units_layers(model: PreTrainedModel,
     # 暂时没有更好的假设，直接使用selected_layers 中的最后一个层作为对齐层
     align_index = trainable_layer_idx_list[-1]
     last_block_idx = len(model.model.layers) - 1
-    with CatcherManager(qlayers, [align_index,last_block_idx]),CatcherManager(fp_layers, [align_index,last_block_idx]):
-        if args.align_type == "tail":
-            qlayers[align_index].set_forward_state(stop_forward=True)
-            fp_layers[align_index].set_forward_state(stop_forward=True)
-        else:
-            qlayers[last_block_idx].set_forward_state(stop_forward=True)
-            fp_layers[last_block_idx].set_forward_state(stop_forward=True)
+    if args.loss_func == "KL-Divergence":
+        qlayer_idxs = []
+        fp_layer_idxs = []
+    else:
+        qlayer_idxs = [align_index,last_block_idx]
+        fp_layer_idxs = [align_index,last_block_idx]
+
+    with CatcherManager(qlayers, qlayer_idxs),CatcherManager(fp_layers, fp_layer_idxs):
+        if not args.loss_func == "KL-Divergence":
+            if args.align_type == "tail":
+                qlayers[align_index].set_forward_state(stop_forward=True)
+                fp_layers[align_index].set_forward_state(stop_forward=True)
+            else:
+                qlayers[last_block_idx].set_forward_state(stop_forward=True)
+                fp_layers[last_block_idx].set_forward_state(stop_forward=True)
 
         for name, param in model.named_parameters():
             param.requires_grad = False
@@ -204,29 +212,72 @@ def train_units_layers(model: PreTrainedModel,
                     
                     with torch.no_grad():
                         try:
-                            target_output = target_model(input_data.to("cuda:1"))
+                            target_logits = target_model(input_data.to("cuda:1")).logits
                         except StopException:
                             pass
                         except Exception as e:
                             raise e
-                        if args.align_type == "tail":
-                            target_output = fp_layers[align_index].outs[0]
-                        else:
-                            target_output = fp_layers[last_block_idx].outs[0]
+                        if not args.loss_func == "KL-Divergence" :
+                            if  args.align_type == "tail":
+                                target_output = fp_layers[align_index].outs[0]
+                            else:
+                                target_output = fp_layers[last_block_idx].outs[0]
 
                     try:
-                        output = model(input_data.to(args.dev))
+                        student_logits = model(input_data.to(args.dev)).logits
                     except StopException:
                         pass
                     except Exception as e:
                         raise e
-                    if args.align_type == "tail":
-                        output = qlayers[align_index].outs[0] # outs[0] is out tensor
-                    else:
-                        output = qlayers[last_block_idx].outs[0]
+                    if not args.loss_func == "KL-Divergence" :
+                        if  args.align_type == "tail":
+                            output = qlayers[align_index].outs[0] # outs[0] is out tensor
+                        else:
+                            output = qlayers[last_block_idx].outs[0]
 
                 # 获取当前层的自定义损失 mse
-                    loss = loss_func(output, target_output.to(args.dev,dtype=torch.float32))
+                    if args.loss_func == "KL-Divergence":
+                        def kl_div(student_hiddens, teacher_hiddens):
+                            C = student_hiddens.shape[-1]  # num classes
+                            return F.kl_div(
+                                input=F.log_softmax(student_hiddens.view(-1, C), dim=-1),
+                                target=F.log_softmax(teacher_hiddens.view(-1, C), dim=-1),
+                                log_target=True,
+                                reduction="batchmean",
+                            )
+                        # loss = F.kl_div(F.log_softmax(student_logits, dim=-1),
+                        #                 F.softmax(target_logits.to(student_logits.device), dim=-1),
+                        #                 reduction='batchmean')
+                        loss = kl_div(student_logits,
+                                      target_logits.to(student_logits.device))/args.train_size
+                    else:
+                        loss = loss_func(output, target_output.to(args.dev,dtype=torch.float32))
+                    if args.get("constrain2raw",False):
+                        trainable_layer_idx_list
+                        for idx in trainable_layer_idx_list:
+                            name = f"model.layers.{idx}"
+                            module = dict(model.named_modules()).get(name,None)
+                            assert module is not None
+                            target_module = dict(target_model.named_modules()).get(name,None)
+                            assert target_module is not None
+                            if isinstance(module, Catcher):
+                                module = module.module
+                                target_module = target_module.module
+                            for sub_name, sub_module in module.named_modules():
+                                if isinstance(sub_module, int_linear_fake.QuantLinear):
+                                    w1,b1 = sub_module.get_quant_weight_bias()
+                                    target_sub_module = dict(target_module.named_modules()).get(sub_name,None)
+                                    assert target_sub_module is not None
+                                    w2 = target_sub_module.weight.detach()
+                                    if b1 is not None:
+                                        b2 = target_sub_module.bias.detach().view(-1)
+                                        b1 = b1.view(-1)
+                                        loss += F.cosine_similarity(b1,b2.to(b1.device),dim=0)
+                                    w1 = w1.view(-1)
+                                    w2 = w2.view(-1)
+                                    loss += F.cosine_similarity(w1,w2.to(w1.device),dim=0)
+
+                                
                     # 看看dlc与akl
                 if not math.isfinite(loss.item()) or loss.item()==0:
                     logger.info("Loss is NAN, stopping training")
@@ -237,7 +288,8 @@ def train_units_layers(model: PreTrainedModel,
                                         loss.detach().cpu().item())
                 loss_list.append(loss.detach().cpu())
                 # 反向传播和优化
-                optimizer.zero_grad()
+                if not args.loss_func == "KL-Divergence":
+                    optimizer.zero_grad()
                 # norm = loss_scaler(loss,
                 #         optimizer,
                 #         clip_grad=args.clip_grad,
@@ -249,11 +301,12 @@ def train_units_layers(model: PreTrainedModel,
                 if amp_enabled: loss_scaler.unscale_(optimizer)
                 if args.clip_grad > 0:
                         norm = torch.nn.utils.clip_grad_norm_(trainable_parameters(selected_layers), args.clip_grad).cpu()
-                if amp_enabled:
-                    loss_scaler.step(optimizer)
-                    loss_scaler.update()
-                else:
-                    optimizer.step()
+                if not args.loss_func == "KL-Divergence":
+                    if amp_enabled:
+                        loss_scaler.step(optimizer)
+                        loss_scaler.update()
+                    else:
+                        optimizer.step()
                 norm_list.append(norm.data)
                 
                 # adjust lr
@@ -264,7 +317,13 @@ def train_units_layers(model: PreTrainedModel,
                     weight_scheduler.step()
                     optimizer.param_groups[weight_index]['lr'] = weight_scheduler.get_lr()[0]
                 step += 1
-
+            if args.loss_func == "KL-Divergence":
+                if amp_enabled:
+                    loss_scaler.step(optimizer)
+                    loss_scaler.update()
+                else:
+                    optimizer.step()
+                optimizer.zero_grad()
 
             # step 6.5: calculate validation loss
             val_loss_list = []
@@ -273,8 +332,9 @@ def train_units_layers(model: PreTrainedModel,
                                     batch_size=args.batch_size,
                                     shuffle=False
                                     )
-            qlayers[align_index].set_forward_state(stop_forward=False)
-            fp_layers[align_index].set_forward_state(stop_forward=False)
+            if not args.loss_func == "KL-Divergence":
+                qlayers[align_index].set_forward_state(stop_forward=False)
+                fp_layers[align_index].set_forward_state(stop_forward=False)
             for index, input_data in enumerate(dataloader):  
                 # obtain output of quantization model
                 with torch.no_grad():
@@ -282,36 +342,42 @@ def train_units_layers(model: PreTrainedModel,
                                         enabled=amp_enabled,
                                         dtype=args.dtype if amp_enabled else torch.float32):
                         try:
-                            output = model(input_data.to(args.dev))
+                            student_logits = model(input_data.to(args.dev)).logits
                         except StopException:
                             pass
                         except Exception as e:
                             raise e
-                        
-                        if args.align_type == "tail":
-                            output = qlayers[align_index].outs[0].to(dtype=torch.float32,device=args.dev) # outs[0] is out tensor
-                        else:
-                            output = qlayers[last_block_idx].outs[0].to(dtype=torch.float32,device=args.dev)
+                        if not args.loss_func == "KL-Divergence":
+                            if args.align_type == "tail":
+                                output = qlayers[align_index].outs[0].to(dtype=torch.float32,device=args.dev) # outs[0] is out tensor
+                            else:
+                                output = qlayers[last_block_idx].outs[0].to(dtype=torch.float32,device=args.dev)
 
-                        final_output = qlayers[last_block_idx].outs[0]
+                            # final_output = qlayers[last_block_idx].outs[0]
                         try:
-                            target_output = target_model(input_data.to("cuda:1"))[0]
+                            teacher_logits = target_model(input_data.to("cuda:1")).logits
                         except StopException:
                             pass
                         except Exception as e:
                             raise e
-                        
-                        if args.align_type == "tail":
-                            target_output = fp_layers[align_index].outs[0].to(dtype=torch.float32,device=args.dev)
-                        else:
-                            target_output = fp_layers[last_block_idx].outs[0].to(dtype=torch.float32,device=args.dev)
+                        if not args.loss_func == "KL-Divergence":
+                            if args.align_type == "tail":
+                                target_output = fp_layers[align_index].outs[0].to(dtype=torch.float32,device=args.dev)
+                            else:
+                                target_output = fp_layers[last_block_idx].outs[0].to(dtype=torch.float32,device=args.dev)
 
-                        final_target_output = fp_layers[last_block_idx].outs[0].to(dtype=torch.float32,device=args.dev)
-                        loss = loss_func(output, target_output)
-                        final_loss = loss_func(final_output, final_target_output)
+                            # final_target_output = fp_layers[last_block_idx].outs[0].to(dtype=torch.float32,device=args.dev)
+                        if args.loss_func == "KL-Divergence":
+                            loss = F.kl_div(F.log_softmax(student_logits, dim=-1),
+                                            F.softmax(teacher_logits.to(student_logits.device), dim=-1),
+                                            reduction='batchmean')
+                        else:
+                            loss = loss_func(output, target_output)
+                            # final_loss = loss_func(final_output, final_target_output)
                 val_loss_list.append(loss.cpu())
-                final_val_list.append(final_loss.cpu())
-            if args.align_type == "tail":
+                # if not args.loss_func == "KL-Divergence":
+                #     final_val_list.append(final_loss.cpu())
+            if not args.loss_func and  args.align_type == "tail":
                 qlayers[align_index].set_forward_state(stop_forward=True)
                 fp_layers[align_index].set_forward_state(stop_forward=True)
 
@@ -321,7 +387,8 @@ def train_units_layers(model: PreTrainedModel,
             val_loss_mean = torch.stack(val_loss_list).mean()
             norm_mean = torch.stack(norm_list).mean()
             logger.info(f"blocks {trainable_layer_idx_list} epoch {epoch} recon_loss:{loss_mean} val_loss:{val_loss_mean} quant_lr:{quant_scheduler.get_lr()[0]} norm:{norm_mean:.8f} max memory_allocated {torch.cuda.max_memory_allocated(args.dev) / 1024**2} time {time.time()-start_time} ")
-            logger.info(f"blocks {trainable_layer_idx_list} epoch {epoch} final_loss:{torch.stack(final_val_list).mean()}")
+            # if not args.loss_func == "KL-Divergence":
+            #     logger.info(f"blocks {trainable_layer_idx_list} epoch {epoch} final_loss:{torch.stack(final_val_list).mean()}")
             if val_loss_mean < best_val_loss:
                 best_val_loss = val_loss_mean
             else:
@@ -394,7 +461,7 @@ def custom_shedule_train(model:PreTrainedModel,
         for end in range(num_layers, 0, -1*args.slide_step):
             start = max(end - args.crossblock_window_size, 0)
             shedule_list.append(list(range(start, end)))
-    loss_func = get_loss_func(args.loss_func)
+    loss_func = get_loss_func(args.loss_func) if not args.loss_func == "KL-Divergence" else None
     loss_recorder = utils.BlockLossRecorder(file_path=args.log_loss,)
     for train_layer_window in shedule_list:
         if not args.quant_shedule_type == "full" :

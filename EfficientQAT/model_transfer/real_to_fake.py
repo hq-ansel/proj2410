@@ -1,6 +1,6 @@
-from quantize.int_linear_real import load_quantized_model, QuantLinear
+from ..quantize.int_linear_real import load_quantized_model, QuantLinear
 import torch
-from datautils_block import test_ppl
+from ..datautils_block import test_ppl
 from pathlib import Path
 
 def main():

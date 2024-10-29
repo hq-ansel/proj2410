@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from .quantizer import UniformAffineQuantizer
+from .quantizer import UniformAffineQuantizer,GradualUniformAffineQuantizer
 
 
 
@@ -32,7 +32,8 @@ class QuantLinear(nn.Module):
         # de-activate the quantized forward default
         self.use_weight_quant = False
         # initialize quantizer
-        self.weight_quantizer = UniformAffineQuantizer(wbits, group_size, weight=org_module.weight,args=args)
+        # self.weight_quantizer = UniformAffineQuantizer(wbits, group_size, weight=org_module.weight,args=args)
+        self.weight_quantizer = GradualUniformAffineQuantizer(wbits, group_size, weight=org_module.weight,args=args)
         self.use_temporary_parameter = False
         self.clamp_input = args.get('clamp_input',False)
 
@@ -61,4 +62,8 @@ class QuantLinear(nn.Module):
         bias = self.bias
         return weight, bias
 
-
+    def update_ratio(self, ratio: float):
+        """
+        Update the quantization ratio of the weight.
+        """
+        self.weight_quantizer.update_ratio(ratio)

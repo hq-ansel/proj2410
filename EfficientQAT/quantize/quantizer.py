@@ -125,4 +125,87 @@ class UniformAffineQuantizer(nn.Module):
 
         
 
-    
+class GradualUniformAffineQuantizer(nn.Module):
+    def __init__(
+        self,
+        n_bits: int = 8,
+        group_size=None,
+        weight=None,
+        args=None,
+        quantization_ratio=1.0,  # 新增量化比例参数，默认全量化
+    ):
+        super().__init__()
+        assert 2 <= n_bits <= 16, "bitwidth not supported"
+        self.n_bits = n_bits
+        self.qmin = 0
+        self.qmax = 2 ** (n_bits) - 1
+        self.group_size = group_size if group_size != -1 else weight.shape[-1]
+        assert weight.shape[-1] % group_size == 0
+        self.enable = True
+        self.clamp_method = args.clamp_method
+        self.quantization_ratio = quantization_ratio  # 量化比例
+
+        # init scale and zero point through Max-Min quantization
+        with torch.no_grad():
+            if weight is not None:
+                x = weight.reshape(-1, self.group_size)
+                xmin = x.amin([-1], keepdim=True)
+                xmax = x.amax([-1], keepdim=True)
+                range = xmax - xmin
+                scale = range / (2**self.n_bits - 1)
+                if self.clamp_method == "STE":
+                    scale = scale.clamp(min=1e-4, max=1e4)
+                elif self.clamp_method == "MAD":
+                    scale = clamp_mad(scale, 1e-4, 1e4)
+                zero_point = -(xmin / scale).clamp(min=-1e4, max=1e4)
+                self.scale = nn.Parameter(scale)
+                self.zero_point = nn.Parameter(zero_point.round())
+
+    def change_n_bits(self, n_bits):
+        self.n_bits = n_bits
+        self.qmin = 0
+        self.qmax = int(2 ** (n_bits) - 1)
+
+    def update_ratio(self, new_ratio):
+        """Update the quantization ratio dynamically."""
+        if 0.0 <= new_ratio <= 1.0:
+            self.quantization_ratio = new_ratio
+        else:
+            raise ValueError("quantization_ratio should be between 0 and 1.")
+
+    def fake_quant(self, x):
+        if self.clamp_method == "STE":
+            scale = clamp_ste(self.scale, 1e-4, 1e4)
+            round_zero_point = clamp_ste(round_ste(self.zero_point), self.qmin, self.qmax)
+        elif self.clamp_method == "MAD":
+            scale = clamp_mad(self.scale, 1e-4, 1e4)
+            round_zero_point = clamp_mad(round_ste(self.zero_point), self.qmin, self.qmax)
+
+        dim1, dim2 = x.shape
+        x = x.reshape(-1, self.group_size)
+
+        # 计算需要量化的组数
+        total_groups = x.shape[0]
+        quantized_groups = int(total_groups * self.quantization_ratio)
+        if quantized_groups == 0: quantized_groups = 1  # 防止没有
+
+        # 直接构造量化后的新张量
+        x_quantized = x.clone()
+        x_int = round_ste(x[:quantized_groups] / scale[:quantized_groups])
+        if round_zero_point is not None:
+            x_int = x_int.add(round_zero_point[:quantized_groups])
+        x_int = x_int.clamp(self.qmin, self.qmax)
+
+        x_dequant = x_int
+        if round_zero_point is not None:
+            x_dequant = x_dequant.sub(round_zero_point[:quantized_groups])
+        x_dequant = x_dequant.mul(scale[:quantized_groups])
+
+        # 返回量化后的新张量
+        x_quantized[:quantized_groups] = x_dequant
+        return x_quantized.reshape(dim1, dim2)
+
+    def forward(self, x: torch.Tensor):
+        if self.n_bits >= 16 or not self.enable:
+            return x
+        return self.fake_quant(x)

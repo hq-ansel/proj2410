@@ -189,6 +189,32 @@ def train_units_layers(model: PreTrainedModel,
         print(f"estimated memory usage: {trainable_number*(4+2+2*4)/(1024**3)}G")
         best_val_loss = 1e6
         early_stop_flag = 0
+        if args.get("gradual_quant",False):
+            class GradualWarmupScheduler:
+                def __init__(self,
+                              linear_list:List[int_linear_fake.QuantLinear],
+                              total_iteration:int,):
+                    self.linear_list = linear_list
+                    self.total_iteration = total_iteration
+                    self.iteration = 0
+                    self.update()
+                def update(self):
+                    self.iteration += 1
+                    for linear in self.linear_list:
+                        if self.iteration < self.total_iteration/2:
+                            ratio = self.iteration/self.total_iteration/2
+                            linear.update_ratio(ratio)
+                        else:
+                            linear.update_ratio(1.0)
+            q_linear_list = []
+            for i in trainable_layer_idx_list:
+                for n,m in qlayers[i].named_modules():
+                    if isinstance(m, int_linear_fake.QuantLinear):
+                        q_linear_list.append(m)
+            graualWarmupScheduler = GradualWarmupScheduler(
+                q_linear_list,
+                total_training_iteration,
+            )
         # step 6.3: training loop
         for epoch in range(args.epochs):
             loss_list = []
@@ -286,6 +312,7 @@ def train_units_layers(model: PreTrainedModel,
                     loss_recorder.record(f"blk{trainable_layer_idx_list}",
                                         step,
                                         loss.detach().cpu().item())
+                graualWarmupScheduler.update() if args.get("gradual_quant",False) else None
                 loss_list.append(loss.detach().cpu())
                 # 反向传播和优化
                 if not args.loss_func == "KL-Divergence":

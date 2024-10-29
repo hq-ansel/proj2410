@@ -1,14 +1,13 @@
 #!/bin/bash
 quant_model_paths=(
-    /home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-fast-end2start-align-end
-    /home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-fast-slide2-algin-end
+    /home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-fast-gradual-quant
 )
 for quant_model_path in ${quant_model_paths[@]}; do
     (
         cd /home/ubuntu/data/exp/proj2410/
         # 指定数据集位置
         export HF_HOME="/home/ubuntu/data/exp/proj2410/hf_home"
-        export CUDA_VISIBLE_DEVICES=0,1  # or e.g. 0,1,2,3
+        export CUDA_VISIBLE_DEVICES=1  # or e.g. 0,1,2,3
         export MODEL_PATH=/home/ubuntu/data/exp/proj2410/model/Llama2-7b
         export DATASET_PATH=pajama
         export AMP_ENABLED=True

@@ -1,7 +1,7 @@
 import fast_hadamard_transform
 import torch
 
-from lib import utils
+from .. import utils
 
 
 def get_hadK(n, transpose=False):

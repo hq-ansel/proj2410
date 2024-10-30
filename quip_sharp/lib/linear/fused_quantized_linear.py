@@ -4,8 +4,8 @@ import quiptools_cuda
 import torch
 import torch.nn as nn
 
-from lib import codebook
-from lib.utils import dtype_from_str, get_hadK
+from .. import codebook
+from ..utils import dtype_from_str, get_hadK
 
 from .quantized_linear import QuantizedLinear
 

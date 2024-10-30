@@ -1,7 +1,7 @@
 import fast_hadamard_transform
 import torch
 
-from lib import utils
+from . import utils
 torch._dynamo.config.cache_size_limit = 256
 
 

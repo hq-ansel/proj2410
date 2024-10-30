@@ -4,8 +4,8 @@ import quiptools_cuda
 import torch
 import torch.nn as nn
 
-from lib import codebook
-from lib.utils import clean, dtype_from_str, get_hadK
+from .. import codebook
+from ..utils import clean, dtype_from_str, get_hadK
 
 
 class QuantizedLinear(nn.Module):
@@ -95,6 +95,9 @@ class QuantizedLinear(nn.Module):
         return self.no_ckpt_forward(input)
 
     def ckpt_forward(self, input):
+        """
+        Use torch.utils.checkpoint.checkpoint to save memory and compute time.
+        """
         return torch.utils.checkpoint.checkpoint(self.no_ckpt_forward,
                                                  input,
                                                  use_reentrant=True)

@@ -1,7 +1,9 @@
 import torch
 import argparse
-from lib.codebook import get_id
-from lib.linear.quantized_linear import QuantizedLinear
+# from qtip.lib.codebook import get_id
+# from qtip.lib.linear.quantized_linear import QuantizedLinear
+from quip_sharp.lib.codebook import get_id
+from quip_sharp.lib.linear.quantized_linear import QuantizedLinear
 
 
 def get_linear_layer(args):
@@ -41,7 +43,7 @@ def get_linear_layer(args):
     linear = QuantizedLinear(
         args.in_channels,
         args.out_channels,
-        codebook_id=get_id(quip_param_dict[args.bits]['codebook']),
+        # codebook_id=get_id(quip_param_dict[args.bits]['codebook']),
         codesz=quip_param_dict[args.bits]['codesz'],
         packsz=quip_param_dict[args.bits]['packsz'],
         pack_out=False,

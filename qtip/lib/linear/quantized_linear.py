@@ -4,8 +4,8 @@ import math
 import torch
 import torch.nn as nn
 
-from lib.codebook import bitshift
-from lib.utils import clean, dtype_from_str, get_hadK, matmul_hadU_cuda, has_kernel
+from ..codebook import bitshift
+from ..utils import clean, dtype_from_str, get_hadK, matmul_hadU_cuda, has_kernel
 
 
 class QuantizedLinear(nn.Module):

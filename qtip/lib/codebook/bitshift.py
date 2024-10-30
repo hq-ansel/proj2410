@@ -4,10 +4,10 @@ from torch import nn
 import numpy as np
 from functools import cache
 import itertools
-from lib.utils.matmul_had import matmul_hadU_cuda, matmul_hadUt_cuda
-from lib.utils.kernel_check import has_kernel
-from lib.utils.kernel_decompress import decode_compressed
-from lib.codebook import kdict
+from ..utils.matmul_had import matmul_hadU_cuda, matmul_hadUt_cuda
+from ..utils.kernel_check import has_kernel
+from ..utils.kernel_decompress import decode_compressed
+from ..codebook import kdict
 import os
 
 from tqdm import tqdm

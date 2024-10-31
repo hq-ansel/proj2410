@@ -22,6 +22,10 @@ _E8P_CODESZ = 8
 
 
 def get_norm12():
+    """
+    return a tensor of shape (29, 8) 
+    
+    """
     # 29 elements of norm 12 in E8 + 1/4
     return torch.tensor([
         [3, 1, 1, 1, 3, 3, 3, 3],
@@ -57,6 +61,11 @@ def get_norm12():
 
 
 def get_packed_abs_grid():
+    """
+    d8 (8^8, 8)
+    d8m2 (8) is a boolean mask of d8 with sum is even
+    d8n (8) is a boolean mask of d8 with squre sum <= 10
+    """
     intr = torch.arange(-4, 4)
     d8 = torch.cartesian_prod(*[intr] * 8).float() + 1 / 2
     d8m2 = (d8.sum(dim=-1) % 2 == 0)
@@ -86,6 +95,10 @@ def get_abs_grid():
 
 
 def get_full_grid(packed_abs_grid):
+    """
+    args:
+        packed_abs_grid: a tensor of shape (256, 8) containing the packed absolute grid
+    """
     synth_codebook = torch.zeros(1 << 16, 8)
     parity_idx = []
     shuffle_map = [0, 4, 1, 5, 2, 6, 3, 7]

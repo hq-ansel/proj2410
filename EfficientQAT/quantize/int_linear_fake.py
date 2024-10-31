@@ -33,7 +33,10 @@ class QuantLinear(nn.Module):
         self.use_weight_quant = False
         # initialize quantizer
         # self.weight_quantizer = UniformAffineQuantizer(wbits, group_size, weight=org_module.weight,args=args)
-        self.weight_quantizer = GradualUniformAffineQuantizer(wbits, group_size, weight=org_module.weight,args=args)
+        self.weight_quantizer = GradualUniformAffineQuantizer(wbits,
+                                                            group_size,
+                                                            weight=org_module.weight,
+                                                            args=args)
         self.use_temporary_parameter = False
         self.clamp_input = args.get('clamp_input',False)
 
@@ -62,8 +65,13 @@ class QuantLinear(nn.Module):
         bias = self.bias
         return weight, bias
 
-    def update_ratio(self, ratio: float):
+    def update_position_ratio(self, ratio: float):
         """
         Update the quantization ratio of the weight.
         """
-        self.weight_quantizer.update_ratio(ratio)
+        self.weight_quantizer.update_position_ratio(ratio)
+    def update_interpolate_ratio(self, ratio: float):
+        """
+        Update the interpolation ratio of the raw weight.
+        """
+        self.weight_quantizer.update_interpolate_ratio(ratio)

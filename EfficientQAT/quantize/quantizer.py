@@ -132,7 +132,7 @@ class GradualUniformAffineQuantizer(nn.Module):
         group_size=None,
         weight=None,
         args=None,
-        quantization_ratio=1.0,  # 新增量化比例参数，默认全量化
+        quantization_position_ratio=1.0,  # 新增量化比例参数，默认全量化
     ):
         super().__init__()
         assert 2 <= n_bits <= 16, "bitwidth not supported"
@@ -143,7 +143,8 @@ class GradualUniformAffineQuantizer(nn.Module):
         assert weight.shape[-1] % group_size == 0
         self.enable = True
         self.clamp_method = args.clamp_method
-        self.quantization_ratio = quantization_ratio  # 量化比例
+        self.quantization_position_ratio = quantization_position_ratio  # 量化比例
+        self.interpolate = 1.0 if args.get("interpolate", False) else 0  # 插值比例 0 代表没有前权重 1代表全是前权重
 
         # init scale and zero point through Max-Min quantization
         with torch.no_grad():
@@ -166,12 +167,19 @@ class GradualUniformAffineQuantizer(nn.Module):
         self.qmin = 0
         self.qmax = int(2 ** (n_bits) - 1)
 
-    def update_ratio(self, new_ratio):
-        """Update the quantization ratio dynamically."""
-        if 0.0 <= new_ratio <= 1.0:
-            self.quantization_ratio = new_ratio
+    def update_position_ratio(self, new_position_ratio):
+        """Update the quantization position_ratio dynamically."""
+        if 0.0 <= new_position_ratio <= 1.0:
+            self.quantization_position_ratio = new_position_ratio
         else:
-            raise ValueError("quantization_ratio should be between 0 and 1.")
+            raise ValueError("quantization_position_ratio should be between 0 and 1.")
+
+    def update_interpolate_ratio(self, new_interpolate):
+        """Update the interpolate ratio dynamically."""
+        if 0.0 <= new_interpolate <= 1.0:
+            self.interpolate = new_interpolate
+        else:
+            raise ValueError("interpolate should be between 0 and 1.")
 
     def fake_quant(self, x):
         if self.clamp_method == "STE":
@@ -186,7 +194,7 @@ class GradualUniformAffineQuantizer(nn.Module):
 
         # 计算需要量化的组数
         total_groups = x.shape[0]
-        quantized_groups = int(total_groups * self.quantization_ratio)
+        quantized_groups = int(total_groups * self.quantization_position_ratio)
         if quantized_groups == 0: quantized_groups = 1  # 防止没有
 
         # 直接构造量化后的新张量
@@ -203,6 +211,9 @@ class GradualUniformAffineQuantizer(nn.Module):
 
         # 返回量化后的新张量
         x_quantized[:quantized_groups] = x_dequant
+        if self.interpolate>1e-6:
+            x_quantized = (1-self.interpolate)*x_quantized+x*self.interpolate
+
         return x_quantized.reshape(dim1, dim2)
 
     def forward(self, x: torch.Tensor):

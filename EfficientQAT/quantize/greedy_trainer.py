@@ -189,7 +189,7 @@ def train_units_layers(model: PreTrainedModel,
         print(f"estimated memory usage: {trainable_number*(4+2+2*4)/(1024**3)}G")
         best_val_loss = 1e6
         early_stop_flag = 0
-        if args.get("gradual_quant",False):
+        if args.get("gradual_quant",False) or args.get("interpolate",False):
             class GradualWarmupScheduler:
                 def __init__(self,
                               linear_list:List[int_linear_fake.QuantLinear],
@@ -203,9 +203,14 @@ def train_units_layers(model: PreTrainedModel,
                     for linear in self.linear_list:
                         if self.iteration < self.total_iteration/2:
                             ratio = self.iteration/self.total_iteration/2
-                            linear.update_ratio(ratio)
+                            if args.get("gradual_quant",False):
+                                linear.update_position_ratio(ratio)
+                            if args.get("interpolate", False):
+                                linear.update_interpolate_ratio(1-ratio)
                         else:
-                            linear.update_ratio(1.0)
+                            linear.update_position_ratio(1.0)
+                            if args.get("interpolate", False):
+                                linear.update_interpolate_ratio(0)
             q_linear_list = []
             for i in trainable_layer_idx_list:
                 for n,m in qlayers[i].named_modules():

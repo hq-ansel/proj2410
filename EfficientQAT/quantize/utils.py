@@ -1,8 +1,12 @@
 from collections import OrderedDict
-from .int_linear_fake import QuantLinear
+from typing  import Optional
+
 import torch
 from torch import nn
-from typing  import Optional
+from concurrent.futures import ThreadPoolExecutor
+
+from .int_linear_fake import QuantLinear
+
 
 class StopException(Exception):
     pass
@@ -22,18 +26,85 @@ class Catcher(nn.Module):
     def __init__(self, module,stop_forward_flag=False):
         super().__init__()
         self.module = module  # 包装的原始module
+        self.stop_forward_flag = stop_forward_flag  # 控制前向传播的标志
+        
         self.index = 0  # 输入数据的索引
+        self.layer_idx = 0  # 用于记录当前层的索引
+        
         self.attention_mask = None  # 用于存储attention mask
         self.position_ids = None  # 用于存储位置id
-        self.stop_forward_flag = stop_forward_flag  # 控制前向传播的标志
+        
         self.inps = {}  # 用于存储输入
         self.outs=None
+        
+        self.store_dir = None  # 用于存储输入数据的文件夹
+        
+        self.input_catch_state = False  # 控制是否存储输入数据
+        self.output_catch_state = False  # 控制是否存储输出数据
+        self.store_input_flag = False  # 控制是否存储输入数据
+        self.store_output_flag = False  # 控制是否存储输出数据
+        self.store_executor = None  # 用于存储数据的线程池
+
+    def set_input_catch_state(self, state: bool):
+        self.input_catch_state = state
+    def set_output_catch_state(self, state: bool):
+        self.output_catch_state = state
+    def set_store_dir(self, store_dir: str):
+        self.store_dir = store_dir
+    def set_store_state(self, store_input: bool, store_output: bool):
+        self.store_input_flag = store_input
+        self.store_output_flag = store_output
+
+    def set_layer_idx(self, layer_idx: int):
+        self.layer_idx = layer_idx
+
+    def setup_executor(self, max_workers: int):
+        self.store_executor = ThreadPoolExecutor(max_workers=max_workers)
+
+    def store_tensor(self, tensor: torch.Tensor, type: str):
+        """
+        仅允许存储 (seq_len,hidden_size)
+        """
+        assert tensor.dim() == 2, f"Only allow store (seq_len,hidden_size) tensor, but got {tensor.shape}"
+        if type == 'input':
+            path = os.path.join(self.store_dir, f"input_layer{self.layer_idx}_{self.index}.pt")
+            self.store_executor.submit(torch.save, tensor.cpu(), path)
+        elif type == 'output':
+            path = os.path.join(self.store_dir, f"output_layer{self.layer_idx}_{self.index}.pt")
+            self.store_executor.submit(torch.save, tensor.cpu(), path)
+
     def forward(self, inp, **kwargs):
-        
-        
-        # 前向传播，并存储输出
+        # 强制store与catch应该是两套逻辑
+        # 所以这两个的index应该是分开的
+        assert not (self.input_catch_state and self.store_input_flag), "Catcher should not store input data when catch input data"
+        if self.input_catch_state:
+            if self.attention_mask is None:
+                self.attention_mask = kwargs.get('attention_mask', None)
+            if self.position_ids is None:
+                self.position_ids = kwargs.get('position_ids', None)
+            self.inps[self.index] = inp  # 存储输入数据
+            self.index += 1  # 输入数据的索引加1
+
         output = self.module(inp, **kwargs)
-        self.outs = output  # 存储输出
+
+        if self.store_input_flag or self.store_output_flag:
+            if inp.dim() == 3:
+                for i in range(inp.size(0)):
+                    if self.store_input_flag:
+                        self.store_tensor(inp[i], 'input')
+                    if self.store_output_flag:
+                        self.store_tensor(output[0][i], 'output')
+                    self.index += 1
+            else:
+                if self.store_input_flag:
+                    self.store_tensor(inp, 'input')
+                if self.store_output_flag:
+                    self.store_tensor(output[0], 'output')
+                self.index += 1
+            
+        
+        if self.output_catch_state:
+            self.outs = output  # 存储输出
         if self.stop_forward_flag:
             raise StopException(f"stop forward shape: {output[0].shape}")
         return output

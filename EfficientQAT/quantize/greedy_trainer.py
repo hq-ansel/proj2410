@@ -138,10 +138,14 @@ def train_units_layers(model: PreTrainedModel,
         if not args.loss_func == "KL-Divergence":
             if args.align_type == "tail":
                 qlayers[align_index].set_forward_state(stop_forward=True)
+                qlayers[align_index].set_output_catch_state(state=True)
                 fp_layers[align_index].set_forward_state(stop_forward=True)
+                fp_layers[align_index].set_output_catch_state(state=True)
             else:
                 qlayers[last_block_idx].set_forward_state(stop_forward=True)
+                qlayers[last_block_idx].set_output_catch_state(state=True)
                 fp_layers[last_block_idx].set_forward_state(stop_forward=True)
+                fp_layers[last_block_idx].set_output_catch_state(state=True)
 
         for name, param in model.named_parameters():
             param.requires_grad = False

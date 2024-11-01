@@ -1,15 +1,84 @@
-from transformers import AutoTokenizer,PreTrainedTokenizer
-from datasets import load_dataset
-import numpy as np
-import torch
+import os
 import random
 from tqdm import tqdm
-import torch.nn as nn
 from typing import List, Tuple,Union,Dict
 
 import torch
-from torch.utils.data import Dataset
-import os
+import torch.nn as nn
+from torch.utils.data import Dataset,DataLoader
+from transformers import AutoTokenizer,PreTrainedTokenizer,PreTrainedModel
+from datasets import load_dataset
+import numpy as np
+
+from .quantize.utils import StopException,Catcher
+
+class CustomDataset(Dataset):
+    def __init__(self, data_dir, transform=None):
+        """
+        初始化Dataset
+
+        参数:
+            data_dir (str): 数据文件的路径
+            transform (callable, optional): 应用于数据的转换函数
+        """
+        self.data_dir = data_dir
+        self.file_list = sorted([f for f in os.listdir(data_dir) if f.endswith('.pt')])
+        self.transform = transform
+
+    def __len__(self):
+        """返回数据集中样本的数量"""
+        return len(self.file_list)
+
+    def __getitem__(self, idx):
+        """
+        根据索引idx加载并返回样本数据
+
+        参数:
+            idx (int): 数据索引
+        返回:
+            sample: 数据样本，经过transform后（如果存在transform）
+        """
+        # 读取 .pt 文件
+        file_path = os.path.join(self.data_dir, self.file_list[idx])
+        sample = torch.load(file_path)
+
+        # 应用 transform（如果有）
+        if self.transform:
+            sample = self.transform(sample)
+
+        return sample
+
+
+@torch.no_grad()
+def generate_block_train_data(
+        model: PreTrainedModel,
+        dataloader: DataLoader,
+        out_dir: str,
+):
+    """
+    第一层存储input,output
+    第二层以及后面的层数仅存储output
+    """
+    device = next(model.parameters()).device
+    layers = dict(model.named_modules()).get("model.layers",None)
+    assert layers is not None, "model.layers not found"
+    for idx in range(len(layers)):
+        layers[idx] = Catcher(layers[idx])
+        if idx == 0:
+            layers[idx].set_store_state(store_input=True, store_output=True)
+        else:
+            layers[idx].set_store_state(store_input=False, store_output=True)   
+        layers[idx].setup_executor(2)
+        layers[idx].set_store_dir(out_dir)
+        layers[idx].set_layer_idx(idx)
+
+    print(f"len of dataloader: {len(dataloader)}")
+    for idx, batch in tqdm(enumerate(dataloader)):
+        inp, tar = batch
+        model(inp.to(device))
+    for idx in range(len(layers)):
+        layers[idx] = layers[idx].module
+
 
 def get_wikitext2(
     tokenizer: PreTrainedTokenizer, 

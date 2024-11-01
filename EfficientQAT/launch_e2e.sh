@@ -1,6 +1,6 @@
 #!/bin/bash
 quant_model_paths=(
-    /home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-fast-gradual-quant-slide2-end2start
+    /home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-fast-gradual-interpolate
 )
 for quant_model_path in ${quant_model_paths[@]}; do
     (
@@ -38,6 +38,7 @@ for quant_model_path in ${quant_model_paths[@]}; do
         --bf16 \
         --data_seed 42 \
         --max_grad_norm 0.3 \
+        --save_total_limit 1 \
         --group_by_length
     )
 done

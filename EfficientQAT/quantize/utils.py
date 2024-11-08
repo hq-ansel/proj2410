@@ -1,8 +1,9 @@
 from collections import OrderedDict
-from typing  import Optional
+from typing  import Optional, Tuple, Union, List, Dict
 
 import torch
 from torch import nn
+from torch.utils.checkpoint import checkpoint
 from concurrent.futures import ThreadPoolExecutor
 
 from .int_linear_fake import QuantLinear
@@ -33,6 +34,7 @@ class Catcher(nn.Module):
         
         self.attention_mask = None  # 用于存储attention mask
         self.position_ids = None  # 用于存储位置id
+        self.position_embeddings = None  # 用于存储位置embedding
         
         self.inps = {}  # 用于存储输入
         self.outs=None
@@ -60,18 +62,42 @@ class Catcher(nn.Module):
 
     def setup_executor(self, max_workers: int):
         self.store_executor = ThreadPoolExecutor(max_workers=max_workers)
+        if max_workers == 0:
+            self.store_executor = None
+        else:
+            self.result = []
 
     def store_tensor(self, tensor: torch.Tensor, type: str):
         """
         仅允许存储 (seq_len,hidden_size)
         """
         assert tensor.dim() == 2, f"Only allow store (seq_len,hidden_size) tensor, but got {tensor.shape}"
+
+        # 检查队列是否达到上限
+        if self.store_executor and len(self.result) >= 4:
+            # 强制等待队列中的任务完成
+            for future in self.result:
+                future.result()  # 等待任务完成
+            # 清空已完成的任务
+            self.result.clear()
+
         if type == 'input':
             path = os.path.join(self.store_dir, f"input_layer{self.layer_idx}_{self.index}.pt")
-            self.store_executor.submit(torch.save, tensor.cpu(), path)
+            if self.store_executor:
+                self.result.append(
+                    self.store_executor.submit(torch.save, tensor.cpu(), path)
+                )
+            else:
+                torch.save(tensor.cpu(), path)
         elif type == 'output':
             path = os.path.join(self.store_dir, f"output_layer{self.layer_idx}_{self.index}.pt")
-            self.store_executor.submit(torch.save, tensor.cpu(), path)
+            if   self.store_executor:
+                self.result.append(
+                    self.store_executor.submit(torch.save, tensor.cpu(), path)
+                    )
+            else:
+                torch.save(tensor.cpu(), path)
+
 
     def forward(self, inp, **kwargs):
         # 强制store与catch应该是两套逻辑
@@ -82,12 +108,20 @@ class Catcher(nn.Module):
                 self.attention_mask = kwargs.get('attention_mask', None)
             if self.position_ids is None:
                 self.position_ids = kwargs.get('position_ids', None)
+            if self.position_embeddings is None:
+                self.position_embeddings = kwargs.get('position_embeddings', None)
             self.inps[self.index] = inp  # 存储输入数据
             self.index += 1  # 输入数据的索引加1
 
         output = self.module(inp, **kwargs)
 
         if self.store_input_flag or self.store_output_flag:
+            if self.attention_mask is None:
+                self.attention_mask = kwargs.get('attention_mask', None)
+            if self.position_ids is None:
+                self.position_ids = kwargs.get('position_ids', None)
+            if self.position_embeddings is None:
+                self.position_embeddings = kwargs.get('position_embeddings', None)
             if inp.dim() == 3:
                 for i in range(inp.size(0)):
                     if self.store_input_flag:
@@ -114,20 +148,41 @@ class Catcher(nn.Module):
 
 
 class MultiBlock(nn.Module):
+    """
+    这个模块是用来模拟多层的block进行推理的过程
+    """
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.block_list = nn.ModuleList([])
     
     def add_block(self, block):
         self.block_list.append(block)
+    def set_block_list(self, block_list):
+        self.block_list = block_list
+
+    def move2device(self, device:str = 'cpu'):
+        for block in self.block_list:
+            block.to(device)
         
     def forward(self,
         hidden_states: torch.Tensor,
         attention_mask: Optional[torch.Tensor] = None,
-        position_ids: Optional[torch.LongTensor] = None):
+        position_embeddings: Tuple[torch.Tensor,torch.Tensor]  = None,
+        gradient_checkpointing: bool = False,
+        training: bool = False,
+        ) -> torch.Tensor:
+        assert position_embeddings is not None and attention_mask is not None, "position_embeddings and attention_mask should not be None"
         for block in self.block_list:
-            hidden_states = block(hidden_states, attention_mask=attention_mask,position_ids=position_ids)[0]
-        return (hidden_states, )
+            if gradient_checkpointing and training:
+                layer_outputs = checkpoint(block.__call__, 
+                                            hidden_states, 
+                                            attention_mask, 
+                                            position_embeddings, 
+                                            )
+            else:
+                layer_outputs = block(hidden_states, attention_mask, position_embeddings)
+            hidden_states = layer_outputs[0]
+        return hidden_states
 
 
 def set_weight_parameters(model, requires_grad):

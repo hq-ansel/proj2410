@@ -4,7 +4,7 @@ group_size: 128
 # training settings
 cuda_ids: "0,1"
 epochs: 2
-net: Qwen2.5
+net: Qwen2.5-0.5B
 batch_size: 2
 quant_lr: 0.0001
 weight_lr: 0.00001
@@ -14,7 +14,7 @@ crossblock_window_size: 2
 train_size: 4096
 slide_step: 2
 
-model: /home/ubuntu/data/exp/proj2410/model/Qwen-2.5-0.5B
+model: /home/ubuntu/data/exp/proj2410/model/Qwen2.5-0.5B
 # save settings
 output_dir: /home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-fast-gradual-quant-slide2-end2start/
 log_loss: /home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-fast-gradual-quant-slide2-end2start/loss.csv

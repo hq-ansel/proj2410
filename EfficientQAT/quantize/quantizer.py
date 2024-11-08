@@ -142,7 +142,7 @@ class GradualUniformAffineQuantizer(nn.Module):
         self.group_size = group_size if group_size != -1 else weight.shape[-1]
         assert weight.shape[-1] % group_size == 0
         self.enable = True
-        self.clamp_method = args.clamp_method
+        self.clamp_method = args.get("clamp_method", "STE")
         self.quantization_position_ratio = quantization_position_ratio  # 量化比例
         self.interpolate = 1.0 if args.get("interpolate", False) else 0  # 插值比例 0 代表没有前权重 1代表全是前权重
 

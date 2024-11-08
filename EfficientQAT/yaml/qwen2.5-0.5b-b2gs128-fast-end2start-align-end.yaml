@@ -14,7 +14,7 @@ crossblock_window_size: 1
 train_size: 4096
 slide_step: 1
 
-model: /home/ubuntu/data/exp/proj2410/model/Qwen-2.5-0.5B
+model: /home/ubuntu/data/exp/proj2410/model/Qwen2.5-0.5B
 # save settings
 output_dir: /home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-fast-end2start-align-end/
 log_loss: /home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-fast-end2start-align-end/loss.csv

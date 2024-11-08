@@ -206,9 +206,9 @@ def main():
             cache_trainloader = f'{args.cache_dir}/dataloader_{args.net}_{args.calib_dataset}_{args.train_size}_{args.val_size}_{args.training_seqlen}_train.cache'
             cache_valloader = f'{args.cache_dir}/dataloader_{args.net}_{args.calib_dataset}_{args.train_size}_{args.val_size}_{args.training_seqlen}_val.cache'
             if os.path.exists(cache_trainloader) and os.path.exists(cache_valloader):
-                trainloader = torch.load(cache_trainloader)
+                trainloader = torch.load(cache_trainloader,weights_only=True)
                 logger.info(f"load trainloader from {cache_trainloader}")
-                valloader = torch.load(cache_valloader)
+                valloader = torch.load(cache_valloader,weights_only=True)
                 logger.info(f"load valloader from {cache_valloader}")
             else:
                 trainloader, valloader = get_loaders(
@@ -242,5 +242,5 @@ def main():
 
 
 if __name__ == "__main__":
-    print(sys.argv)
+    # print(sys.argv)
     main()

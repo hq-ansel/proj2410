@@ -1,6 +1,7 @@
 #!/bin/bash
 quant_model_paths=(
-    /home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-fast-gradual-interpolate
+    /home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-fast-skip25
+    /home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-fast-skip50
 )
 for quant_model_path in ${quant_model_paths[@]}; do
     (

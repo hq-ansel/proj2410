@@ -41,7 +41,9 @@ class QuantLinear(nn.Module, TritonModuleMixin):
         if infeatures % 32 != 0 or outfeatures % 32 != 0:
             raise NotImplementedError("in_feature and out_feature must be divisible by 32.")
         self.infeatures = infeatures
+        self.in_features = infeatures
         self.outfeatures = outfeatures
+        self.out_features = outfeatures
         self.bits = bits
         self.group_size = group_size if group_size != -1 else infeatures
         self.maxq = 2 ** self.bits - 1
@@ -176,8 +178,8 @@ class QuantLinear(nn.Module, TritonModuleMixin):
             weight = ((weight.view(-1, self.group_size, dim1) - zeros.view(-1, 1, dim1)) * self.scales.view(-1, 1, dim1)).reshape(dim0, dim1)
         # out = torch.matmul(x, weight)
         # torch.cuda.synchronize()
-        if self.clamp_input:
-            x = torch.clamp(x, -128, 127)
+        # if self.clamp_input:
+        #     x = torch.clamp(x, -128, 127)
         out = torch.matmul(x, weight.to(x.dtype))
         # torch.cuda.synchronize()
 

@@ -254,3 +254,51 @@ c4 perplexity: 36.93
 |             |       |none  |     0|acc_norm|0.6279|±  |0.0113|
 
 Average Acc: 44.67%
+
+AMP enabled: False
+Loading quantized model from /home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-fast-skip25-alpaca-4096/checkpoint-10000
+Loading pre-computed quantized weights...
+Loading pre-computed quantized weights Successfully
+device_map: OrderedDict([('', 0)])
+Loading Wikitext-2 dataset...
+wikitext2: 89.71896362304688
+get_c4
+c4: 50.727874755859375
+wikitext2 perplexity: 89.72
+c4 perplexity: 50.73
+|    Tasks    |Version|Filter|n-shot| Metric |   |Value |   |Stderr|
+|-------------|------:|------|-----:|--------|---|-----:|---|-----:|
+|arc_challenge|      1|none  |     0|acc     |↑  |0.2108|±  |0.0119|
+|             |       |none  |     0|acc_norm|↑  |0.2355|±  |0.0124|
+|arc_easy     |      1|none  |     0|acc     |↑  |0.4773|±  |0.0102|
+|             |       |none  |     0|acc_norm|↑  |0.4474|±  |0.0102|
+|hellaswag    |      1|none  |     0|acc     |↑  |0.2995|±  |0.0046|
+|             |       |none  |     0|acc_norm|↑  |0.3318|±  |0.0047|
+|piqa         |      1|none  |     0|acc     |↑  |0.6039|±  |0.0114|
+|             |       |none  |     0|acc_norm|↑  |0.6153|±  |0.0114|
+|winogrande   |      1|none  |     0|acc     |↑  |0.5296|±  |0.0140|
+
+Average Acc: 42.42%
+Loading quantized model from /home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-fast-skip50-alpaca-4096/checkpoint-10000
+Loading pre-computed quantized weights...
+Loading pre-computed quantized weights Successfully
+device_map: OrderedDict([('', 0)])
+Loading Wikitext-2 dataset...
+wikitext2: 222.3687286376953
+get_c4
+c4: 74.11389923095703
+wikitext2 perplexity: 222.37
+c4 perplexity: 74.11
+|    Tasks    |Version|Filter|n-shot| Metric |   |Value |   |Stderr|
+|-------------|------:|------|-----:|--------|---|-----:|---|-----:|
+|arc_challenge|      1|none  |     0|acc     |↑  |0.1997|±  |0.0117|
+|             |       |none  |     0|acc_norm|↑  |0.2278|±  |0.0123|
+|arc_easy     |      1|none  |     0|acc     |↑  |0.4217|±  |0.0101|
+|             |       |none  |     0|acc_norm|↑  |0.3880|±  |0.0100|
+|hellaswag    |      1|none  |     0|acc     |↑  |0.2871|±  |0.0045|
+|             |       |none  |     0|acc_norm|↑  |0.3090|±  |0.0046|
+|piqa         |      1|none  |     0|acc     |↑  |0.5963|±  |0.0114|
+|             |       |none  |     0|acc_norm|↑  |0.5936|±  |0.0115|
+|winogrande   |      1|none  |     0|acc     |↑  |0.5178|±  |0.0140|
+
+Average Acc: 40.45%

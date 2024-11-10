@@ -105,12 +105,11 @@ class LazyLoadDataset(Dataset):
         output_file_path = input_file_path.replace("input","output")
         if self.meta_device_list[idx] == "disk":
             input_sample = torch.load(input_file_path,weights_only=True)
-            self.data_list[idx] = input_sample
+            output_sample = torch.load(output_file_path,weights_only=True)
+            self.data_list[idx] = (input_sample, output_sample)
             self.meta_device_list[idx] = "cpu"
         else:
-            input_sample = self.data_list[idx]
-        output_sample = torch.load(output_file_path,weights_only=True)
-
+            input_sample,output_sample = self.data_list[idx]
         return input_sample, output_sample
     # @torch.no_grad()
     # def update_dataset(self, module: Callable,
@@ -222,9 +221,10 @@ class LazyLoadDataset(Dataset):
                     if self.meta_device_list[real_idx] == "disk":
                         tasks.append(save_to_disk(output[inner_idx].detach().cpu(), new_input_file_path))
                     else:
-                        self.data_list[real_idx] = output[inner_idx].detach().cpu()
+                        output_sample = torch.load(self.file_dict["output"][layer_idx][real_idx], weights_only=True)
+                        self.data_list[real_idx] = (output[inner_idx].detach().cpu(), output_sample)
 
-                    tasks.append(copy_to_disk(self.file_dict["output"][layer_idx][real_idx], new_output_file_path))
+                    # tasks.append(copy_to_disk(self.file_dict["output"][layer_idx][real_idx], new_output_file_path))
 
             # 等待所有异步任务完成
             await asyncio.gather(*tasks)

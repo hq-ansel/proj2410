@@ -247,7 +247,8 @@ def train_units_layers(model: PreTrainedModel,
 
                     for layer_idx in trainable_layer_idx_list:
                         # 使用 lambda 将关键字参数改为位置参数
-                        hidden_state.requires_grad = True
+                        # hidden_state.requires_grad = True
+                        assert hidden_state.requires_grad == True, "hidden_state.requires_grad is False"
                         layer_outputs = checkpoint(
                             lambda hidden_state, attention_mask, position_embeddings: qlayers[layer_idx](
                                 hidden_states=hidden_state,

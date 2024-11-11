@@ -211,10 +211,10 @@ class LazyLoadDataset(Dataset):
                 for inner_idx in range(batch_size):
                     real_idx = idx * batch_size + inner_idx
                     new_input_file_name = f"input_layer{layer_idx}_{real_idx}.pt"
-                    new_input_file_path = os.path.join(self.tmp_dir, new_input_file_name)
+                    new_input_file_path = os.path.join(self.data_dir, new_input_file_name)
                     new_file_list.append(new_input_file_path)
-                    new_output_file_name = f"output_layer{layer_idx}_{real_idx}.pt"
-                    new_output_file_path = os.path.join(self.tmp_dir, new_output_file_name)
+                    # new_output_file_name = f"output_layer{layer_idx}_{real_idx}.pt"
+                    # new_output_file_path = os.path.join(self.tmp_dir, new_output_file_name)
 
                     assert output[inner_idx].dim() == 2, f"Output should be 2-dimensional, got {output[inner_idx].dim()}"
 

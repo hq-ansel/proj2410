@@ -5,7 +5,7 @@
 config_files=(
     # /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/qwen2.5-0.5b-b2gs128-fast-skip50.yaml
     # /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/qwen2.5-0.5b-b2gs128-fast-skip25.yaml
-    # /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/Llama2-7b-b2gs128.yaml
+    /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/Llama2-7b-b2gs128.yaml
     /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/Llama2-7b-b2gs128-slide2.yaml
     # /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/Llama2-7b-b2gs128-end2start.yaml
     /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/Llama2-7b-b2gs128-gradual-quant.yaml

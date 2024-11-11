@@ -1,4 +1,5 @@
 import shutil
+import functools
 import time
 import os
 import copy
@@ -111,9 +112,6 @@ def train_units_layers(model: PreTrainedModel,
     param_groups = []
     param_group_index = 0
     assert args.quant_lr > 0 or args.weight_lr > 0
-    qlayers = model.model.layers
-    selected_layers = [qlayers[i] for i in trainable_layer_idx_list]
-    selected_layers = nn.ModuleList(selected_layers)
 
     # 使用amp仍然需要权重为float32
     with torch.no_grad():
@@ -126,6 +124,9 @@ def train_units_layers(model: PreTrainedModel,
                         else qlayer.half() for index,
                             qlayer in enumerate(model.model.layers)])
         
+    qlayers = model.model.layers
+    selected_layers = [qlayers[i] for i in trainable_layer_idx_list]
+    selected_layers = nn.ModuleList(selected_layers)
 
     # 暂时没有更好的假设，直接使用selected_layers 中的最后一个层作为对齐层
     align_index = trainable_layer_idx_list[-1]
@@ -244,18 +245,22 @@ def train_units_layers(model: PreTrainedModel,
                                     dtype=args.dtype if amp_enabled else torch.float32):
                     inp,target = input_data
                     hidden_state = inp.to(args.dev,dtype=args.dtype)
-
+                    # assert hidden_state.requires_grad == True, "hidden_state.requires_grad is False"
+                    hidden_state.requires_grad = True
                     for layer_idx in trainable_layer_idx_list:
                         # 使用 lambda 将关键字参数改为位置参数
-                        # hidden_state.requires_grad = True
-                        assert hidden_state.requires_grad == True, "hidden_state.requires_grad is False"
-                        layer_outputs = checkpoint(
-                            lambda hidden_state, attention_mask, position_embeddings: qlayers[layer_idx](
-                                hidden_states=hidden_state,
-                                attention_mask=attention_mask,
-                                position_embeddings=position_embeddings
-                            ),
-                            hidden_state, attention_mask, position_embeddings
+                        # layer_func = functools.partial(
+                        #     qlayers[layer_idx].forward,  # 指定需要调用的函数
+                        #     attention_mask=attention_mask,
+                        #     position_embeddings=position_embeddings
+                        # )
+                        
+                        # # 在 checkpoint 中使用 layer_func 作为函数调用
+                        # layer_outputs = checkpoint(layer_func, hidden_state)
+                        layer_outputs = qlayers[layer_idx](
+                            hidden_states=hidden_state,
+                            attention_mask=attention_mask,
+                            position_embeddings=position_embeddings
                         )
                         hidden_state = layer_outputs[0]
                     loss = loss_func(hidden_state, target.to(args.dev,dtype=torch.float32))
@@ -353,6 +358,7 @@ def trans_quant_block(qlayer:nn.Module,args):
                                 args.wbits,
                                 args.group_size,
                                 args)
+            quantlinear.set_quant_state(True)
             set_op_by_name(qlayer, name, quantlinear)  
             del module  
     return qlayer
@@ -446,7 +452,7 @@ def custom_shedule_train(model:PreTrainedModel,
                 torch.cuda.empty_cache()
                 gc.collect()
             if amp_enabled:
-                qlayer.to(dtype=args.dtype)
+                qlayer= qlayer.to(dtype=args.dtype)
             # 更新数据
             _dtype = attention_mask.dtype
             attention_mask = attention_mask.to(dtype=torch.float32)

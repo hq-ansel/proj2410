@@ -95,7 +95,7 @@ class AffineMSE(nn.Module):
         # 使用 A 进行仿射变换
         transformed_label = label @ self.A
         # 计算损失
-        loss = torch.mean((out - transformed_label) ** 2)+ F.mse_loss(out, transformed_label)*0.01
+        loss = torch.mean((out - transformed_label) ** 2)+ F.mse_loss(out, transformed_label)*0.1
         return loss
 
 

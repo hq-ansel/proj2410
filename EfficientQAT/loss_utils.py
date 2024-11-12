@@ -1,4 +1,5 @@
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
 
 def MSE(output, target):
@@ -81,12 +82,31 @@ def low_frequency_loss(teacher_output, student_output, freq_cutoff=5):
 
     return loss
 
+class AffineMSE(nn.Module):
+    def __init__(self, label_dim):
+        super(AffineMSE, self).__init__()
+        # 初始化仿射变换矩阵 A，大小为 (label_dim, label_dim)
+        self.A = nn.Parameter(torch.eye(label_dim))  # 初始化为单位矩阵
+
+    def reinitialize_A(self):
+        # 重初始化 A
+        self.A.data = torch.eye(self.A.shape[0])
+    def forward(self, out, label):
+        # 使用 A 进行仿射变换
+        transformed_label = label @ self.A
+        # 计算损失
+        loss = torch.mean((out - transformed_label) ** 2)+ F.mse_loss(out, transformed_label)*0.01
+        return loss
+
+
 def get_loss_func(loss_type: str):
     """
     Get the loss function based on the loss type.
     """
     if loss_type == 'MSE':
         return MSE
+    elif loss_type == 'AFFINE_MSE':
+        return AffineMSE
     elif loss_type == 'FKLD':
         return FKLD
     elif loss_type == 'RKLD':

@@ -4,6 +4,7 @@ from tqdm import tqdm
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 import shutil
 from concurrent.futures import ThreadPoolExecutor
+import gc
 
 import asyncio
 import torch
@@ -86,6 +87,29 @@ class LazyLoadDataset(Dataset):
         self.data_list = [None for idx in range(len(self.file_dict["input"][0]))]
         self.max_layer_idx = len(self.file_dict["input"])
         self.executor = ThreadPoolExecutor(max_workers=32)
+    
+    def load_data_all(self):
+        """
+        加载所有数据到内存
+        """
+        print(f"load_data_all, len {len(self.file_list)}")
+        
+        async def load_all():
+            tasks = []
+            for idx in range(len(self.file_list)):
+                tasks.append(load_data(idx))
+            await asyncio.gather(*tasks)
+
+        async def load_data(idx):
+            input_file_path = self.file_list[idx]
+            output_file_path = input_file_path.replace("input", "output")
+            input_sample = await async_torch_load(input_file_path, self.executor)
+            output_sample = await async_torch_load(output_file_path, self.executor)
+            self.data_list[idx] = (input_sample, output_sample)
+
+        # 调用包装的异步函数
+        asyncio.run(load_all())
+
 
     def __len__(self):
         """返回数据集中样本的数量"""
@@ -100,75 +124,14 @@ class LazyLoadDataset(Dataset):
         返回:
             Tuple[torch.Tensor, torch.Tensor]: 输入与输出的张量
         """
-        # 读取 .pt 文件
-        input_file_path = self.file_list[idx]
-        output_file_path = input_file_path.replace("input","output")
-        if self.meta_device_list[idx] == "disk":
-            input_sample = torch.load(input_file_path,weights_only=True)
-            output_sample = torch.load(output_file_path,weights_only=True)
-            self.data_list[idx] = (input_sample, output_sample)
-            self.meta_device_list[idx] = "cpu"
-        else:
-            input_sample,output_sample = self.data_list[idx]
+        input_sample,output_sample = self.data_list[idx]
         return input_sample, output_sample
-    # @torch.no_grad()
-    # def update_dataset(self, module: Callable,
-    #                     layer_idx: int ,
-    #                     batch_size: int=1 ,
-    #                     num_workers: int=2,
-    #                     attention_mask:torch.Tensor=None,
-    #                     position_embeddings:Tuple[torch.Tensor, torch.Tensor]=None):
-    #     """
-    #     更新第i层的参数
-    #     还是不要设置batch size 因为这里是单个样本的更新?
-    #     """
-    #     assert attention_mask is not None and position_embeddings is not None, f"attention_mask is {attention_mask} and position_embeddings is {position_embeddings}, they should not be None"
-    #     new_file_list = []
-    #     tmpDataset = LazyLoadDataset(None,
-    #                 None,
-    #                 file_list=self.file_list,
-    #                 meta_device_list=self.meta_device_list,
-    #                 data_list=self.data_list)
-    #     tmpDataLoader = DataLoader(tmpDataset, batch_size=batch_size,num_workers=num_workers, shuffle=False)
-    #     device = next(module.parameters()).device
-    #     futures = []
-    #     _dtype = next(module.parameters()).dtype
-
-    #     for it in position_embeddings:
-    #         it.to(device)
-    #     for idx, batch in tqdm(enumerate(tmpDataLoader),total=len(tmpDataLoader),desc="update_dataset"):
-    #         input_sample, output_sample = batch
-    #         output = module(input_sample.to(device,dtype=_dtype),
-    #                         attention_mask=attention_mask.to(device),
-    #                           position_embeddings=position_embeddings)[0]
-    #         # print(f"output-output_sample{output-output_sample.to(device,dtype=_dtype)}")
-    #         # 保存更新后的参数
-    #         for innder_idx in range(batch_size):
-    #             real_idx = idx * batch_size + innder_idx
-    #             new_input_file_name = "input_layer{}_{}.pt".format(layer_idx, real_idx)
-    #             new_input_file_path = os.path.join(self.tmp_dir, new_input_file_name)
-    #             new_file_list.append(new_input_file_path)
-    #             new_output_file_name = "output_layer{}_{}.pt".format(layer_idx, real_idx)
-    #             new_output_file_path = os.path.join(self.tmp_dir, new_output_file_name)
-    #             # print(f"save {new_input_file_path} and {new_output_file_path}")
-    #             assert output[innder_idx].dim() == 2, f"output should be 2-dimensional,get {output[innder_idx].dim()}"
-    #             if self.meta_device_list[real_idx] == "disk":
-    #                 futures.append(self.executor.submit(torch.save, output[innder_idx].detach().cpu(), new_input_file_path))
-    #             else:
-    #                 self.data_list[real_idx] = output[innder_idx].detach().cpu()
-    #             futures.append(self.executor.submit(
-    #                 shutil.copy, self.file_dict["output"][layer_idx][real_idx], new_output_file_path))
-
-    #     # 等待所有 Future 完成
-    #     for future in futures:
-    #         future.result() 
-    #     self.file_list = new_file_list
-    #     self.layer_idx = layer_idx
+    
     @torch.no_grad()
     def update_dataset(self, module: Callable,
+                       next_module: Callable,
                     layer_idx: int,
                     batch_size: int = 1,
-                    num_workers: int = 2,
                     attention_mask: torch.Tensor = None,
                     position_embeddings: Tuple[torch.Tensor, torch.Tensor] = None):
         """
@@ -180,58 +143,57 @@ class LazyLoadDataset(Dataset):
         )
 
         new_file_list = []
-        tmpDataset = LazyLoadDataset(None,
-                                    None,
-                                    file_list=self.file_list,
-                                    meta_device_list=self.meta_device_list,
-                                    data_list=self.data_list)
-        tmpDataLoader = DataLoader(tmpDataset, batch_size=batch_size, num_workers=num_workers, shuffle=False)
         device = next(module.parameters()).device
         _dtype = next(module.parameters()).dtype
 
         # 确保 position_embeddings 移动到正确的设备
         position_embeddings = tuple(it.to(device) for it in position_embeddings)
 
-        async def async_update():
-            loop = asyncio.get_running_loop()
-            tasks = []
+        for idx in range(0, (len(self.data_list)+batch_size-1 )//batch_size):
+            # 批量加载数据
+            input_samples = []
+            output_samples = []
+            for inner_idx in range(batch_size):
+                real_idx = idx + inner_idx
+                if real_idx >= len(self.data_list):
+                    break
 
-            async def save_to_disk(tensor, path):
-                await loop.run_in_executor(self.executor, torch.save, tensor, path)
+                # 加载输入数据
+                # input_path = self.file_list[real_idx]
+                # input_sample = torch.load(input_path, map_location=device,weights_only=True)
+                input_sample = self.data_list[real_idx][0].to(device, dtype=_dtype)
+                input_samples.append(input_sample)
 
-            async def copy_to_disk(src, dst):
-                await loop.run_in_executor(self.executor, shutil.copy, src, dst)
+                # # 加载输出数据，如果需要
+                # output_sample = torch.load(self.file_dict["output"][layer_idx][real_idx],
+                #                             map_location=device,weights_only=True)
+                output_sample = self.data_list[real_idx][1].to(device, dtype=_dtype)
+                output_samples.append(output_sample)
 
-            for idx, batch in tqdm(enumerate(tmpDataLoader), total=len(tmpDataLoader), desc="update_dataset"):
-                input_sample, output_sample = batch
-                output = module(input_sample.to(device, dtype=_dtype),
-                                attention_mask=attention_mask.to(device),
-                                position_embeddings=position_embeddings)[0]
+            # 构造 batch tensor 并前向传播
+            input_batch = torch.stack(input_samples).to(device, dtype=_dtype)
+            output_batch = torch.stack(output_samples).to(device, dtype=_dtype)
 
-                for inner_idx in range(batch_size):
-                    real_idx = idx * batch_size + inner_idx
-                    new_input_file_name = f"input_layer{layer_idx}_{real_idx}.pt"
-                    new_input_file_path = os.path.join(self.data_dir, new_input_file_name)
-                    new_file_list.append(new_input_file_path)
-                    # new_output_file_name = f"output_layer{layer_idx}_{real_idx}.pt"
-                    # new_output_file_path = os.path.join(self.tmp_dir, new_output_file_name)
+            output = module(input_batch, attention_mask=attention_mask.to(device),
+                            position_embeddings=position_embeddings)[0]
+            next_output = next_module(output_batch, attention_mask=attention_mask.to(device),
+                                        position_embeddings=position_embeddings)[0]
 
-                    assert output[inner_idx].dim() == 2, f"Output should be 2-dimensional, got {output[inner_idx].dim()}"
+            for inner_idx in range(len(input_samples)):
+                real_idx = idx + inner_idx
+                new_input_file_name = f"input_layer{layer_idx}_{real_idx}.pt"
+                new_input_file_path = os.path.join(self.data_dir, new_input_file_name)
+                new_file_list.append(new_input_file_path)
 
-                    if self.meta_device_list[real_idx] == "disk":
-                        tasks.append(save_to_disk(output[inner_idx].detach().cpu(), new_input_file_path))
-                    else:
-                        output_sample = torch.load(self.file_dict["output"][layer_idx][real_idx], weights_only=True)
-                        self.data_list[real_idx] = (output[inner_idx].detach().cpu(), output_sample)
+                assert output[inner_idx].dim() == 2, f"Output should be 2-dimensional, got {output[inner_idx].dim()}"
+                # TODO:后续再考虑磁盘，优先完善性能实验
+                # 如果是内存存储，直接更新 `data_list`
+                self.data_list[real_idx] = (output[inner_idx].detach().cpu(),
+                                                next_output[inner_idx].detach().cpu())
 
-                    # tasks.append(copy_to_disk(self.file_dict["output"][layer_idx][real_idx], new_output_file_path))
-
-            # 等待所有异步任务完成
-            await asyncio.gather(*tasks)
-
-        # 使用 asyncio.run 调用异步任务
-        asyncio.run(async_update())
-
+            # 释放内存
+            del input_samples, output_samples, input_batch, output_batch, output, next_output
+            gc.collect()
         # 更新属性
         self.file_list = new_file_list
         self.layer_idx = layer_idx

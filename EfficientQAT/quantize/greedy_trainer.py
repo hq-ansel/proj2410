@@ -489,17 +489,17 @@ def custom_shedule_train(model:PreTrainedModel,
                             layer_idx = slide_base 
                             # print(f"slide_base {slide_base} layer_idx {layer_idx}")
                             layer = model.model.layers[layer_idx].to(args.dev,dtype=args.dtype)
-                            next_layer = model.model.layers[layer_idx+1].to(args.dev,dtype=args.dtype)
+                            next_layer = model.model.layers[layer_idx+args.slide_step].to(args.dev,dtype=args.dtype)
                             train_dataset.update_dataset(module=layer, 
                                                     next_module=next_layer,
-                                                    layer_idx=layer_idx+1,
+                                                    layer_idx=layer_idx+args.slide_step,
                                                     batch_size=args.batch_size,
                                                     attention_mask=attention_mask,
                                                     position_embeddings=position_embeddings,
                                                         )
                             val_dataset.update_dataset(module=layer, 
                                                     next_module=next_layer,
-                                                    layer_idx=layer_idx+1,
+                                                    layer_idx=layer_idx+args.slide_step,
                                                     batch_size=args.batch_size,
                                                     attention_mask=attention_mask,
                                                     position_embeddings=position_embeddings,
@@ -547,6 +547,8 @@ def greedy_local_train(
     cache_dir = os.path.join(cache_dir, f"{args.calib_dataset}_{args.train_size}_{args.val_size}_{args.training_seqlen}")
     print(f"try to load traindata from cache {cache_dir}")
     if os.path.exists(cache_dir):
+        tmp_path = os.path.join(cache_dir, "mask_and_position_embedding.pt")
+        print(tmp_path)
         mask_and_pos_embed = torch.load(os.path.join(cache_dir, "mask_and_position_embedding.pt"), weights_only=True)
         if mask_and_pos_embed["attention_mask"] is not None:
             attention_mask = mask_and_pos_embed["attention_mask"].to(dtype=args.dtype)

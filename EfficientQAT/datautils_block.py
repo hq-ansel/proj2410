@@ -124,6 +124,8 @@ class LazyLoadDataset(Dataset):
         返回:
             Tuple[torch.Tensor, torch.Tensor]: 输入与输出的张量
         """
+        # if idx == 0:
+        #     print(f"output sampel {self.data_list[0][1]}")
         input_sample,output_sample = self.data_list[idx]
         return input_sample, output_sample
     
@@ -161,14 +163,10 @@ class LazyLoadDataset(Dataset):
                     break
 
                 # 加载输入数据
-                # input_path = self.file_list[real_idx]
-                # input_sample = torch.load(input_path, map_location=device,weights_only=True)
                 input_sample = self.data_list[real_idx][0].to(device, dtype=_dtype)
                 input_samples.append(input_sample)
 
                 # # 加载输出数据，如果需要
-                # output_sample = torch.load(self.file_dict["output"][layer_idx][real_idx],
-                #                             map_location=device,weights_only=True)
                 output_sample = self.data_list[real_idx][1].to(device, dtype=_dtype)
                 output_samples.append(output_sample)
 

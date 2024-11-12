@@ -497,6 +497,7 @@ def custom_shedule_train(model:PreTrainedModel,
                                                     position_embeddings=position_embeddings,
                                                         )
                             layer.cpu()
+                            next_layer.cpu()
             attention_mask = attention_mask.to(dtype=_dtype)
             position_embeddings = (position_embeddings[0].to(dtype=_dtype),position_embeddings[1].to(dtype=_dtype))
             # 保存模型

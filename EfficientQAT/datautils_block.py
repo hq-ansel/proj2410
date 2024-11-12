@@ -149,7 +149,9 @@ class LazyLoadDataset(Dataset):
         # 确保 position_embeddings 移动到正确的设备
         position_embeddings = tuple(it.to(device) for it in position_embeddings)
 
-        for idx in range(0, (len(self.data_list)+batch_size-1 )//batch_size):
+        # for idx in range(0, (len(self.data_list)+batch_size-1 )//batch_size):
+        for idx in tqdm(range(0, (len(self.data_list)+batch_size-1 )//batch_size),
+                         total=len(self.data_list)//batch_size, desc="update_dataset"):
             # 批量加载数据
             input_samples = []
             output_samples = []
@@ -171,12 +173,12 @@ class LazyLoadDataset(Dataset):
                 output_samples.append(output_sample)
 
             # 构造 batch tensor 并前向传播
-            input_batch = torch.stack(input_samples).to(device, dtype=_dtype)
-            output_batch = torch.stack(output_samples).to(device, dtype=_dtype)
+            input_batch = torch.stack(input_samples)
+            output_batch = torch.stack(output_samples)
 
-            output = module(input_batch, attention_mask=attention_mask.to(device),
+            output = module(input_batch, attention_mask=attention_mask,
                             position_embeddings=position_embeddings)[0]
-            next_output = next_module(output_batch, attention_mask=attention_mask.to(device),
+            next_output = next_module(output_batch, attention_mask=attention_mask,
                                         position_embeddings=position_embeddings)[0]
 
             for inner_idx in range(len(input_samples)):

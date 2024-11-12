@@ -33,7 +33,7 @@ from .utils import (
     set_weight_parameters,trainable_parameters_num,get_named_linears,set_op_by_name,
     Catcher,StopException,MultiBlock
     )
-from ..datautils_block import BlockTrainDataset,OptimBlockTrainDataset,LazyLoadDataset
+from ..datautils_block import BlockTrainDataset,OptimBlockTrainDataset,LazyLoadDataset,generate_block_train_data
 from ..loss_utils import get_loss_func
 
 
@@ -506,7 +506,7 @@ def custom_shedule_train(model:PreTrainedModel,
     torch.cuda.empty_cache()
     gc.collect()
 
-
+@timer
 def greedy_local_train(
     model: PreTrainedModel,
     args,
@@ -540,7 +540,10 @@ def greedy_local_train(
     print(f"try to load traindata from cache {cache_dir}")
     if os.path.exists(cache_dir):
         mask_and_pos_embed = torch.load(os.path.join(cache_dir, "mask_and_position_embedding.pt"), weights_only=True)
-        attention_mask = mask_and_pos_embed["attention_mask"].to(dtype=args.dtype)
+        if mask_and_pos_embed["attention_mask"] is not None:
+            attention_mask = mask_and_pos_embed["attention_mask"].to(dtype=args.dtype)
+        else:
+            attention_mask = None
         position_embeddings = mask_and_pos_embed["position_embeddings"]
         assert attention_mask is not None, "attention_mask is None"
         # TODO tmp_dir 现在写死了，后面有时间再改吧
@@ -552,59 +555,19 @@ def greedy_local_train(
                                        tmp_dir="/home/ubuntu/data/exp/proj2410/cache/tmp",
                                        split="val",)
         val_dataset.load_data_all()
-    # else:
+    else:
     #     # 没有提前缓存，需要生成数据集
-    #     val_dataset_dir = os.path.join(cache_dir, "val")
-    #     train_dataset_dir = os.path.join(cache_dir, "train")
-    #     os.makedirs(train_dataset_dir, exist_ok=True)
-    #     os.makedirs(val_dataset_dir, exist_ok=True)
+        val_dataset_dir = os.path.join(cache_dir, "val")
+        train_dataset_dir = os.path.join(cache_dir, "train")
+        os.makedirs(train_dataset_dir, exist_ok=True)
+        os.makedirs(val_dataset_dir, exist_ok=True)
     #     # 临时让pe相关模块先跑一遍
-    #     model.model.embed_tokens = model.model.embed_tokens.to(dev)
-    #     model.model.norm = model.model.norm.to(dev)
-    #     if hasattr(model.model, 'rotary_emb'):
-    #         # for llama-3.1
-    #         model.model.rotary_emb = model.model.rotary_emb.to(dev)
-    #     with torch.no_grad():
-    #         class Interrunpter(nn.Module):
-    #             def __init__(self, module):
-    #                 super().__init__()
-    #                 self.module = module
-    #                 self.index = 0
-    #                 self.attention_mask = None
-    #                 self.position_embedding = None
-
-    #             def forward(self, inp, **kwargs):
-    #                 self.index += 1
-    #                 if self.attention_mask is None:
-    #                     self.attention_mask = kwargs["attention_mask"]
-    #                 if self.position_embedding is None:
-    #                     self.position_embedding = kwargs["position_embedding"]
-    #                 raise ValueError
-    #         layers = model.model.layers
-    #         layers[0] = Interrunpter(layers[0])
-    #         induce_data = torch.cat([trainloader[i][0] for i in range(args.batch_size)])
-    #         try:
-    #             model(induce_data.to(dev))
-    #         except ValueError:
-    #             pass
-    #         attention_mask = layers[0].attention_mask
-    #         position_embedding = layers[0].position_embedding
-    #         layers[0] = layers[0].module
-
-    #         # 准备数据集
-    #         result = []
-    #         executor = ThreadPoolExecutor(max_workers=16)
-    #         for idx, batch in tqdm(enumerate(trainloader), total=len(trainloader), desc="prepare train dataset"):
-
-    #     # 恢复相关模块回cpu
-    #     model.model.embed_tokens = model.model.embed_tokens.to("cpu")
-    #     model.model.norm = model.model.norm.to("cpu")
-    #     if hasattr(model.model, 'rotary_emb'):
-    #         # for llama-3.1
-    #         model.model.rotary_emb = model.model.rotary_emb.to("cpu")
-
-    # 输入数据应该通过generate dataset test 提前生成好
-
+        model = model.to(args.dev)
+        with torch.no_grad():
+            attention_mask, position_embeddings =  generate_block_train_data(model, trainloader, train_dataset_dir)
+            assert attention_mask is not None and position_embeddings is not None , "Attention mask and position embeddings should not be None"
+            generate_block_train_data(model, valloader, val_dataset_dir)
+        model = model.cpu()
 
     del trainloader, valloader
     gc.collect()

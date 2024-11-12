@@ -232,6 +232,10 @@ async def async_generate_block_train_data(
         def forward(self, inp, **kwargs):
             self.attention_mask = kwargs.get("attention_mask", None)
             self.position_embeddings = kwargs.get("position_embeddings", None)
+            assert self.position_embeddings is not None, (
+                f"attention_mask is {self.attention_mask} and position_embeddings is {self.position_embeddings}, "
+                f"they should not be None and {kwargs}"
+            )
             result.append(asyncio.create_task(
                 async_torch_save(
                     inp.squeeze(0).detach().cpu(),
@@ -256,9 +260,14 @@ async def async_generate_block_train_data(
         except StopException:
             pass
 
-    attention_mask, position_embeddings = layers[0].attention_mask, layers[0].position_embeddings
-    total = layers[0].idx
-    layers[0] = layers[0].module
+    attention_mask, position_embeddings = model.model.layers[0].attention_mask, model.model.layers[0].position_embeddings
+    # using SPDA will cause attention_mask be none
+    assert  position_embeddings is not None, (
+        f"attention_mask is {attention_mask} and position_embeddings is {position_embeddings}, "
+        "they should not be None"
+    )
+    total = model.model.layers[0].idx
+    model.model.layers[0] = model.model.layers[0].module
     model.to("cpu")
     print(f"save attention_mask and position_embeddings")
 
@@ -287,7 +296,7 @@ async def async_generate_block_train_data(
             
             output = layer(
                 inp.unsqueeze(0).to(device),
-                attention_mask=attention_mask.to(device),
+                attention_mask=attention_mask,
                 position_embeddings=position_embeddings
             )[0]
 

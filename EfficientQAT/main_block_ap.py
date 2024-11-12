@@ -143,7 +143,7 @@ def main():
     parser.add_argument("--quant_lr", type=float, default=1e-4, help="lr of quantization parameters (s and z)")
     parser.add_argument("--weight_lr", type=float, default=1e-5, help="lr of full-precision weights")
     parser.add_argument("--min_lr_factor", type=float, default=20, help="min_lr = lr/min_lr_factor")
-    parser.add_argument("--clip_grad", type=float, default=0.3)
+    parser.add_argument("--clip_grad", type=float, default=40)
     parser.add_argument("--wd", type=float, default=0,help="weight decay")
     parser.add_argument("--net", type=str, default=None,help="model (family) name, for the easier saving of data cache")
     parser.add_argument("--max_memory", type=str, default="70GiB",help="The maximum memory of each GPU")

@@ -259,6 +259,42 @@ def get_activation_in_layers(model:AutoModelForCausalLM,
         activations[idx] = torch.cat(activations[idx],dim=0)
     return activations
 
+# 得到单层的激活值
+def get_activation_in_single_layer(model:AutoModelForCausalLM,
+                                test_tensor:torch.Tensor):
+    class Catcher (nn.Module):
+        def __init__(self,module:nn.Module):
+            super().__init__()
+            self.module = module
+            self.position_embeddings = None
+            self.attention_mask = None
+        def forward(self, inp, **kwargs):
+            self.position_embeddings = kwargs["position_embeddings"]
+            self.attention_mask = kwargs["attention_mask"]
+            raise ValueError("Stop")
+    model.model.layers[0] = Catcher(model.model.layers[0])
+    model.to(device)
+    induce_ids = torch.randint(0,9999,size=(test_tensor.shape[0],test_tensor.shape[1]))
+    with torch.no_grad():
+        try:
+            model(induce_ids.to(device))
+        except ValueError:
+            pass
+    position_embeddings = model.model.layers[0].position_embeddings
+    attention_mask = model.model.layers[0].attention_mask
+    model.model.layers[0] = model.model.layers[0].module
+    model = model.cpu()
+    activations = [[] for _ in range(len(model.model.layers)+1)]
+    activations[0] = torch.Tensor([0])
+    with torch.no_grad():
+        for idx,layer in enumerate(model.model.layers):
+            layer = layer.to(device)
+            activations[idx+1] = layer(test_tensor.to(device),
+                                        position_embeddings=position_embeddings,
+                                        attention_mask=attention_mask)[0].detach().cpu()
+            layer = layer.cpu()
+    return activations
+
 def compare_cca_in_quantized_model(base_model:AutoModelForCausalLM,
                                    tokenizer:AutoTokenizer,
                                    valloader:List[Tuple[torch.Tensor,torch.Tensor]]):
@@ -269,8 +305,13 @@ def compare_cca_in_quantized_model(base_model:AutoModelForCausalLM,
         "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-fast-gradual-quant-slide2-alpaca-4096/checkpoint-10000",
     ]
     base_model_path = "/home/ubuntu/data/exp/proj2410/model/Qwen2.5-0.5B"
-    base_activations = get_activation_in_layers(base_model,tokenizer,valloader)
-    # hidden_size = base_model.config.hidden_size
+    # 暂时
+    # base_activations = get_activation_in_layers(base_model,tokenizer,valloader)
+    hidden_size = base_model.config.hidden_size
+
+    test_tensor = torch.randn(64,2048,hidden_size,dtype=torch.float16,device=device)
+    base_activations = get_activation_in_single_layer(base_model,test_tensor)
+    
     for path in quantized_path:
         args = edict({
             "wbits": 2,
@@ -282,7 +323,10 @@ def compare_cca_in_quantized_model(base_model:AutoModelForCausalLM,
                 compared_model.model.layers[idx] = trans_quant_block(compared_model.model.layers[idx], args)
         else:
             compared_model,_ = load_quantized_model(path,args.wbits,args.group_size)
-        compared_activations = get_activation_in_layers(compared_model,tokenizer,valloader)
+        # 共用模型输入 暂时
+        # compared_activations = get_activation_in_layers(compared_model,tokenizer,valloader)
+        # 共用层输入,生成大小为(64,2048,hidden_size)的fp16张量
+        compared_activations = get_activation_in_single_layer(compared_model,test_tensor)
         cca = CCASimilarity()
 
         # 计算3个cca距离
@@ -314,7 +358,11 @@ def compare_cca_in_quantized_model(base_model:AutoModelForCausalLM,
         }
         name1 = base_model_path.split("/")[-1]
         name2 = path.split("/")[-1]
-        with open(f"/home/ubuntu/data/exp/proj2410/test/cca/{name1}_{name2}.json", "w") as f:
+        # 考虑整个模型
+        # model_cca_path = f"/home/ubuntu/data/exp/proj2410/test/cca/{name1}_{name2}.json"
+        # 仅考虑单层
+        model_cca_path = f"/home/ubuntu/data/exp/proj2410/test/cca/layer{name1}_{name2}.json"
+        with open(model_cca_path, "w") as f:
             json.dump(res_dict, f, indent=4)
         
         # save json
@@ -344,15 +392,17 @@ def main():
     # 加载模型和 tokenizer
     base_model,tokenizer,quantized = get_model_and_tokenizer(args.model)
     # 加载模型参数
+    # 暂时
     # 获取训练和验证数据加载器
-    trainloader, valloader = get_loaders(
-        args.calib_dataset,
-        tokenizer,
-        args.train_size,
-        args.val_size,
-        seed=args.seed,
-        seqlen=args.training_seqlen,
-    )
+    # trainloader, valloader = get_loaders(
+    #     args.calib_dataset,
+    #     tokenizer,
+    #     args.train_size,
+    #     args.val_size,
+    #     seed=args.seed,
+    #     seqlen=args.training_seqlen,
+    # )
+    trainloader, valloader = None, None
     # model.to(device)
     compare_cca_in_quantized_model(base_model,tokenizer,valloader)
     

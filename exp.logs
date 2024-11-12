@@ -326,3 +326,27 @@ c4 perplexity: 45.15
 |winogrande   |      1|none  |     0|acc     |↑  |0.4957|±  |0.0141|
 
 Average Acc: 41.66%
+AMP enabled: False
+Loading quantized model from /home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-fast-alpaca-4096/checkpoint-10000
+Loading pre-computed quantized weights...
+Loading pre-computed quantized weights Successfully
+device_map: OrderedDict([('', 0)])
+Loading Wikitext-2 dataset...
+wikitext2: 35.83269500732422
+get_c4
+c4: 34.07741928100586
+wikitext2 perplexity: 35.83
+c4 perplexity: 34.08
+|    Tasks    |Version|Filter|n-shot| Metric |   |Value |   |Stderr|
+|-------------|------:|------|-----:|--------|---|-----:|---|-----:|
+|arc_challenge|      1|none  |     0|acc     |↑  |0.2474|±  |0.0126|
+|             |       |none  |     0|acc_norm|↑  |0.2722|±  |0.0130|
+|arc_easy     |      1|none  |     0|acc     |↑  |0.5299|±  |0.0102|
+|             |       |none  |     0|acc_norm|↑  |0.4949|±  |0.0103|
+|hellaswag    |      1|none  |     0|acc     |↑  |0.3255|±  |0.0047|
+|             |       |none  |     0|acc_norm|↑  |0.3788|±  |0.0048|
+|piqa         |      1|none  |     0|acc     |↑  |0.6447|±  |0.0112|
+|             |       |none  |     0|acc_norm|↑  |0.6404|±  |0.0112|
+|winogrande   |      1|none  |     0|acc     |↑  |0.5249|±  |0.0140|
+
+Average Acc: 45.45%

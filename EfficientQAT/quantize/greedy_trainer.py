@@ -179,6 +179,11 @@ def train_units_layers(model: PreTrainedModel,
                 param_group_index += 1
             else:
                 set_weight_parameters(qlayer,False)
+        
+        if args.loss_func == "AFFINE_MSE":
+            loss_func.reinitialize_A()
+            loss_func = loss_func.to(args.dev)
+            param_groups.append({"params":loss_func.parameters(),"lr":args.weight_lr})
         optimizer =torch.optim.AdamW(param_groups,
                                     weight_decay=args.wd,
                                     foreach=True)
@@ -232,10 +237,11 @@ def train_units_layers(model: PreTrainedModel,
             norm_list = []
             start_time = time.time()
             # used for debug
-            torch.autograd.set_detect_anomaly(True)
+            # torch.autograd.set_detect_anomaly(True)
             dataloader = DataLoader(train_dataset,
                                     batch_size=args.batch_size,
                                     num_workers=64,
+                                    pin_memory=True,
                                     shuffle=True
                                     )
             # step 6.4: training                   
@@ -304,6 +310,7 @@ def train_units_layers(model: PreTrainedModel,
             dataloader = DataLoader(val_dataset,
                                     batch_size=args.batch_size,
                                     num_workers=32,
+                                    pin_memory=True,
                                     shuffle=False
                                     )
             # if not args.loss_func == "KL-Divergence":
@@ -390,7 +397,12 @@ def custom_shedule_train(model:PreTrainedModel,
         for end in range(num_layers, 0, -1*args.slide_step):
             start = max(end - args.crossblock_window_size, 0)
             shedule_list.append(list(range(start, end)))
-    loss_func = get_loss_func(args.loss_func) if not args.loss_func == "KL-Divergence" else None
+    if args.loss_func == "KL-Divergence":
+        loss_func = None
+    elif args.loss_func == "AFFINE_MSE":
+        loss_func = get_loss_func(args.loss_func)(model.config.hidden_size)
+    else:
+        loss_func = get_loss_func(args.loss_func)
     loss_recorder = utils.BlockLossRecorder(file_path=args.log_loss,)
     
     for train_layer_window in shedule_list:
@@ -469,17 +481,18 @@ def custom_shedule_train(model:PreTrainedModel,
                             layer_idx = slide_base 
                             # print(f"slide_base {slide_base} layer_idx {layer_idx}")
                             layer = model.model.layers[layer_idx].to(args.dev,dtype=args.dtype)
+                            next_layer = model.model.layers[layer_idx+1].to(args.dev,dtype=args.dtype)
                             train_dataset.update_dataset(module=layer, 
+                                                    next_module=next_layer,
                                                     layer_idx=layer_idx+1,
                                                     batch_size=args.batch_size,
-                                                    num_workers=16,
                                                     attention_mask=attention_mask,
                                                     position_embeddings=position_embeddings,
                                                         )
                             val_dataset.update_dataset(module=layer, 
+                                                    next_module=next_layer,
                                                     layer_idx=layer_idx+1,
                                                     batch_size=args.batch_size,
-                                                    num_workers=16,
                                                     attention_mask=attention_mask,
                                                     position_embeddings=position_embeddings,
                                                         )
@@ -533,9 +546,11 @@ def greedy_local_train(
         train_dataset = LazyLoadDataset(cache_dir,
                                          tmp_dir="/home/ubuntu/data/exp/proj2410/cache/tmp",
                                          split="train",)
+        train_dataset.load_data_all()
         val_dataset = LazyLoadDataset(cache_dir,
                                        tmp_dir="/home/ubuntu/data/exp/proj2410/cache/tmp",
                                        split="val",)
+        val_dataset.load_data_all()
     # else:
     #     # 没有提前缓存，需要生成数据集
     #     val_dataset_dir = os.path.join(cache_dir, "val")

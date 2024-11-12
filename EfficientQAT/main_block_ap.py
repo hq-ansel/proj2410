@@ -119,7 +119,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--config_path", type=str, help="path of config file")
     parser.add_argument("--model", type=str, help="model name of model path")
-    parser.add_argument("--cache_dir", default="./cache", type=str, help="direction of cached dataset, leading to faster debug")
+    parser.add_argument("--cache_dir", default="/home/ubuntu/data/exp/proj2410/cache", type=str, help="direction of cached dataset, leading to faster debug")
     parser.add_argument("--output_dir", default="./log/", type=str, help="direction of logging file")
     parser.add_argument("--save_quant_dir", default=None, type=str, help="direction for saving quantization model")
     parser.add_argument("--real_quant", default=False, action="store_true",

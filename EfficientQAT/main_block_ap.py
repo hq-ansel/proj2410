@@ -19,7 +19,7 @@ from .datautils_block import get_loaders, test_ppl
 from .quantize.int_linear_real import load_quantized_model
 from .quantize.block_ap import block_ap
 from .quantize.crossblockquant import cross_block_quantization
-from .quantize.greedy_trainer import greedy_local_train
+from .quantize.greedy_trainer import greedy_local_train,timer
 
 
 amp_enabled = os.environ.get("AMP_ENABLED", "False").lower() == "true"

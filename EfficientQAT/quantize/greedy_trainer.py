@@ -240,8 +240,9 @@ def train_units_layers(model: PreTrainedModel,
             # torch.autograd.set_detect_anomaly(True)
             dataloader = DataLoader(train_dataset,
                                     batch_size=args.batch_size,
-                                    num_workers=64,
+                                    num_workers=16,
                                     pin_memory=True,
+                                    prefetch_factor=4,  
                                     shuffle=True
                                     )
             # step 6.4: training                   
@@ -309,8 +310,9 @@ def train_units_layers(model: PreTrainedModel,
             val_loss_list = []
             dataloader = DataLoader(val_dataset,
                                     batch_size=args.batch_size,
-                                    num_workers=32,
+                                    num_workers=8,
                                     pin_memory=True,
+                                    prefetch_factor=4,  
                                     shuffle=False
                                     )
             # if not args.loss_func == "KL-Divergence":
@@ -319,20 +321,26 @@ def train_units_layers(model: PreTrainedModel,
                 # obtain output of quantization model
                 with torch.no_grad():
                     with torch.autocast(device_type=args.dev,
-                                        enabled=amp_enabled,
-                                        dtype=args.dtype if amp_enabled else torch.float32):
+                                    enabled=amp_enabled,
+                                    dtype=args.dtype if amp_enabled else torch.float32):
                         inp,target = input_data
                         hidden_state = inp.to(args.dev,dtype=args.dtype)
-
+                        # assert hidden_state.requires_grad == True, "hidden_state.requires_grad is False"
+                        hidden_state.requires_grad = True
                         for layer_idx in trainable_layer_idx_list:
-                            hidden_state.requires_grad = True
-                            layer_outputs = checkpoint(
-                                lambda hidden_state, attention_mask, position_embeddings: qlayers[layer_idx](
-                                    hidden_states=hidden_state,
-                                    attention_mask=attention_mask,
-                                    position_embeddings=position_embeddings
-                                ),
-                                hidden_state, attention_mask, position_embeddings
+                            # 使用 lambda 将关键字参数改为位置参数
+                            # layer_func = functools.partial(
+                            #     qlayers[layer_idx].forward,  # 指定需要调用的函数
+                            #     attention_mask=attention_mask,
+                            #     position_embeddings=position_embeddings
+                            # )
+                            
+                            # # 在 checkpoint 中使用 layer_func 作为函数调用
+                            # layer_outputs = checkpoint(layer_func, hidden_state)
+                            layer_outputs = qlayers[layer_idx](
+                                hidden_states=hidden_state,
+                                attention_mask=attention_mask,
+                                position_embeddings=position_embeddings
                             )
                             hidden_state = layer_outputs[0]
                         loss = loss_func(hidden_state, target.to(args.dev,dtype=torch.float32))

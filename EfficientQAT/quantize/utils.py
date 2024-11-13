@@ -184,9 +184,15 @@ class Catcher(nn.Module):
         # if self.position_ids is None:
         #     self.position_ids = kwargs.get("position_ids", None)
         
-        
+        inp = inp.detach()
         # 前向传播，并存储输出
         output = self.module(inp, **kwargs)
+        self.inps = {
+            "hidden_states": inp,
+            "attention_mask": kwargs.get("attention_mask", None),
+            "position_ids": kwargs.get("position_ids", None),
+            "position_embeddings": kwargs.get("position_embeddings", None),
+        }  # 存储输入数据
         self.outs = output  # 存储输出
         if self.stop_forward_flag:
             # print(f"stop forward shape: {output[0].shape}")

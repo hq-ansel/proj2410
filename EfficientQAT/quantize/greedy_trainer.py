@@ -222,19 +222,21 @@ def train_units_layers(model: PreTrainedModel,
                 total_training_iteration,
             )
         # step 6.3: training loop
-
+        position_ids = torch.arange(args.training_seqlen, dtype=torch.long, device=args.dev)
+        position_ids = position_ids.unsqueeze(0).expand(args.batch_size, -1).contiguous()
+        # print(f" data size {len(train_dataset)}")
         for epoch in range(args.epochs):
             loss_list = []
             norm_list = []
             start_time = time.time()
             # used for debug
-            # torch.autograd.set_detect_anomaly(True)
+            torch.autograd.set_detect_anomaly(True)
             dataloader = DataLoader(train_dataset,
                                     batch_size=args.batch_size,
                                     num_workers=8,
                                     pin_memory=True,
                                     prefetch_factor=16,  
-                                    shuffle=True
+                                    # shuffle=True
                                     )
             # step 6.4: training                   
             for index, input_data in enumerate(dataloader):
@@ -244,7 +246,7 @@ def train_units_layers(model: PreTrainedModel,
                     inp,target = input_data
                     hidden_state = inp.to(args.dev,dtype=args.dtype)
                     # assert hidden_state.requires_grad == True, "hidden_state.requires_grad is False"
-                    hidden_state.requires_grad = True
+                    # hidden_state.requires_grad = True
                     for layer_idx in trainable_layer_idx_list:
                         # 使用 lambda 将关键字参数改为位置参数
                         # layer_func = functools.partial(
@@ -258,9 +260,17 @@ def train_units_layers(model: PreTrainedModel,
                         layer_outputs = qlayers[layer_idx](
                             hidden_states=hidden_state,
                             attention_mask=attention_mask,
+                            position_ids=position_ids,
                             position_embeddings=position_embeddings
                         )
                         hidden_state = layer_outputs[0]
+                    if index == 0:
+                        tmp = {
+                            "hidden_state":inp,
+                            "attention_mask":attention_mask,
+                            "position_embeddings":position_embeddings,
+                        }
+                        print(f"layers {trainable_layer_idx_list} input_data {tmp} output {hidden_state} target {target} ")
                     loss = loss_func(hidden_state, target.to(args.dev,dtype=torch.float32))
                                 
                 if not math.isfinite(loss.item()) or loss.item()==0:
@@ -298,6 +308,10 @@ def train_units_layers(model: PreTrainedModel,
                     optimizer.param_groups[weight_index]['lr'] = weight_scheduler.get_lr()[0]
                 step += 1
 
+
+                break
+
+
             # step 6.5: calculate validation loss
             val_loss_list = []
             dataloader = DataLoader(val_dataset,
@@ -318,17 +332,7 @@ def train_units_layers(model: PreTrainedModel,
                         inp,target = input_data
                         hidden_state = inp.to(args.dev,dtype=args.dtype)
                         # assert hidden_state.requires_grad == True, "hidden_state.requires_grad is False"
-                        hidden_state.requires_grad = True
                         for layer_idx in trainable_layer_idx_list:
-                            # 使用 lambda 将关键字参数改为位置参数
-                            # layer_func = functools.partial(
-                            #     qlayers[layer_idx].forward,  # 指定需要调用的函数
-                            #     attention_mask=attention_mask,
-                            #     position_embeddings=position_embeddings
-                            # )
-                            
-                            # # 在 checkpoint 中使用 layer_func 作为函数调用
-                            # layer_outputs = checkpoint(layer_func, hidden_state)
                             layer_outputs = qlayers[layer_idx](
                                 hidden_states=hidden_state,
                                 attention_mask=attention_mask,
@@ -337,6 +341,10 @@ def train_units_layers(model: PreTrainedModel,
                             hidden_state = layer_outputs[0]
                         loss = loss_func(hidden_state, target.to(args.dev,dtype=torch.float32))
                 val_loss_list.append(loss.cpu())
+
+
+                break
+
                 # if not args.loss_func == "KL-Divergence":
                 #     final_val_list.append(final_loss.cpu())
             if not args.loss_func and  args.align_type == "tail":
@@ -500,7 +508,7 @@ def train_units_layers_with_catcher(model: PreTrainedModel,
                 total_training_iteration,
             )
         # step 6.3: training loop
-
+        print(f" data size {len(train_dataset)}")
         for epoch in range(args.epochs):
             loss_list = []
             norm_list = []
@@ -512,7 +520,7 @@ def train_units_layers_with_catcher(model: PreTrainedModel,
                                     num_workers=8,
                                     pin_memory=True,
                                     prefetch_factor=16,  
-                                    shuffle=True
+                                    # shuffle=True
                                     )
             # step 6.4: training                   
             for index, input_data in enumerate(dataloader):
@@ -532,8 +540,12 @@ def train_units_layers_with_catcher(model: PreTrainedModel,
                         except StopException as e:
                             pass
                         target_output = fp_layers[align_index].outs[0]
+                    if index == 0:
+                        inp = qlayers[align_index].inps
+                        print(f"input {inp} output {output} target_output {target_output}")
                     loss = loss_func(output, target_output.to(args.dev,dtype=torch.float32))
-                                
+
+                          
                 if not math.isfinite(loss.item()) or loss.item()==0:
                     logger.info("Loss is NAN, stopping training")
                     pdb.set_trace()
@@ -569,6 +581,10 @@ def train_units_layers_with_catcher(model: PreTrainedModel,
                     optimizer.param_groups[weight_index]['lr'] = weight_scheduler.get_lr()[0]
                 step += 1
 
+            
+                break
+
+
             # step 6.5: calculate validation loss
             val_loss_list = []
             dataloader = DataLoader(val_dataset,
@@ -599,6 +615,11 @@ def train_units_layers_with_catcher(model: PreTrainedModel,
                         target_output = fp_layers[align_index].outs[0].to(torch.float32)
                         loss = loss_func(output, target_output.to(args.dev,dtype=torch.float32))
                 val_loss_list.append(loss.cpu())
+
+                
+                break
+
+
                 # if not args.loss_func == "KL-Divergence":
                 #     final_val_list.append(final_loss.cpu())
             if not args.loss_func and  args.align_type == "tail":
@@ -616,6 +637,8 @@ def train_units_layers_with_catcher(model: PreTrainedModel,
                 early_stop_flag += 1
                 if args.early_stop > 0 and early_stop_flag >=args.early_stop:
                     break
+
+
         optimizer.zero_grad()
         del optimizer
         # step 7: pack quantized weights into low-bits format, note that this process is slow on poor CPU or busy CPU
@@ -638,8 +661,8 @@ def trans_quant_block(qlayer:nn.Module,args):
     return qlayer
 
 def custom_shedule_train(model:PreTrainedModel,
-                    train_dataset: LazyLoadDataset,
-                    val_dataset: LazyLoadDataset,
+                    train_dataset: LazyLoadDatasetV2,
+                    val_dataset: LazyLoadDatasetV2,
                     attention_mask : torch.Tensor,
                     position_embeddings : Tuple[torch.Tensor, torch.Tensor],
                     logger: logging.Logger,
@@ -698,7 +721,7 @@ def custom_shedule_train(model:PreTrainedModel,
                         break
             else:
                 skip_flag=False
-            if True and not skip_flag:
+            if  not skip_flag:
                 train_units_layers(model,
                         trainable_layer_idx_list=train_layer_window,
                         loss_func=loss_func,
@@ -709,16 +732,16 @@ def custom_shedule_train(model:PreTrainedModel,
                         loss_recorder=loss_recorder,
                         logger=logger,
                         args=args)
-            # else: 
-            #     train_units_layers_with_catcher(model,
-            #         trainable_layer_idx_list=train_layer_window,
-            #         loss_func=loss_func,
-            #         train_dataset=train_dataset,
-            #         val_dataset=val_dataset,
-            #         target_model=target_model,
-            #         loss_recorder=loss_recorder,
-            #         logger=logger,
-            #         args=args)
+            else: 
+                train_units_layers_with_catcher(model,
+                    trainable_layer_idx_list=train_layer_window,
+                    loss_func=loss_func,
+                    train_dataset=train_dataset,
+                    val_dataset=val_dataset,
+                    target_model=target_model,
+                    loss_recorder=loss_recorder,
+                    logger=logger,
+                    args=args)
             selected_layers= nn.ModuleList([model.model.layers[i] for i in train_layer_window])
             quant_inplace(selected_layers)
             for layer_idx in train_layer_window:
@@ -754,35 +777,37 @@ def custom_shedule_train(model:PreTrainedModel,
             # DEBUG
             # position_embeddings = (position_embeddings[0].to(dtype=torch.float32),position_embeddings[1].to(dtype=torch.float32))
             # DEBUG
-            # if train_layer_window != shedule_list[-1]:
-            #     with torch.no_grad():
-            #         with torch.autocast(device_type=args.dev,
-            #                             enabled=amp_enabled,
-            #                             dtype=args.dtype if amp_enabled else torch.float32):
-            #             for slide_base in train_layer_window:
-            #                 # 更新后的input 需要经过[windows_start,windows_start+slide_step)层的输出
-            #                 if slide_base == train_layer_window[0]+args.slide_step:
-            #                     break
-            #                 layer_idx = slide_base 
-            #                 # print(f"slide_base {slide_base} layer_idx {layer_idx}")
-            #                 layer = model.model.layers[layer_idx].to(args.dev,dtype=args.dtype)
-            #                 next_layer = model.model.layers[layer_idx+args.slide_step].to(args.dev,dtype=args.dtype)
-            #                 train_dataset.update_dataset(module=layer, 
-            #                                         next_module=next_layer,
-            #                                         layer_idx=layer_idx+args.slide_step,
-            #                                         batch_size=args.batch_size,
-            #                                         attention_mask=attention_mask,
-            #                                         position_embeddings=position_embeddings,
-            #                                             )
-            #                 val_dataset.update_dataset(module=layer, 
-            #                                         next_module=next_layer,
-            #                                         layer_idx=layer_idx+args.slide_step,
-            #                                         batch_size=args.batch_size,
-            #                                         attention_mask=attention_mask,
-            #                                         position_embeddings=position_embeddings,
-            #                                             )
-            #                 layer.cpu()
-            #                 next_layer.cpu()
+            if train_layer_window != shedule_list[-1]:
+                with torch.no_grad():
+                    with torch.autocast(device_type=args.dev,
+                                        enabled=amp_enabled,
+                                        dtype=args.dtype if amp_enabled else torch.float32):
+                        for slide_base in train_layer_window:
+                            # 更新后的input 需要经过[windows_start,windows_start+slide_step)层的输出
+                            if slide_base == train_layer_window[0]+args.slide_step:
+                                break
+                            layer_idx = slide_base 
+                            # print(f"slide_base {slide_base} layer_idx {layer_idx}")
+                            layer = model.model.layers[layer_idx].to(args.dev,dtype=args.dtype)
+                            next_layer = model.model.layers[layer_idx+args.slide_step].to(args.dev,dtype=args.dtype)
+                            print(f" layer {layer_idx}  update input")
+                            print(f" layer {layer_idx+args.slide_step}  update output")
+                            train_dataset.update_dataset(module=layer, 
+                                                    next_module=next_layer,
+                                                    layer_idx=layer_idx+args.slide_step,
+                                                    batch_size=args.batch_size,
+                                                    attention_mask=attention_mask,
+                                                    position_embeddings=position_embeddings,
+                                                        )
+                            val_dataset.update_dataset(module=layer, 
+                                                    next_module=next_layer,
+                                                    layer_idx=layer_idx+args.slide_step,
+                                                    batch_size=args.batch_size,
+                                                    attention_mask=attention_mask,
+                                                    position_embeddings=position_embeddings,
+                                                        )
+                            layer.cpu()
+                            next_layer.cpu()
             # attention_mask = attention_mask.to(dtype=_dtype)
             # position_embeddings = (position_embeddings[0].to(dtype=_dtype),position_embeddings[1].to(dtype=_dtype))
             # 保存模型

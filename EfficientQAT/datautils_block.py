@@ -139,13 +139,13 @@ class LazyLoadDatasetV2(Dataset):
         position_embeddings = tuple(it.to(device) for it in position_embeddings)
 
         # for idx in range(0, (len(self.data_list)+batch_size-1 )//batch_size):
-        for idx in tqdm(range(0, (len(self.data_list)+batch_size-1 )//batch_size),
+        for idx in tqdm(range(0, len(self.data_list)//batch_size),
                          total=len(self.data_list)//batch_size, desc="update_dataset"):
             # 批量加载数据
             input_samples = []
             output_samples = []
             for inner_idx in range(batch_size):
-                real_idx = idx + inner_idx
+                real_idx = idx*batch_size + inner_idx
                 if real_idx >= len(self.data_list):
                     break
 
@@ -165,11 +165,11 @@ class LazyLoadDatasetV2(Dataset):
                             position_embeddings=position_embeddings)[0]
             next_output = next_module(output_batch, attention_mask=attention_mask,
                                         position_embeddings=position_embeddings)[0]
-            if idx == 0:
-                print(f"output: {output} output_batch {output_batch} next_output {next_output}")
+            # if idx == 0:
+            #     print(f"output: {output} output_batch {output_batch} next_output {next_output}")
 
             for inner_idx in range(len(input_samples)):
-                real_idx = idx + inner_idx
+                real_idx = idx*batch_size + inner_idx
 
                 assert output[inner_idx].dim() == 2, f"Output should be 2-dimensional, got {output[inner_idx].dim()}"
                 # TODO:后续再考虑磁盘，优先完善性能实验
@@ -325,10 +325,6 @@ class LazyLoadDataset(Dataset):
 
             for inner_idx in range(len(input_samples)):
                 real_idx = idx + inner_idx
-                new_input_file_name = f"input_layer{layer_idx}_{real_idx}.pt"
-                new_input_file_path = os.path.join(self.data_dir, new_input_file_name)
-                new_file_list.append(new_input_file_path)
-
                 assert output[inner_idx].dim() == 2, f"Output should be 2-dimensional, got {output[inner_idx].dim()}"
                 # TODO:后续再考虑磁盘，优先完善性能实验
                 # 如果是内存存储，直接更新 `data_list`
@@ -339,9 +335,6 @@ class LazyLoadDataset(Dataset):
             del input_samples, output_samples, input_batch, output_batch, output, next_output
             gc.collect()
         # 更新属性
-        self.file_list = new_file_list
-        self.layer_idx = layer_idx
-
 
 
 async def async_torch_save(tensor, path, executor):

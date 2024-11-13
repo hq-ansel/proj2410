@@ -8,6 +8,8 @@ def MSE(output, target):
     """
     return F.mse_loss(output, target)
 
+# TODO: 手动实现cross block的损失函数函数
+
 def FKLD(output, target):
     """
     Forward Kullback-Leibler divergence (FKLD).

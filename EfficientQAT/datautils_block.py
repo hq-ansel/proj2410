@@ -1,5 +1,6 @@
 import os
 import random
+from sympy import det
 from tqdm import tqdm
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 import shutil
@@ -39,6 +40,147 @@ def generate_llama_mask_and_position_embedding(seq_len,
     hidden_states = torch.zeros((batch_size, seq_len, hidden_size), dtype=dtype, device=device)
     position_embeddings = rotary_emb(hidden_states, position_ids.to(device))
     return attention_mask, position_embeddings
+
+class LazyLoadDatasetV2(Dataset):
+    
+    def __init__(self,
+            model: PreTrainedModel,
+            dataloader: List[Tuple[torch.Tensor, torch.Tensor]],
+            cache_path: str=None,
+             ):
+        """
+        仅接收输入为get loader的内容
+        """
+        # if os.path.exists(cache_path):
+        #     tmp_dict = torch.load(cache_path, weights_only=True)
+        #     self.data_list = tmp_dict["data_list"]
+        #     self.attention_mask = tmp_dict["attention_mask"]
+        #     self.position_embeddings = tmp_dict["position_embeddings"]
+        self.data_list = []
+        tmp_dict = {}
+        class Cacher(nn.Module):
+            def __init__(self, module: nn.Module, ):
+                super().__init__()
+                self._data_list = []
+                self.module = module
+                self.attention_mask = None
+                self.position_embeddings = None
+            def forward(self, hidden_states: torch.Tensor, 
+                        **kwargs):
+                output = self.module(hidden_states, **kwargs)[0]
+                self._data_list.append(
+                    (hidden_states.detach().cpu().squeeze(0),
+                      output.detach().cpu().squeeze(0))
+                )
+                self.attention_mask = kwargs.get("attention_mask", None)
+                self.position_embeddings = kwargs.get("position_embeddings", None)
+                raise StopException()
+        layers = model.model.layers
+        for n, m in model.named_modules():
+            if "norm" in n or "head" in n or "emb" in n:
+                m.to("cuda")
+        layers[0].to("cuda")
+        layers[0] = Cacher(layers[0])
+        with torch.no_grad():
+            for inp,tar in dataloader:
+                try:
+                    model(inp.to("cuda"))
+                except StopException:
+                    pass
+        tmp_dict["data_list"] = layers[0]._data_list
+        tmp_dict["attention_mask"] = layers[0].attention_mask
+        tmp_dict["position_embeddings"] = layers[0].position_embeddings
+        self.data_list = tmp_dict["data_list"]
+        self.attention_mask = tmp_dict["attention_mask"]
+        self.position_embeddings = tmp_dict["position_embeddings"]
+
+        layers[0] = layers[0].module
+        model =  model.to("cpu")
+    
+
+    def __len__(self):
+        """返回数据集中样本的数量"""
+        return len(self.data_list)
+
+    def __getitem__(self, idx) -> Union[ Tuple[torch.Tensor, torch.Tensor]]:
+        """
+        根据索引idx加载并返回样本数据
+
+        参数:
+            idx (int): 数据索引
+        返回:
+            Tuple[torch.Tensor, torch.Tensor]: 输入与输出的张量
+        """
+        # if idx == 0:
+        #     print(f"output sampel {self.data_list[0][1]}")
+        input_sample,output_sample = self.data_list[idx]
+        return input_sample, output_sample
+    
+    @torch.no_grad()
+    def update_dataset(self, module: Callable,
+                       next_module: Callable,
+                    layer_idx: int,
+                    batch_size: int = 1,
+                    attention_mask: torch.Tensor = None,
+                    position_embeddings: Tuple[torch.Tensor, torch.Tensor] = None):
+        """
+        更新第 i 层的参数
+        """
+        assert  position_embeddings is not None, (
+            f"attention_mask is {attention_mask} and position_embeddings is {position_embeddings}, "
+            "they should not be None"
+        )
+
+        new_file_list = []
+        device = next(module.parameters()).device
+        _dtype = next(module.parameters()).dtype
+
+        # 确保 position_embeddings 移动到正确的设备
+        position_embeddings = tuple(it.to(device) for it in position_embeddings)
+
+        # for idx in range(0, (len(self.data_list)+batch_size-1 )//batch_size):
+        for idx in tqdm(range(0, (len(self.data_list)+batch_size-1 )//batch_size),
+                         total=len(self.data_list)//batch_size, desc="update_dataset"):
+            # 批量加载数据
+            input_samples = []
+            output_samples = []
+            for inner_idx in range(batch_size):
+                real_idx = idx + inner_idx
+                if real_idx >= len(self.data_list):
+                    break
+
+                # 加载输入数据
+                input_sample = self.data_list[real_idx][0].to(device, dtype=_dtype)
+                input_samples.append(input_sample)
+
+                # # 加载输出数据，如果需要
+                output_sample = self.data_list[real_idx][1].to(device, dtype=_dtype)
+                output_samples.append(output_sample)
+
+            # 构造 batch tensor 并前向传播
+            input_batch = torch.stack(input_samples)
+            output_batch = torch.stack(output_samples)
+
+            output = module(input_batch, attention_mask=attention_mask,
+                            position_embeddings=position_embeddings)[0]
+            next_output = next_module(output_batch, attention_mask=attention_mask,
+                                        position_embeddings=position_embeddings)[0]
+            if idx == 0:
+                print(f"output: {output} output_batch {output_batch} next_output {next_output}")
+
+            for inner_idx in range(len(input_samples)):
+                real_idx = idx + inner_idx
+
+                assert output[inner_idx].dim() == 2, f"Output should be 2-dimensional, got {output[inner_idx].dim()}"
+                # TODO:后续再考虑磁盘，优先完善性能实验
+                # 如果是内存存储，直接更新 `data_list`
+                self.data_list[real_idx] = (output[inner_idx].detach().cpu(),
+                                                next_output[inner_idx].detach().cpu())
+
+            # 释放内存
+            del input_samples, output_samples, input_batch, output_batch, output, next_output
+            gc.collect()
+
 
 class LazyLoadDataset(Dataset):
     def __init__(self,
@@ -139,7 +281,7 @@ class LazyLoadDataset(Dataset):
         """
         更新第 i 层的参数
         """
-        assert attention_mask is not None and position_embeddings is not None, (
+        assert  position_embeddings is not None, (
             f"attention_mask is {attention_mask} and position_embeddings is {position_embeddings}, "
             "they should not be None"
         )
@@ -178,6 +320,8 @@ class LazyLoadDataset(Dataset):
                             position_embeddings=position_embeddings)[0]
             next_output = next_module(output_batch, attention_mask=attention_mask,
                                         position_embeddings=position_embeddings)[0]
+            if idx == 0:
+                print(f"output: {output} output_batch {output_batch} next_output {next_output}")
 
             for inner_idx in range(len(input_samples)):
                 real_idx = idx + inner_idx
@@ -246,9 +390,8 @@ async def async_generate_block_train_data(
 
     layers[0] = Interrupt(layers[0])
     for n, m in model.named_modules():
-        if "layer" in n:
-            break
-        m.to(device)
+        if "norm" in n or "head" in n or "emb" in n:
+            m.to(device)
     layers[0].to(device)
 
     for idx, batch in enumerate(dataloader):
@@ -279,6 +422,8 @@ async def async_generate_block_train_data(
     )
 
     for layer_idx in tqdm(range(len(layers)), total=len(layers), desc="update_dataset"):
+        if layer_idx == 1:
+            break
         await asyncio.gather(*result)
         result.clear()
         layer = layers[layer_idx]

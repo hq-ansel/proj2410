@@ -12,6 +12,140 @@ from .int_linear_fake import QuantLinear
 class StopException(Exception):
     pass
 
+# class Catcher(nn.Module):
+#     """
+#     Args:
+#         module: nn.Module 需要包装的module
+#         dataset: Dataset 用于更新输入数据的dataset
+#         index: int 输入数据的索引
+#         attention_mask: Optional[torch.Tensor] 用于存储attention mask
+#         position_ids: Optional[torch.LongTensor] 用于存储位置id
+#         stop_forward: bool 控制前向传播的标志
+#         inps: dict 用于存储输入以及参数
+#         outs: dict 用于存储输出，Tuple类型
+#     """
+#     def __init__(self, module,stop_forward_flag=False):
+#         super().__init__()
+#         self.module = module  # 包装的原始module
+#         self.stop_forward_flag = stop_forward_flag  # 控制前向传播的标志
+        
+#         self.index = 0  # 输入数据的索引
+#         self.layer_idx = 0  # 用于记录当前层的索引
+        
+#         self.attention_mask = None  # 用于存储attention mask
+#         self.position_ids = None  # 用于存储位置id
+#         self.position_embeddings = None  # 用于存储位置embedding
+        
+#         self.inps = {}  # 用于存储输入
+#         self.outs=None
+        
+#         self.store_dir = None  # 用于存储输入数据的文件夹
+        
+#         self.input_catch_state = False  # 控制是否存储输入数据
+#         self.output_catch_state = False  # 控制是否存储输出数据
+#         self.store_input_flag = False  # 控制是否存储输入数据
+#         self.store_output_flag = False  # 控制是否存储输出数据
+#         self.store_executor = None  # 用于存储数据的线程池
+
+#     def set_input_catch_state(self, state: bool):
+#         self.input_catch_state = state
+#     def set_output_catch_state(self, state: bool):
+#         self.output_catch_state = state
+#     def set_store_dir(self, store_dir: str):
+#         self.store_dir = store_dir
+#     def set_store_state(self, store_input: bool, store_output: bool):
+#         self.store_input_flag = store_input
+#         self.store_output_flag = store_output
+
+#     def set_layer_idx(self, layer_idx: int):
+#         self.layer_idx = layer_idx
+
+#     def setup_executor(self, max_workers: int):
+#         self.store_executor = ThreadPoolExecutor(max_workers=max_workers)
+#         if max_workers == 0:
+#             self.store_executor = None
+#         else:
+#             self.result = []
+
+#     def store_tensor(self, tensor: torch.Tensor, type: str):
+#         """
+#         仅允许存储 (seq_len,hidden_size)
+#         """
+#         assert tensor.dim() == 2, f"Only allow store (seq_len,hidden_size) tensor, but got {tensor.shape}"
+
+#         # 检查队列是否达到上限
+#         if self.store_executor and len(self.result) >= 4:
+#             # 强制等待队列中的任务完成
+#             for future in self.result:
+#                 future.result()  # 等待任务完成
+#             # 清空已完成的任务
+#             self.result.clear()
+
+#         if type == 'input':
+#             path = os.path.join(self.store_dir, f"input_layer{self.layer_idx}_{self.index}.pt")
+#             if self.store_executor:
+#                 self.result.append(
+#                     self.store_executor.submit(torch.save, tensor.cpu(), path)
+#                 )
+#             else:
+#                 torch.save(tensor.cpu(), path)
+#         elif type == 'output':
+#             path = os.path.join(self.store_dir, f"output_layer{self.layer_idx}_{self.index}.pt")
+#             if   self.store_executor:
+#                 self.result.append(
+#                     self.store_executor.submit(torch.save, tensor.cpu(), path)
+#                     )
+#             else:
+#                 torch.save(tensor.cpu(), path)
+
+
+#     def forward(self, inp, **kwargs):
+#         # 强制store与catch应该是两套逻辑
+#         # 所以这两个的index应该是分开的
+#         assert not (self.input_catch_state and self.store_input_flag), "Catcher should not store input data when catch input data"
+#         if self.input_catch_state:
+#             if self.attention_mask is None:
+#                 self.attention_mask = kwargs.get('attention_mask', None)
+#             if self.position_ids is None:
+#                 self.position_ids = kwargs.get('position_ids', None)
+#             if self.position_embeddings is None:
+#                 self.position_embeddings = kwargs.get('position_embeddings', None)
+#             self.inps[self.index] = inp  # 存储输入数据
+#             self.index += 1  # 输入数据的索引加1
+
+#         output = self.module(inp, **kwargs)
+
+#         if self.store_input_flag or self.store_output_flag:
+#             if self.attention_mask is None:
+#                 self.attention_mask = kwargs.get('attention_mask', None)
+#             if self.position_ids is None:
+#                 self.position_ids = kwargs.get('position_ids', None)
+#             if self.position_embeddings is None:
+#                 self.position_embeddings = kwargs.get('position_embeddings', None)
+#             if inp.dim() == 3:
+#                 for i in range(inp.size(0)):
+#                     if self.store_input_flag:
+#                         self.store_tensor(inp[i], 'input')
+#                     if self.store_output_flag:
+#                         self.store_tensor(output[0][i], 'output')
+#                     self.index += 1
+#             else:
+#                 if self.store_input_flag:
+#                     self.store_tensor(inp, 'input')
+#                 if self.store_output_flag:
+#                     self.store_tensor(output[0], 'output')
+#                 self.index += 1
+            
+        
+#         if self.output_catch_state:
+#             self.outs = output  # 存储输出
+#         if self.stop_forward_flag:
+#             raise StopException(f"stop forward shape: {output[0].shape}")
+#         return output
+
+#     def set_forward_state(self, stop_forward: bool):
+#         self.stop_forward_flag = stop_forward
+
 class Catcher(nn.Module):
     """
     Args:
@@ -27,124 +161,42 @@ class Catcher(nn.Module):
     def __init__(self, module,stop_forward_flag=False):
         super().__init__()
         self.module = module  # 包装的原始module
-        self.stop_forward_flag = stop_forward_flag  # 控制前向传播的标志
-        
         self.index = 0  # 输入数据的索引
-        self.layer_idx = 0  # 用于记录当前层的索引
-        
         self.attention_mask = None  # 用于存储attention mask
         self.position_ids = None  # 用于存储位置id
-        self.position_embeddings = None  # 用于存储位置embedding
-        
+        self.stop_forward_flag = stop_forward_flag  # 控制前向传播的标志
         self.inps = {}  # 用于存储输入
         self.outs=None
-        
-        self.store_dir = None  # 用于存储输入数据的文件夹
-        
-        self.input_catch_state = False  # 控制是否存储输入数据
-        self.output_catch_state = False  # 控制是否存储输出数据
-        self.store_input_flag = False  # 控制是否存储输入数据
-        self.store_output_flag = False  # 控制是否存储输出数据
-        self.store_executor = None  # 用于存储数据的线程池
-
-    def set_input_catch_state(self, state: bool):
-        self.input_catch_state = state
-    def set_output_catch_state(self, state: bool):
-        self.output_catch_state = state
-    def set_store_dir(self, store_dir: str):
-        self.store_dir = store_dir
-    def set_store_state(self, store_input: bool, store_output: bool):
-        self.store_input_flag = store_input
-        self.store_output_flag = store_output
-
-    def set_layer_idx(self, layer_idx: int):
-        self.layer_idx = layer_idx
-
-    def setup_executor(self, max_workers: int):
-        self.store_executor = ThreadPoolExecutor(max_workers=max_workers)
-        if max_workers == 0:
-            self.store_executor = None
-        else:
-            self.result = []
-
-    def store_tensor(self, tensor: torch.Tensor, type: str):
-        """
-        仅允许存储 (seq_len,hidden_size)
-        """
-        assert tensor.dim() == 2, f"Only allow store (seq_len,hidden_size) tensor, but got {tensor.shape}"
-
-        # 检查队列是否达到上限
-        if self.store_executor and len(self.result) >= 4:
-            # 强制等待队列中的任务完成
-            for future in self.result:
-                future.result()  # 等待任务完成
-            # 清空已完成的任务
-            self.result.clear()
-
-        if type == 'input':
-            path = os.path.join(self.store_dir, f"input_layer{self.layer_idx}_{self.index}.pt")
-            if self.store_executor:
-                self.result.append(
-                    self.store_executor.submit(torch.save, tensor.cpu(), path)
-                )
-            else:
-                torch.save(tensor.cpu(), path)
-        elif type == 'output':
-            path = os.path.join(self.store_dir, f"output_layer{self.layer_idx}_{self.index}.pt")
-            if   self.store_executor:
-                self.result.append(
-                    self.store_executor.submit(torch.save, tensor.cpu(), path)
-                    )
-            else:
-                torch.save(tensor.cpu(), path)
-
-
     def forward(self, inp, **kwargs):
-        # 强制store与catch应该是两套逻辑
-        # 所以这两个的index应该是分开的
-        assert not (self.input_catch_state and self.store_input_flag), "Catcher should not store input data when catch input data"
-        if self.input_catch_state:
-            if self.attention_mask is None:
-                self.attention_mask = kwargs.get('attention_mask', None)
-            if self.position_ids is None:
-                self.position_ids = kwargs.get('position_ids', None)
-            if self.position_embeddings is None:
-                self.position_embeddings = kwargs.get('position_embeddings', None)
-            self.inps[self.index] = inp  # 存储输入数据
-            self.index += 1  # 输入数据的索引加1
-
-        output = self.module(inp, **kwargs)
-
-        if self.store_input_flag or self.store_output_flag:
-            if self.attention_mask is None:
-                self.attention_mask = kwargs.get('attention_mask', None)
-            if self.position_ids is None:
-                self.position_ids = kwargs.get('position_ids', None)
-            if self.position_embeddings is None:
-                self.position_embeddings = kwargs.get('position_embeddings', None)
-            if inp.dim() == 3:
-                for i in range(inp.size(0)):
-                    if self.store_input_flag:
-                        self.store_tensor(inp[i], 'input')
-                    if self.store_output_flag:
-                        self.store_tensor(output[0][i], 'output')
-                    self.index += 1
-            else:
-                if self.store_input_flag:
-                    self.store_tensor(inp, 'input')
-                if self.store_output_flag:
-                    self.store_tensor(output[0], 'output')
-                self.index += 1
-            
+        # 存储输入和 kwargs 的内容
+        # combined_input = {"input": inp.clone().detach().to('cpu')}
+        # combined_input.update({k: v.to('cpu') if isinstance(v, torch.Tensor) else v for k, v in kwargs.items()})
         
-        if self.output_catch_state:
-            self.outs = output  # 存储输出
+        # # 将数据存入inps
+        # self.inps = combined_input  # 存储输入和 kwargs
+
+        # # 更新索引
+        # self.index += 1
+
+        # # 存储 attention_mask 和 position_ids
+        # if self.attention_mask is None:
+        #     self.attention_mask = kwargs.get("attention_mask", None)
+        # if self.position_ids is None:
+        #     self.position_ids = kwargs.get("position_ids", None)
+        
+        
+        # 前向传播，并存储输出
+        output = self.module(inp, **kwargs)
+        self.outs = output  # 存储输出
         if self.stop_forward_flag:
+            # print(f"stop forward shape: {output[0].shape}")
             raise StopException(f"stop forward shape: {output[0].shape}")
         return output
 
     def set_forward_state(self, stop_forward: bool):
         self.stop_forward_flag = stop_forward
+
+
 
 
 class MultiBlock(nn.Module):

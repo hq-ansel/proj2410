@@ -2,7 +2,7 @@
 wbits: 2
 group_size: 128
 # training settings
-cuda_ids: "0,1"
+cuda_ids: "3,7"
 epochs: 2
 net: Llama2-7b
 batch_size: 2
@@ -13,6 +13,8 @@ loss_func: MSE # "MSE", "FKLD" , "RKLD", "FKLD_RKLD" ,"MSE_FKLD", "MSE_RKLD", "M
 crossblock_window_size: 1
 train_size: 4096
 slide_step: 1
+clip_grad: 0.3
+
 
 model: /home/ubuntu/data/exp/proj2410/model/Llama2-7b
 # save settings

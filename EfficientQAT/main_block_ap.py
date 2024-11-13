@@ -157,6 +157,7 @@ def main():
     parser.add_argument("--clamp_method", type=str, default="STE", help="clamp method for training")
     parser.add_argument("--quant_shedule_type", type=str, default="partial", help="quantization shedule type")
     parser.add_argument("--train_shedule_type", type=str, default="start2end", help="train shedule type")
+    parser.add_argument("--with_catcher", action="store_true", default=False, help="use catcher for training saving memory")
 
     os.environ['TOKENIZERS_PARALLELISM'] = 'false'
     args = parser.parse_args()

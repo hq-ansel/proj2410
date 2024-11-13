@@ -32,11 +32,11 @@ class QuantLinear(nn.Module):
         # de-activate the quantized forward default
         self.use_weight_quant = False
         # initialize quantizer
-        self.weight_quantizer = UniformAffineQuantizer(wbits, group_size, weight=org_module.weight,args=args)
-        # self.weight_quantizer = GradualUniformAffineQuantizer(wbits,
-        #                                                     group_size,
-        #                                                     weight=org_module.weight,
-        #                                                     args=args)
+        # self.weight_quantizer = UniformAffineQuantizer(wbits, group_size, weight=org_module.weight,args=args)
+        self.weight_quantizer = GradualUniformAffineQuantizer(wbits,
+                                                            group_size,
+                                                            weight=org_module.weight,
+                                                            args=args)
         self.use_temporary_parameter = False
         self.clamp_input = args.get('clamp_input',False)
 

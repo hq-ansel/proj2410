@@ -20,7 +20,7 @@ from .quantize.int_linear_real import load_quantized_model
 from .quantize.block_ap import block_ap
 from .quantize.crossblockquant import cross_block_quantization
 from .quantize.greedy_trainer import greedy_local_train,timer
-
+from .quantize.awq_pipline import *
 
 amp_enabled = os.environ.get("AMP_ENABLED", "False").lower() == "true"
 torch.backends.cudnn.benchmark = True
@@ -180,6 +180,7 @@ def main():
         Path(args.save_quant_dir).mkdir(parents=True, exist_ok=True)
     output_dir = Path(args.output_dir)
     logger = utils.create_logger(output_dir)
+    args.logger = logger
     logger.info(args)
     
     if args.net is None:
@@ -242,6 +243,7 @@ def main():
                     "zero_point": True,  # by default True
                     "q_group_size": args.q_group_size,  # whether to use group quantization
                 }
+                # 从.quantize.awq_pipline 导入 pipeline函数
             logger.info(time.time() - tick)
     torch.cuda.empty_cache()
     if args.save_quant_dir:

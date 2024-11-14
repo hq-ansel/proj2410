@@ -238,11 +238,12 @@ def main():
                     logger,
                 )
             elif args.quant_method == "awq":
-                w_bit = args.wbits
-                q_config = {
-                    "zero_point": True,  # by default True
-                    "q_group_size": args.q_group_size,  # whether to use group quantization
-                }
+                from .quantize.awq_pipline import awq_pipline
+                awq_pipline(
+                    model,
+                    trainloader,
+                    args,
+                )
                 # 从.quantize.awq_pipline 导入 pipeline函数
             logger.info(time.time() - tick)
     torch.cuda.empty_cache()

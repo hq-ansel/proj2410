@@ -40,11 +40,11 @@ from accelerate import (
 from accelerate.utils.modeling import get_balanced_memory
 
 
-from awq.quantize.quantizer import (real_quantize_model_weight,
+from llm_awq.quantize.quantizer import (real_quantize_model_weight,
                                     pseudo_quantize_model_weight)
-from awq.utils.utils import simple_dispatch_model
-from awq.quantize.auto_scale import auto_scale_block,apply_scale
-from awq.quantize.auto_clip import auto_clip_block,apply_clip
+from llm_awq.utils.utils import simple_dispatch_model
+from llm_awq.quantize.auto_scale import auto_scale_block,apply_scale
+from llm_awq.quantize.auto_clip import auto_clip_block,apply_clip
 
 def load_awq_model_tokenizer(model_path,
                              w_bit,
@@ -77,10 +77,10 @@ def load_awq_model_tokenizer(model_path,
         **kwargs,
     )
     # Load checkpoint in the model
-    load_quant = os.path.join(model_path, "awq_results.pt")
+    # load_quant = os.path.join(model_path, "awq_model.pt")
     load_checkpoint_in_model(
         model,
-        checkpoint=load_quant,
+        checkpoint=model_path,
         device_map=device_map,
         offload_state_dict=True,
     )
@@ -120,6 +120,7 @@ def move_embed(model, device):
     # add qwen2.5
     if isinstance(model, LlamaForCausalLM):
         model.model.embed_tokens = model.model.embed_tokens.to(device)
+        model.model.rotary_emb = model.model.rotary_emb.to(device)
     elif isinstance(model, OPTForCausalLM):
         model.model.decoder.embed_tokens = model.model.decoder.embed_tokens.to(device)
         model.model.decoder.embed_positions = model.model.decoder.embed_positions.to(
@@ -127,6 +128,7 @@ def move_embed(model, device):
         )
     elif isinstance(model, Qwen2ForCausalLM):
         model.model.embed_tokens = model.model.embed_tokens.to(device)
+        model.model.rotary_emb = model.model.rotary_emb.to(device)
     elif isinstance(model, BloomForCausalLM):
         model.transformer.word_embeddings = model.transformer.word_embeddings.to(device)
         model.transformer.word_embeddings_layernorm = (
@@ -160,15 +162,15 @@ def run_awq(
     w_bit: int,
     q_config: Dict,
 ):
-    from awq.utils.module import append_str_prefix, get_op_name
+    from llm_awq.utils.module import append_str_prefix, get_op_name
 
     if "bigcode" in str(model.__class__).lower():
         # otherwise attention_mask will always be on cpu.
         model.transformer.bias = model.transformer.bias.to("cuda")
 
     layers = get_blocks(model)
-
-    samples = torch.cat(samples, dim=0)
+    # 一次性输入果然炸完了
+    # samples = torch.cat(samples, dim=0)
 
     inps = []
     layer_kwargs = {}
@@ -185,19 +187,20 @@ def run_awq(
             self.module = module
 
         def forward(self, inp, **kwargs):
-            inps.append(inp)
+            inps.append(inp.detach().cpu())
             layer_kwargs.update(kwargs)
             raise ValueError  # early exit to break later inference
 
     # patch layer 0 to catch input and kwargs
     layers[0] = Catcher(layers[0])
-    try:
-        model(samples.to(next(model.parameters()).device))
-    except ValueError:  # work with early exit
-        pass
+    for sample in samples:
+        try:
+            model(sample.to(next(model.parameters()).device))
+        except ValueError:  # work with early exit
+            pass
     del samples
     layers[0] = layers[0].module  # restore
-    inps = inps[0]
+    # inps = inps[0]
 
     layers[0] = layers[0].cpu()
     move_embed(model, "cpu")
@@ -209,9 +212,9 @@ def run_awq(
         "scale": [],
         "clip": [],
     }
-
+    model = model.to("cpu")
     # solve layer by layer
-    for i in tqdm.tqdm(range(len(layers)), desc="Running AWQ..."):
+    for i in tqdm(range(len(layers)), desc="Running AWQ..."):
         layer = layers[i]
         layer = layer.cuda()
         named_linears = get_named_linears(layer)
@@ -230,9 +233,11 @@ def run_awq(
                     functools.partial(cache_input_hook, name=name, feat_dict=input_feat)
                 )
             )
-        inps = inps.to(next(layer.parameters()).device)  # in case multi-gpu
+        # inps = inps.to(next(layer.parameters()).device)  # in case multi-gpu
         # get output as next layer's input
-        inps = layer(inps, **layer_kwargs)[0]
+        for idx, inp in enumerate(inps):
+            inp = inp.to(next(layer.parameters()).device)
+            inps[idx] = layer(inp, **layer_kwargs)[0].to("cpu")
         for h in handles:
             h.remove()
         # now solve for scaling and clipping
@@ -240,7 +245,7 @@ def run_awq(
 
         # Clear GPU memory
         torch.cuda.empty_cache()
-
+        print(f"Finish solving layer {i}")
         if (
             # auto_scale
             True
@@ -296,13 +301,15 @@ def awq_pipline(
         train_dataset: List[Tuple[torch.Tensor, torch.Tensor]],
         args: edict,
 ):
+    model.to(dtype = torch.float16)
     w_bit = args.wbits
     q_config = {
         "zero_point": True,  # by default True
-        "q_group_size": args.q_group_size,  # whether to use group quantization
+        "q_group_size": args.group_size,  # whether to use group quantization
     }
     cali_model = copy.deepcopy(model)
     train_dataset = [x[0] for x in train_dataset]
+    args.logger.info("Running AWQ...")
     awq_results = run_awq(
         cali_model,
         train_dataset,
@@ -311,6 +318,8 @@ def awq_pipline(
     del cali_model
     del train_dataset
     gc.collect()
-    dump_awq = os.path.join(args.output_dir, "awq_results.pt")
-    torch.save(awq_results, dump_awq)
+    args.logger.info("Applying AWQ...")
     apply_awq(model, awq_results)
+    args.logger.info("Real-quantizing model weight...")
+    real_quantize_model_weight(model, w_bit=w_bit, q_config=q_config)
+    

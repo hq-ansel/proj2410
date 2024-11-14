@@ -165,6 +165,7 @@ class Catcher(nn.Module):
         self.attention_mask = None  # 用于存储attention mask
         self.position_ids = None  # 用于存储位置id
         self.stop_forward_flag = stop_forward_flag  # 控制前向传播的标志
+        self.detach_input = False  # 控制是否detach输入
         self.inps = {}  # 用于存储输入
         self.outs=None
     def forward(self, inp, **kwargs):
@@ -183,8 +184,8 @@ class Catcher(nn.Module):
         #     self.attention_mask = kwargs.get("attention_mask", None)
         # if self.position_ids is None:
         #     self.position_ids = kwargs.get("position_ids", None)
-        
-        inp = inp.detach()
+        if self.detach_input:
+            inp = inp.detach()
         # 前向传播，并存储输出
         output = self.module(inp, **kwargs)
         self.inps = {

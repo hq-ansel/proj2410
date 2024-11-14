@@ -20,7 +20,7 @@ from .quantize.int_linear_real import load_quantized_model
 from .quantize.block_ap import block_ap
 from .quantize.crossblockquant import cross_block_quantization
 from .quantize.greedy_trainer import greedy_local_train,timer
-
+from .quantize.awq_pipline import *
 
 amp_enabled = os.environ.get("AMP_ENABLED", "False").lower() == "true"
 torch.backends.cudnn.benchmark = True
@@ -158,6 +158,7 @@ def main():
     parser.add_argument("--quant_shedule_type", type=str, default="partial", help="quantization shedule type")
     parser.add_argument("--train_shedule_type", type=str, default="start2end", help="train shedule type")
     parser.add_argument("--with_catcher", action="store_true", default=False, help="use catcher for training saving memory")
+    parser.add_argument("--quant_method", type=str, default="block_ap", help="quantization method")
 
     os.environ['TOKENIZERS_PARALLELISM'] = 'false'
     args = parser.parse_args()
@@ -179,6 +180,7 @@ def main():
         Path(args.save_quant_dir).mkdir(parents=True, exist_ok=True)
     output_dir = Path(args.output_dir)
     logger = utils.create_logger(output_dir)
+    args.logger = logger
     logger.info(args)
     
     if args.net is None:
@@ -224,13 +226,25 @@ def main():
                 torch.save(valloader, cache_valloader)    
             # cross_block_quantization(
             # block_ap(
-            greedy_local_train(
-                model,
-                args,
-                trainloader,
-                valloader,
-                logger,
-            )
+
+            # 依靠 args.quant_method 选择不同的量化方法
+            # "block_ap": 就是我的方法
+            if args.quant_method == "block_ap":
+                greedy_local_train(
+                    model,
+                    args,
+                    trainloader,
+                    valloader,
+                    logger,
+                )
+            elif args.quant_method == "awq":
+                from .quantize.awq_pipline import awq_pipline
+                awq_pipline(
+                    model,
+                    trainloader,
+                    args,
+                )
+                # 从.quantize.awq_pipline 导入 pipeline函数
             logger.info(time.time() - tick)
     torch.cuda.empty_cache()
     if args.save_quant_dir:

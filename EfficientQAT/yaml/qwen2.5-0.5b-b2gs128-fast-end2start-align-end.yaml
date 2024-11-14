@@ -2,7 +2,7 @@
 wbits: 2
 group_size: 128
 # training settings
-cuda_ids: "3,7"
+cuda_ids: "0,1"
 epochs: 2
 net: Qwen2.5
 batch_size: 2

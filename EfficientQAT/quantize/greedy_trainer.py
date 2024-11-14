@@ -77,7 +77,8 @@ class CatcherManager:
     def __exit__(self, exc_type, exc_val, exc_tb):
         # 恢复原始模块
         for idx in self.indices:
-            self.layers[idx] = self.original_modules[idx]
+            if isinstance(self.layers[idx], Catcher):
+                self.layers[idx] = self.original_modules[idx]
 
 class CommonInputDataset(Dataset):
     def __init__(self, data):
@@ -401,17 +402,22 @@ def train_units_layers_with_catcher(model: PreTrainedModel,
     # 暂时没有更好的假设，直接使用selected_layers 中的最后一个层作为对齐层
     align_index = trainable_layer_idx_list[-1]
     last_block_idx = len(model.model.layers) - 1
-    if args.loss_func == "KL-Divergence":
-        qlayer_idxs = []
-        fp_layer_idxs = []
-    else:
-        qlayer_idxs = [align_index,last_block_idx]
-        fp_layer_idxs = [align_index,last_block_idx]
+    # if args.loss_func == "KL-Divergence":
+    #     qlayer_idxs = []
+    #     fp_layer_idxs = []
+    # else:
+    #     qlayer_idxs = [align_index,last_block_idx]
+    #     fp_layer_idxs = [align_index,last_block_idx]
+    
+    start_block = trainable_layer_idx_list[0]
+    qlayer_idxs = [align_index,start_block]
+    fp_layer_idxs = [align_index,start_block]
 
     with CatcherManager(qlayers, qlayer_idxs),CatcherManager(fp_layers, fp_layer_idxs):
         if not args.loss_func == "KL-Divergence":
             if args.align_type == "tail":
                 qlayers[align_index].set_forward_state(stop_forward=True)
+                qlayers[start_block].detach_input = True
                 # qlayers[align_index].set_output_catch_state(state=True)
             else:
                 qlayers[last_block_idx].set_forward_state(stop_forward=True)

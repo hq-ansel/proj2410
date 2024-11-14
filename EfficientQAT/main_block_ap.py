@@ -158,6 +158,7 @@ def main():
     parser.add_argument("--quant_shedule_type", type=str, default="partial", help="quantization shedule type")
     parser.add_argument("--train_shedule_type", type=str, default="start2end", help="train shedule type")
     parser.add_argument("--with_catcher", action="store_true", default=False, help="use catcher for training saving memory")
+    parser.add_argument("--quant_method", type=str, default="block_ap", help="quantization method")
 
     os.environ['TOKENIZERS_PARALLELISM'] = 'false'
     args = parser.parse_args()
@@ -224,13 +225,23 @@ def main():
                 torch.save(valloader, cache_valloader)    
             # cross_block_quantization(
             # block_ap(
-            greedy_local_train(
-                model,
-                args,
-                trainloader,
-                valloader,
-                logger,
-            )
+
+            # 依靠 args.quant_method 选择不同的量化方法
+            # "block_ap": 就是我的方法
+            if args.quant_method == "block_ap":
+                greedy_local_train(
+                    model,
+                    args,
+                    trainloader,
+                    valloader,
+                    logger,
+                )
+            elif args.quant_method == "awq":
+                w_bit = args.wbits
+                q_config = {
+                    "zero_point": True,  # by default True
+                    "q_group_size": args.q_group_size,  # whether to use group quantization
+                }
             logger.info(time.time() - tick)
     torch.cuda.empty_cache()
     if args.save_quant_dir:

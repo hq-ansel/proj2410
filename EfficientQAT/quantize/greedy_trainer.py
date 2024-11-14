@@ -10,7 +10,6 @@ from functools import wraps
 from contextlib import contextmanager
 from typing import List, Tuple, Dict, Union, Callable
 from concurrent.futures import ThreadPoolExecutor
-from sympy import Q
 from tqdm import tqdm
 
 import numpy as np

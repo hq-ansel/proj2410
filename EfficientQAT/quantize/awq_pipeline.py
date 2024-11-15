@@ -72,6 +72,7 @@ def load_awq_model_tokenizer(model_path,
             "LlamaDecoderLayer",
             "BloomBlock",
             "MPTBlock",
+            "Qwen2DecoderLayer",
             "DecoderLayer",
         ],
         **kwargs,
@@ -222,7 +223,7 @@ def run_awq(
         # firstly, get input features of all linear layers
         def cache_input_hook(m, x, y, name, feat_dict):
             x = x[0]
-            x = x.detach().cpu()
+            x = x.to("cpu")
             feat_dict[name].append(x)
 
         input_feat = defaultdict(list)
@@ -233,16 +234,24 @@ def run_awq(
                     functools.partial(cache_input_hook, name=name, feat_dict=input_feat)
                 )
             )
+        estimate_memory = sum([
+            p.numel() * p.element_size() for p in layer.parameters()
+        ])
+        print(f"Estimated layer memory usage: {estimate_memory / 1024 ** 3:.2f} GB")
+        estimate_memory = sum(
+            [p.numel()*2  for p in inps ]
+        )
+        print(f"Estimated input memory usage: {estimate_memory / 1024 ** 3:.2f} GB")
         # inps = inps.to(next(layer.parameters()).device)  # in case multi-gpu
         # get output as next layer's input
-        for idx, inp in enumerate(inps):
-            inp = inp.to(next(layer.parameters()).device)
+        for idx in range(len(inps)):
+            inp = inps[idx].half().to(next(layer.parameters()).device)
             inps[idx] = layer(inp, **layer_kwargs)[0].to("cpu")
+            del inp
         for h in handles:
             h.remove()
         # now solve for scaling and clipping
         input_feat = {k: torch.cat(v, dim=0) for k, v in input_feat.items()}
-
         # Clear GPU memory
         torch.cuda.empty_cache()
         print(f"Finish solving layer {i}")

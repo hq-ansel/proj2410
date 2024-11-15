@@ -20,7 +20,7 @@ from .quantize.int_linear_real import load_quantized_model
 from .quantize.block_ap import block_ap
 from .quantize.crossblockquant import cross_block_quantization
 from .quantize.greedy_trainer import greedy_local_train,timer
-from .quantize.awq_pipline import *
+from .quantize.awq_pipeline import *
 
 amp_enabled = os.environ.get("AMP_ENABLED", "False").lower() == "true"
 torch.backends.cudnn.benchmark = True
@@ -238,18 +238,28 @@ def main():
                     logger,
                 )
             elif args.quant_method == "awq":
-                from .quantize.awq_pipline import awq_pipline
+                from .quantize.awq_pipeline import awq_pipline
                 awq_pipline(
                     model,
                     trainloader,
                     args,
                 )
                 # 从.quantize.awq_pipline 导入 pipeline函数
+            elif args.quant_method == "gptq":
+                from .quantize.gptq_pipeline import gptq_pipeline
+                model = gptq_pipeline(
+                    model,
+                    trainloader,
+                    args,
+                )
             logger.info(time.time() - tick)
     torch.cuda.empty_cache()
     if args.save_quant_dir:
         logger.info("start saving model")
-        model.save_pretrained(args.save_quant_dir)  
+        if args.quant_method == "gptq":
+            model.save(args.save_quant_dir)
+        else:
+            model.save_pretrained(args.save_quant_dir)  
         tokenizer.save_pretrained(args.save_quant_dir) 
         logger.info("save model success")
     evaluate(model, tokenizer, args,logger)

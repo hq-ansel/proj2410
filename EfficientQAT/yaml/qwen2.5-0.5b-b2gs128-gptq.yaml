@@ -14,13 +14,13 @@ crossblock_window_size: 1
 train_size: 4096
 slide_step: 1
 clip_grad: 0.3
-quant_method: awq
+quant_method: gptq
 
 model: /home/ubuntu/data/exp/proj2410/model/Qwen2.5-0.5B
 # save settings
-output_dir: /home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/AWQ/w2gs128/
-log_loss: /home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/AWQ/w2gs128/loss.csv
-save_quant_dir: /home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/AWQ/w2gs128/
+output_dir: /home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/GPTQ/w2gs128/
+log_loss: /home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/GPTQ/w2gs128/loss.csv
+save_quant_dir: /home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/GPTQ/w2gs128/
 clamp_method: STE
 
 align_type: tail

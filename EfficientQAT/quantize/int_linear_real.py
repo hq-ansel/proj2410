@@ -13,6 +13,8 @@ from accelerate import init_empty_weights, infer_auto_device_map, load_checkpoin
 from .triton_utils.kernels import dequant_dim0, dequant_dim1
 from .utils import get_named_linears,set_op_by_name
 
+from gptqmodel.nn_modules.qlinear.qlinear_tritonv2 import QLinearTritonV2
+
 logger = getLogger(__name__)
 
 
@@ -185,7 +187,20 @@ class QuantLinear(nn.Module, TritonModuleMixin):
 
         out = out + self.bias if self.bias is not None else out
         return out
-
+    
+    @classmethod
+    def from_TritonV2QuantLinear(linear: QLinearTritonV2):
+        q_linear = QuantLinear(linear.bits, 
+                                linear.group_size, 
+                                linear.infeatures, 
+                                linear.outfeatures, 
+                                linear.bias is not None,
+        )
+        q_linear.qweight = linear.qweight
+        q_linear.qzeros = linear.qzeros
+        q_linear.scales = linear.scales
+        q_linear.g_idx = linear.g_idx
+        return q_linear
 
 def load_quantized_model(model_path, wbits, group_size):
     print(f"Loading quantized model from {model_path}")

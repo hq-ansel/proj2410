@@ -222,9 +222,23 @@ def load_quantized_model(model_path, wbits, group_size):
     gc.collect()
     # print("Loading pre-computed quantized weights...",model)
     model.tie_weights()
-    device_map = infer_auto_device_map(model)
+    # kwargs = {"max_memory": "16GB"} 
+    device_map = infer_auto_device_map(model,
+        no_split_module_classes=[
+            "OPTDecoderLayer",
+            "LlamaDecoderLayer",
+            "BloomBlock",
+            "Qwen2DecoderLayer",
+            "MPTBlock",
+            "DecoderLayer",
+        ],                               
+        # **kwargs
+        )
     print("Loading pre-computed quantized weights...")
-    load_checkpoint_in_model(model,checkpoint=model_path,device_map=device_map,offload_state_dict=True)
+    load_checkpoint_in_model(model,
+        checkpoint=model_path,
+        device_map=device_map,
+        offload_state_dict=True)
     print("Loading pre-computed quantized weights Successfully")
 
     return model, tokenizer

@@ -291,7 +291,21 @@ def get_accelerate_model(args, checkpoint_dir):
                 ),
         })
 
-
+    from gptqmodel.nn_modules.qlinear.qlinear_tritonv2 import TritonV2QuantLinear
+    for name, module in model.named_modules():
+        if isinstance(module, TritonV2QuantLinear):
+            # 创建新的 QuantLinear 模块
+            new_module = QuantLinear.from_TritonV2QuantLinear(module)
+            
+            # 找到父模块并替换子模块
+            parent_name = ".".join(name.split(".")[:-1])  # 获取父模块名称
+            if parent_name:
+                parent_module = dict(model.named_modules())[parent_name]
+            else:
+                parent_module = model  # 顶层模块
+            
+            # 替换模块
+            setattr(parent_module, name.split(".")[-1], new_module)
     for name, param in model.named_parameters():
         # freeze base model's layers
         param.requires_grad = False
@@ -414,7 +428,6 @@ def train():
 
     data_module = make_data_module(tokenizer=tokenizer, args=args)
 
-    
 
     optimizer_grouped_parameters = []
     for name, module in model.named_modules():

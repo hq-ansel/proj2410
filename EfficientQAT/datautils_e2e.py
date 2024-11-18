@@ -128,9 +128,10 @@ def make_data_module(tokenizer: transformers.PreTrainedTokenizer, args) -> Dict:
             return dataset
         elif dataset_name == 'redpajama':
             try:
-                loacal_dataset = "/cpfs01/user/chenmengzhao/huggingface/datasets/togethercomputer___red_pajama-data-1_t-sample"
+                loacal_dataset = "/path/to/local/redpajama-dataset"
                 dataset = load_dataset(loacal_dataset)
             except:
+                loacal_dataset = "togethercomputer/RedPajama-Data-1T-Sample"
                 dataset = load_dataset("togethercomputer/RedPajama-Data-1T-Sample")   
             if "validation" not in dataset.keys():
                 validation_split = args.eval_dataset_size

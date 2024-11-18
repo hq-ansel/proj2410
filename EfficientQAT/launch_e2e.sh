@@ -25,26 +25,25 @@ for quant_model_path in ${quant_model_paths[@]}; do
         --wbits 2 \
         --group_size 128 \
         --learning_rate 2e-5 \
-        --dataset alpaca \
-        --dataset_format alpaca \
-        --output_dir "${quant_model_path}-alpaca-4096" \
+        --dataset redpajama \
+        --dataset_format pt \
+        --output_dir "${quant_model_path}-redpajama-4096" \
         --do_train True \
-        --do_mmlu_eval True \
-        --source_max_len 384 \
-        --target_max_len 128 \
-        --per_device_train_batch_size 16 \
+        --per_device_train_batch_size 4 \
         --per_device_eval_batch_size 4 \
-        --gradient_accumulation_steps 1 \
+        --gradient_accumulation_steps 8 \
         --logging_steps 10 \
         --save_strategy steps \
         --evaluation_strategy steps \
-        --max_steps 10000 \
-        --eval_steps 2000 \
+        --max_steps 4096 \
+        --eval_steps 1024 \
+         --num_train_epochs 1 \
         --eval_dataset_size 16 \
         --bf16 \
         --data_seed 42 \
         --max_grad_norm 0.3 \
         --save_total_limit 1 \
-        --group_by_length
+        --preprocessing_num_workers 32 \
+        --do_ppl_eval
     )
 done

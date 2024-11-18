@@ -10,11 +10,11 @@ from tqdm import trange
 from tqdm.auto import trange
 from transformers import PreTrainedModel
 
-from aq_engine import AQEngine
-from src.aq import QuantizedLinear
-from src.datautils import get_loaders
-from src.finetune import finetune_groupwise
-from src.modelutils import (
+from .aq_engine import AQEngine
+from .src.aq import QuantizedLinear
+from .src.datautils import get_loaders
+from .src.finetune import finetune_groupwise
+from .src.modelutils import (
     FALCON_TYPES,
     find_sublayers,
     get_layers,
@@ -24,7 +24,7 @@ from src.modelutils import (
     get_sequential_groups,
     save_not_quantized_weights,
 )
-from src.utils import using_tf32
+from .src.utils import using_tf32
 
 try:
     import wandb
@@ -591,7 +591,7 @@ def main():
         help="path to llama model to load, as in LlamaForCausalLM.from_pretrained()",
     )
     parser.add_argument(
-        "dataset",
+        "--dataset",
         type=str,
         help="Dataset name [c4, pajama] or path to data where to extract calibration data from.",
     )

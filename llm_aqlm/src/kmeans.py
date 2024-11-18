@@ -3,7 +3,7 @@ from typing import List, Optional, Tuple
 
 import torch
 
-from src.utils import maybe_script
+from .utils import maybe_script
 
 
 @maybe_script
@@ -92,7 +92,6 @@ def fit_kmeans(
             for gi in range(1, len(devices)):
                 cluster_sums[0] += cluster_sums[gi]
                 cluster_counts[0] += cluster_counts[gi]
-
             new_clusters = [cluster_sums[0] / cluster_counts[0].unsqueeze(1).clamp_min(1)]
             new_clusters[0] += (cluster_counts[0].unsqueeze(1) == 0) * clusters[0]
             for gi in range(1, len(devices)):

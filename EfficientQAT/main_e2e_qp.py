@@ -306,7 +306,6 @@ def get_accelerate_model(args, checkpoint_dir):
             model.get_input_embeddings().register_forward_hook(make_inputs_require_grad)    
             
         model.gradient_checkpointing_enable()
-
     for name, module in model.named_modules():
         # if isinstance(module, QuantLinear):
         #     # transfer trainable step size into float32

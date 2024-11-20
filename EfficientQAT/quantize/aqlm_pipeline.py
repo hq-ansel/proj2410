@@ -12,7 +12,7 @@ from collections import defaultdict
 from contextlib import contextmanager
 from typing import List, Tuple, Dict, Union, Callable,Sequence,Any
 from concurrent.futures import ThreadPoolExecutor
-from regex import T
+from regex import E, T
 from tqdm import tqdm
 from tqdm import trange
 from tqdm.auto import trange
@@ -377,8 +377,8 @@ def aqlm_pipeline(
     train_dataset = [x[0] for x in train_dataset]
     vali_dataset = [x[0] for x in vali_dataset]
     
-    args.num_codebooks = 1
-    args.nbits_per_codebook = 16
+    args.num_codebooks = 2
+    args.nbits_per_codebook = 8
     args.in_group_size = 8
     args.out_group_size = 1
     args.codebook_value_nbits = 16
@@ -392,13 +392,17 @@ def aqlm_pipeline(
     args.max_epochs = 1000
     args.relative_mse_tolerance = None
     args.steps_per_epoch = 100
+    args.print_frequency = 40
     args.finetune_max_epochs = 5
     args.finetune_early_stop = 3
     args.finetune_lr = 1e-5
-    args.finetune_batch_size = 1
+    args.finetune_batch_size = 16
     args.finetune_adam_beta1 = 0.9
     args.finetune_adam_beta2 = 0.95
-
+    args.use_checkpointing = False
+    args.local_batch_size = None
+    args.offload_activations = False
+    args.on_save = args.save_quant_dir
 
     args.model_seqlen= args.training_seqlen
     args.devices = [torch.device(f"cuda:{i}") for i in range(torch.cuda.device_count())]
@@ -493,7 +497,7 @@ def aqlm_pipeline(
                     **forward_args,
                 )
             for sublayer_name in aq_handlers.keys():
-                print(f"Quantizing module {sublayer_name} of layer {layer_index}")
+                print(f"Quantizing module {sublayer_name} of layer {layer_index} shape is {aq_handlers[sublayer_name].layer.weight.shape}")
                 if "mixtral" in model.config.model_type.lower() and args.mix_compression:
                     assert "mixtral" in model.config.model_type.lower()
                     if "self_attn" in sublayer_name.lower():
@@ -501,7 +505,7 @@ def aqlm_pipeline(
                     else:
                         args.num_codebooks = num_codebooks
                     print(sublayer_name.lower(), " mixtral num codebooks", args.num_codebooks)
-                quantized_weight = aq_handlers[sublayer_name].quantize(args=args, verbose=True)
+                quantized_weight = aq_handlers[sublayer_name].quantize(args=args, verbose=False)
 
                 with torch.no_grad():
                     assert aq_handlers[sublayer_name].layer.weight in set(
@@ -551,8 +555,8 @@ def aqlm_pipeline(
             layer_save_path = os.path.join(args.save_quant_dir, f"{layer_index}.pth")
             print(f"Saving layer {layer_index}... to {layer_save_path}")
             torch.save(layer, layer_save_path)
-            if args.on_save:
-                exec(args.on_save)  # a callback e.g. to save progress in slurm or similar distributed infrastructure
+            # if args.on_save:
+            #     exec(args.on_save)  # a callback e.g. to save progress in slurm or similar distributed infrastructure
 
         should_compute_mse = not (args.skip_out_loss or loaded_layer)
         if len(args.devices) == 1:
@@ -587,7 +591,7 @@ def aqlm_pipeline(
         # Logging
         stats_payload["layer_time"] = time.time() - start_time
         stats_payload["Step"] = layer_index
-        args.logger.Info(f"Layer {layer_index} of {len(layers)} done in {stats_payload['layer_time']:.2f}s")
+        print(f"Layer {layer_index} of {len(layers)} done in {stats_payload['layer_time']:.2f}s")
         if not loaded_layer:
             print(stats_payload)
 
@@ -620,9 +624,9 @@ def aqlm_pipeline(
     model = AutoModelForCausalLM.from_pretrained(args.save_quant_dir, trust_remote_code=True, torch_dtype=torch.float16)
     shutil.rmtree(args.save_quant_dir)
 
-    args.logger.Info(f"max_cuda_mem_quantize: {round(torch.cuda.max_memory_allocated() / 1e9, 2)}")
+    print(f"max_cuda_mem_quantize: {round(torch.cuda.max_memory_allocated() / 1e9, 2)}")
     if number_of_quantized_params > 0:  # do not report avg bits if we load all pre-quantized layers via --resume
-        args.logger.Info(f"Avg_bits: {overall_bits / number_of_quantized_params}")
+        print(f"Avg_bits: {overall_bits / number_of_quantized_params}")
     model.config.use_cache = use_cache
     print(f"quantize: {torch.cuda.max_memory_allocated()=:,}")
     return quantizers

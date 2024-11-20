@@ -97,7 +97,7 @@ class QuantizedWeight(nn.Module):
 
             weight_for_init = (weight_groupwise / scales).swapaxes(1, 2).reshape_as(reference_weight)
             del weight_groupwise
-
+        # import pdb; pdb.set_trace()
         codes, codebooks = init_aq_kmeans(
             weight_for_init,
             num_codebooks=num_codebooks,

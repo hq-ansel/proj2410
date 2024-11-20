@@ -848,6 +848,7 @@ def greedy_local_train(
 
     model = model.cpu()
     if not args.with_catcher:
+        print("using catch")
         train_dataset = LazyLoadDatasetV2(
             model=model,
             dataloader=trainloader,

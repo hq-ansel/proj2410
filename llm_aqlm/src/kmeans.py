@@ -1,5 +1,6 @@
 import itertools
 from typing import List, Optional, Tuple
+import warnings
 
 import torch
 
@@ -52,6 +53,7 @@ def fit_kmeans(
         clusters = _kmeans_greedy_init(data, k)
     else:
         clusters = data[torch.randperm(data.shape[0])[:k], :]  # [k, dim]
+    assert clusters.shape == (k, data.shape[1]), f"Clusters have wrong shape: {clusters.shape} while k is {k} and data has shape {data.shape}"
 
     block_size = block_size_vals // k
     shard_size = (len(data) - 1) // len(devices) + 1

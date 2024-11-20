@@ -17,7 +17,7 @@ config_files=(
 )
 # 循环遍历每个配置文件并执行 Python 命令
 # 设置并行参数，True 为并行，False 为串行
-PARALLEL=True
+PARALLEL=False
 
 # 循环遍历每个配置文件并执行 Python 命令
 for config_path in "${config_files[@]}"; do

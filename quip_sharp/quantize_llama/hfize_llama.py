@@ -9,6 +9,7 @@ from transformers import AutoTokenizer
 from lib import codebook, utils
 from lib.utils.unsafe_import import model_from_hf_path
 from model.llama import LlamaForCausalLM
+from model.qwen2 import Qwen2ForCausalLM
 from lib.utils.model_version import MODEL_VERSION
 
 torch.set_grad_enabled(False)
@@ -29,10 +30,16 @@ def main(args):
     tokenizer = AutoTokenizer.from_pretrained(model_config._name_or_path)
 
     model_config.quip_params['model_version'] = MODEL_VERSION
-    model = LlamaForCausalLM.from_pretrained(model_config._name_or_path,
+    if "llama" in args.quantized_path:
+        model = LlamaForCausalLM.from_pretrained(model_config._name_or_path,
                                              torch_dtype='auto',
                                              low_cpu_mem_usage=True,
                                              config=model_config).half()
+    elif "qwen" in   args.quantized_path:
+        model = Qwen2ForCausalLM.from_pretrained(model_config._name_or_path,
+                                                  torch_dtype='auto',
+                                                  low_cpu_mem_usage=True,
+                                                  config=model_config).half()
     cpu = torch.device('cpu')
     if os.path.exists(f'{args.quantized_path}/lmhead.pt'):
         lmhead_data = torch.load(f'{args.quantized_path}/lmhead.pt',

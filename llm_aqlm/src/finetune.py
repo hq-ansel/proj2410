@@ -12,9 +12,24 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.parallel.scatter_gather import Gather
 
-from aq_engine import replace_parameter_
-from src.utils import iterate_minibatches
+from ..aq_engine import replace_parameter_
+from .utils import iterate_minibatches
 
+def move_to_device(data, device):
+    """
+    递归地将 `torch.Tensor` 或包含张量的结构迁移到目标设备。
+    """
+    if isinstance(data, torch.Tensor):
+        return data.to(device, non_blocking=True)
+    elif isinstance(data, (tuple, list)):
+        # 如果是元组或列表，递归处理其每个元素
+        return type(data)(move_to_device(item, device) for item in data)
+    elif isinstance(data, dict):
+        # 如果是字典，递归处理其值
+        return {key: move_to_device(value, device) for key, value in data.items()}
+    else:
+        # 非张量类型保持不变
+        return data
 
 @torch.enable_grad()
 def finetune_groupwise(
@@ -60,7 +75,11 @@ def finetune_groupwise(
         kwargs_by_device = []
         for device in args.devices:
             kwargs_by_device.append(
-                {k: (v.to(device, non_blocking=True) if isinstance(v, torch.Tensor) else v) for k, v in kwargs.items()}
+                # {k: (v.to(device, non_blocking=True) if isinstance(v, torch.Tensor) else v) for k, v in kwargs.items()}
+                {
+                    k: move_to_device(v, device)
+                        for k, v in kwargs.items()
+                }
             )
 
     # initialize trainable parameters on main device; prepare to send them to replicas

@@ -9,10 +9,10 @@ import torch.nn.functional as F
 from torch.utils.checkpoint import checkpoint
 from tqdm.auto import trange
 
-from src.beam_search_l2 import beam_search_optimal_codes as beam_search_minimize_weight_mse
-from src.beam_search_xtx import beam_search_optimal_codes as beam_search_minimize_activation_mse
-from src.kmeans import find_nearest_cluster, fit_faiss_kmeans, fit_kmeans, fit_kmeans_1d
-from src.utils import IntCodes, _dequantize_weight, ellipsis, is_signed
+from .beam_search_l2 import beam_search_optimal_codes as beam_search_minimize_weight_mse
+from .beam_search_xtx import beam_search_optimal_codes as beam_search_minimize_activation_mse
+from .kmeans import find_nearest_cluster, fit_faiss_kmeans, fit_kmeans, fit_kmeans_1d
+from .utils import IntCodes, _dequantize_weight, ellipsis, is_signed
 
 
 class QuantizedLinear(nn.Module):
@@ -97,7 +97,7 @@ class QuantizedWeight(nn.Module):
 
             weight_for_init = (weight_groupwise / scales).swapaxes(1, 2).reshape_as(reference_weight)
             del weight_groupwise
-
+        # import pdb; pdb.set_trace()
         codes, codebooks = init_aq_kmeans(
             weight_for_init,
             num_codebooks=num_codebooks,

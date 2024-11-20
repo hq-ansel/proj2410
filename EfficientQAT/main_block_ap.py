@@ -252,6 +252,16 @@ def main():
                     trainloader,
                     args,
                 )
+            elif args.quant_method == "aqlm":
+                from .quantize.aqlm_pipeline import aqlm_pipeline
+                model = aqlm_pipeline(
+                    model,
+                    trainloader,
+                    valloader,
+                    args,
+                )
+            else:
+                raise NotImplementedError(f"quantization method {args.quant_method} not implemented")
             logger.info(time.time() - tick)
     torch.cuda.empty_cache()
     if args.save_quant_dir:

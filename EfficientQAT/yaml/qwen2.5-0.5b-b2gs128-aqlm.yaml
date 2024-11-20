@@ -2,7 +2,7 @@
 wbits: 2
 group_size: 128
 # training settings
-cuda_ids: "1,2"
+cuda_ids: "0,1,2,3"
 epochs: 2
 net: Qwen2.5-0.5B
 batch_size: 2
@@ -14,13 +14,13 @@ crossblock_window_size: 1
 train_size: 4096
 slide_step: 1
 clip_grad: 0.3
+quant_method: aqlm
 
 model: /home/ubuntu/data/exp/proj2410/model/Qwen2.5-0.5B
 # save settings
-output_dir: /home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-gradual-quant/
-log_loss: /home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-gradual-quant/loss.csv
-save_quant_dir: /home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-gradual-quant/
+output_dir: /home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/aqlm/w2gs128/
+log_loss: /home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/aqlm/w2gs128/loss.csv
+save_quant_dir: /home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/aqlm/w2gs128/
 clamp_method: STE
-gradual_quant: True
 
 align_type: tail

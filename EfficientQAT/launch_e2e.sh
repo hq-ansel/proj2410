@@ -1,7 +1,11 @@
 #!/bin/bash
 quant_model_paths=(
-    /home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/GPTQ/w2gs128
-    # /home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-fast
+    /home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128
+    /home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-gradual-quant
+    # 这个还没有算完
+    # /home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-slide2
+    # /home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-gradual-quant-slide2
+
 )
 for quant_model_path in ${quant_model_paths[@]}; do
     (

@@ -1,5 +1,6 @@
 import os
 import random
+from regex import F
 from sympy import det
 from tqdm import tqdm
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
@@ -46,55 +47,72 @@ class LazyLoadDatasetV2(Dataset):
     def __init__(self,
             model: PreTrainedModel,
             dataloader: List[Tuple[torch.Tensor, torch.Tensor]],
-            cache_path: str=None,
+            crossblock_window_size: int,
              ):
         """
         仅接收输入为get loader的内容
+        如果需要处理跨块的初始化，需要将targe 设置为
+        block[:crossblock_window_size]的输出
         """
-        # if os.path.exists(cache_path):
-        #     tmp_dict = torch.load(cache_path, weights_only=True)
-        #     self.data_list = tmp_dict["data_list"]
-        #     self.attention_mask = tmp_dict["attention_mask"]
-        #     self.position_embeddings = tmp_dict["position_embeddings"]
         self.data_list = []
         tmp_dict = {}
+
         class Cacher(nn.Module):
             def __init__(self, module: nn.Module, ):
                 super().__init__()
-                self._data_list = []
+                self.inp_data_list = []
+                self.out_data_list = []
                 self.module = module
                 self.attention_mask = None
                 self.position_embeddings = None
+                self.store_input = False
+                self.store_output = False
             def forward(self, hidden_states: torch.Tensor, 
                         **kwargs):
-                output = self.module(hidden_states, **kwargs)[0]
-                self._data_list.append(
-                    (hidden_states.detach().cpu().squeeze(0),
-                      output.detach().cpu().squeeze(0))
-                )
+                output = self.module(hidden_states, **kwargs)
+                if self.store_input:
+                    self.inp_data_list.append(hidden_states.squeeze(0).detach().cpu())
+                if self.store_output:
+                    self.out_data_list.append(output[0].squeeze(0).detach().cpu())
                 self.attention_mask = kwargs.get("attention_mask", None)
                 self.position_embeddings = kwargs.get("position_embeddings", None)
-                raise StopException()
+                if self.store_output:
+                    raise StopException()
+                else:
+                    return output
+                
         layers = model.model.layers
         for n, m in model.named_modules():
             if "norm" in n or "head" in n or "emb" in n:
                 m.to("cuda")
-        layers[0].to("cuda")
+        # 设置截取的层
+        for i in range(0,crossblock_window_size):
+            layers[i].to("cuda")
         layers[0] = Cacher(layers[0])
+        layers[0].store_input = True
+        if crossblock_window_size>1:
+            layers[crossblock_window_size-1] = Cacher(layers[crossblock_window_size-1])
+        layers[crossblock_window_size-1].store_output = True
+
         with torch.no_grad():
             for inp,tar in dataloader:
                 try:
                     model(inp.to("cuda"))
                 except StopException:
                     pass
-        tmp_dict["data_list"] = layers[0]._data_list
+        tmp_dict["data_list"] = []
+        for i,(inp,out) in enumerate(zip(layers[0].inp_data_list,
+                                        layers[crossblock_window_size-1].out_data_list)):
+            self.data_list.append((inp,out))
+
         tmp_dict["attention_mask"] = layers[0].attention_mask
         tmp_dict["position_embeddings"] = layers[0].position_embeddings
-        self.data_list = tmp_dict["data_list"]
         self.attention_mask = tmp_dict["attention_mask"]
         self.position_embeddings = tmp_dict["position_embeddings"]
 
         layers[0] = layers[0].module
+        if crossblock_window_size>1:
+            layers[crossblock_window_size-1] = layers[crossblock_window_size-1].module
         model =  model.to("cpu")
     
 
@@ -133,53 +151,68 @@ class LazyLoadDatasetV2(Dataset):
 
         new_file_list = []
         device = next(module.parameters()).device
-        _dtype = next(module.parameters()).dtype
+        # _dtype = next(module.parameters()).dtype
 
         # 确保 position_embeddings 移动到正确的设备
         position_embeddings = tuple(it.to(device) for it in position_embeddings)
 
-        # for idx in range(0, (len(self.data_list)+batch_size-1 )//batch_size):
-        for idx in tqdm(range(0, len(self.data_list)//batch_size),
-                         total=len(self.data_list)//batch_size, desc="update_dataset"):
-            # 批量加载数据
-            input_samples = []
-            output_samples = []
-            for inner_idx in range(batch_size):
-                real_idx = idx*batch_size + inner_idx
-                if real_idx >= len(self.data_list):
-                    break
-
-                # 加载输入数据
-                input_sample = self.data_list[real_idx][0].to(device, dtype=_dtype)
-                input_samples.append(input_sample)
-
-                # # 加载输出数据，如果需要
-                output_sample = self.data_list[real_idx][1].to(device, dtype=_dtype)
-                output_samples.append(output_sample)
-
-            # 构造 batch tensor 并前向传播
-            input_batch = torch.stack(input_samples)
-            output_batch = torch.stack(output_samples)
-
-            output = module(input_batch, attention_mask=attention_mask,
-                            position_embeddings=position_embeddings)[0]
-            next_output = next_module(output_batch, attention_mask=attention_mask,
-                                        position_embeddings=position_embeddings)[0]
-            # if idx == 0:
-            #     print(f"output: {output} output_batch {output_batch} next_output {next_output}")
-
-            for inner_idx in range(len(input_samples)):
-                real_idx = idx*batch_size + inner_idx
-
-                assert output[inner_idx].dim() == 2, f"Output should be 2-dimensional, got {output[inner_idx].dim()}"
-                # TODO:后续再考虑磁盘，优先完善性能实验
-                # 如果是内存存储，直接更新 `data_list`
-                self.data_list[real_idx] = (output[inner_idx].detach().cpu(),
-                                                next_output[inner_idx].detach().cpu())
-
+        for idx in range(len(self.data_list)):
+            input_sample,output_sample = self.data_list[idx]
+            input_sample = input_sample.to(device).unsqueeze(0)
+            output_sample = output_sample.to(device).unsqueeze(0)
+            # 前向传播
+            output = module(input_sample, attention_mask=attention_mask,
+                            position_embeddings=position_embeddings)[0].squeeze(0)
+            next_output = next_module(output_sample, attention_mask=attention_mask,
+                                    position_embeddings=position_embeddings)[0].squeeze(0)
+            # 更新数据
+            self.data_list[idx] = (output.detach().cpu(),next_output.detach().cpu())
             # 释放内存
-            del input_samples, output_samples, input_batch, output_batch, output, next_output
+            del input_sample, output_sample, output, next_output
             gc.collect()
+
+        # # for idx in range(0, (len(self.data_list)+batch_size-1 )//batch_size):
+        # for idx in tqdm(range(0, len(self.data_list)//batch_size),
+        #                  total=len(self.data_list)//batch_size, desc="update_dataset"):
+        #     # 批量加载数据
+        #     input_samples = []
+        #     output_samples = []
+        #     for inner_idx in range(batch_size):
+        #         real_idx = idx*batch_size + inner_idx
+        #         if real_idx >= len(self.data_list):
+        #             break
+
+        #         # 加载输入数据
+        #         input_sample = self.data_list[real_idx][0].to(device, dtype=_dtype)
+        #         input_samples.append(input_sample)
+
+        #         # # 加载输出数据，如果需要
+        #         output_sample = self.data_list[real_idx][1].to(device, dtype=_dtype)
+        #         output_samples.append(output_sample)
+
+        #     # 构造 batch tensor 并前向传播
+        #     input_batch = torch.stack(input_samples)
+        #     output_batch = torch.stack(output_samples)
+
+        #     output = module(input_batch, attention_mask=attention_mask,
+        #                     position_embeddings=position_embeddings)[0]
+        #     next_output = next_module(output_batch, attention_mask=attention_mask,
+        #                                 position_embeddings=position_embeddings)[0]
+        #     # if idx == 0:
+        #     #     print(f"output: {output} output_batch {output_batch} next_output {next_output}")
+
+        #     for inner_idx in range(len(input_samples)):
+        #         real_idx = idx*batch_size + inner_idx
+
+        #         assert output[inner_idx].dim() == 2, f"Output should be 2-dimensional, got {output[inner_idx].dim()}"
+        #         # TODO:后续再考虑磁盘，优先完善性能实验
+        #         # 如果是内存存储，直接更新 `data_list`
+        #         self.data_list[real_idx] = (output[inner_idx].detach().cpu(),
+        #                                         next_output[inner_idx].detach().cpu())
+
+        #     # 释放内存
+        #     del input_samples, output_samples, input_batch, output_batch, output, next_output
+        #     gc.collect()
 
 
 class LazyLoadDataset(Dataset):

@@ -16,9 +16,9 @@ def FKLD(output, target):
     Assumes softmax is applied on both output and target.
     FKLD = KL(target || output)
     """
-    output_prob = F.softmax(output, dim=-1)
+    output_prob = F.log_softmax(output, dim=-1)
     target_prob = F.softmax(target, dim=-1)
-    return F.kl_div(output_prob.log(), target_prob, reduction='batchmean')
+    return F.kl_div(output_prob, target_prob, reduction='batchmean')
 
 def RKLD(output, target):
     """
@@ -101,6 +101,17 @@ class AffineMSE(nn.Module):
         return loss
 
 
+
+
+def cross_block_loss(output, target):
+    mse_part = F.mse_loss(output, target)
+    # print(f"mse_part: {mse_part}")
+    fkld_part = FKLD(output, target)
+    # print(f"fkld_part: {fkld_part}")
+    coef = 0.001
+    return mse_part + fkld_part*coef
+
+
 def get_loss_func(loss_type: str):
     """
     Get the loss function based on the loss type.
@@ -125,5 +136,7 @@ def get_loss_func(loss_type: str):
         return MSE_MAX_ABS_ERROR
     elif loss_type == 'LOW_FOURIER_LOSS':
         return low_frequency_loss
+    elif loss_type == 'CROSS_BLOCK_LOSS':
+        return cross_block_loss
     else:
         raise ValueError(f'Invalid loss type: {loss_type}')

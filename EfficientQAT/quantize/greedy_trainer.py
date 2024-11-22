@@ -223,6 +223,7 @@ def train_units_layers(model: PreTrainedModel,
                 total_training_iteration,
             )
         # step 6.3: training loop
+        # without catcher 引入的position_ids会影响数值吗？
         position_ids = torch.arange(args.training_seqlen, dtype=torch.long, device=args.dev)
         position_ids = position_ids.unsqueeze(0).expand(args.batch_size, -1).contiguous()
         # print(f" data size {len(train_dataset)}")
@@ -246,18 +247,8 @@ def train_units_layers(model: PreTrainedModel,
                                     dtype=args.dtype if amp_enabled else torch.float32):
                     inp,target = input_data
                     hidden_state = inp.to(args.dev,dtype=args.dtype)
-                    # assert hidden_state.requires_grad == True, "hidden_state.requires_grad is False"
-                    # hidden_state.requires_grad = True
+
                     for layer_idx in trainable_layer_idx_list:
-                        # 使用 lambda 将关键字参数改为位置参数
-                        # layer_func = functools.partial(
-                        #     qlayers[layer_idx].forward,  # 指定需要调用的函数
-                        #     attention_mask=attention_mask,
-                        #     position_embeddings=position_embeddings
-                        # )
-                        
-                        # # 在 checkpoint 中使用 layer_func 作为函数调用
-                        # layer_outputs = checkpoint(layer_func, hidden_state)
                         layer_outputs = qlayers[layer_idx](
                             hidden_states=hidden_state,
                             attention_mask=attention_mask,
@@ -508,7 +499,7 @@ def train_units_layers_with_catcher(model: PreTrainedModel,
                 total_training_iteration,
             )
         # step 6.3: training loop
-        print(f" data size {len(train_dataset)}")
+        # print(f" data size {len(train_dataset)}")
         for epoch in range(args.epochs):
             loss_list = []
             norm_list = []
@@ -848,17 +839,17 @@ def greedy_local_train(
 
     model = model.cpu()
     if not args.with_catcher:
-        print("using catch")
+        print("not using catch")
         train_dataset = LazyLoadDatasetV2(
             model=model,
             dataloader=trainloader,
-            cache_path=train_dataset_path,
+            crossblock_window_size=args.crossblock_window_size,
         )
         # 准备验证集
         val_dataset = LazyLoadDatasetV2(
             model=model,
             dataloader=valloader,
-            cache_path=os.path.join(cache_dir, "val_dataset.pt"),
+            crossblock_window_size=args.crossblock_window_size,
         )
         if train_dataset.attention_mask is None:
             attention_mask = train_dataset.attention_mask
@@ -878,6 +869,7 @@ def greedy_local_train(
                 logger=logger,
                 args=args)
     else:
+        print("using catch")
         common_train_inps = CommonInputDataset(list(map(lambda x: x[0], trainloader)))
         common_val_inps = CommonInputDataset(list(map(lambda x: x[0], valloader)))
         custom_shedule_train(model,

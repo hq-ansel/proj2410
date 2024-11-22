@@ -114,9 +114,6 @@ class BlockLossRecorder:
         self.file_path = file_path
         self.loss_data = {}
 
-        # 如果文件存在，则从文件中加载已有的数据
-        if os.path.exists(self.file_path):
-            self._load_from_file()
 
     def record(self, blk_id, step, loss):
         """

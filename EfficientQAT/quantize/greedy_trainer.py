@@ -729,72 +729,72 @@ def custom_shedule_train(model:PreTrainedModel,
                         logger=logger,
                         args=args)
             selected_layers= nn.ModuleList([model.model.layers[i] for i in train_layer_window])
-            quant_inplace(selected_layers)
-            for layer_idx in train_layer_window:
-                qlayer = model.model.layers[layer_idx]
-                set_quant_state(qlayer,False)
-                # step 7: pack quantized weights into low-bits format, note that this process is slow on poor CPU or busy CPU
-                if args.real_quant:
-                    named_linears = get_named_linears(qlayer, int_linear_fake.QuantLinear)
-                    for name, module in named_linears.items():
-                        scales = module.weight_quantizer.scale.clamp(1e-4,1e4).detach()
-                        zeros = module.weight_quantizer.zero_point.detach().cuda().round().cpu()
-                        group_size = module.weight_quantizer.group_size
-                        dim0 = module.weight.shape[0]
-                        scales = scales.view(dim0,-1).transpose(0,1).contiguous()
-                        zeros = zeros.view(dim0,-1).transpose(0,1).contiguous()
-                        q_linear = int_linear_real.QuantLinear(args.wbits,
-                                                    group_size,
-                                                    module.in_features,
-                                                    module.out_features,
-                                                    not module.bias is None,
-                                                    clamp_input= args.get("clamp_input",False))
-                        q_linear.pack(module.cpu(),  scales.float().cpu(), zeros.float().cpu())
-                        set_op_by_name(qlayer, name, q_linear)       
-                        logger.info(f"pack quantized {name} finished")
-                        del module
-                torch.cuda.empty_cache()
-                gc.collect()
-            if amp_enabled:
-                qlayer= qlayer.to(dtype=args.dtype)
+        quant_inplace(selected_layers)
+        for layer_idx in train_layer_window:
+            qlayer = model.model.layers[layer_idx]
+            set_quant_state(qlayer,False)
+            # step 7: pack quantized weights into low-bits format, note that this process is slow on poor CPU or busy CPU
+            if args.real_quant:
+                named_linears = get_named_linears(qlayer, int_linear_fake.QuantLinear)
+                for name, module in named_linears.items():
+                    scales = module.weight_quantizer.scale.clamp(1e-4,1e4).detach()
+                    zeros = module.weight_quantizer.zero_point.detach().cuda().round().cpu()
+                    group_size = module.weight_quantizer.group_size
+                    dim0 = module.weight.shape[0]
+                    scales = scales.view(dim0,-1).transpose(0,1).contiguous()
+                    zeros = zeros.view(dim0,-1).transpose(0,1).contiguous()
+                    q_linear = int_linear_real.QuantLinear(args.wbits,
+                                                group_size,
+                                                module.in_features,
+                                                module.out_features,
+                                                not module.bias is None,
+                                                clamp_input= args.get("clamp_input",False))
+                    q_linear.pack(module.cpu(),  scales.float().cpu(), zeros.float().cpu())
+                    set_op_by_name(qlayer, name, q_linear)       
+                    logger.info(f"pack quantized {name} finished")
+                    del module
+            torch.cuda.empty_cache()
+            gc.collect()
+        if amp_enabled:
+            qlayer= qlayer.to(dtype=args.dtype)
             # 更新数据
             # _dtype = attention_mask.dtype
             # attention_mask = attention_mask.to(dtype=torch.float32)
             # DEBUG
             # position_embeddings = (position_embeddings[0].to(dtype=torch.float32),position_embeddings[1].to(dtype=torch.float32))
             # DEBUG
-            if not args.with_catcher:
-                if train_layer_window != shedule_list[-1]:
-                    with torch.no_grad():
-                        with torch.autocast(device_type=args.dev,
-                                            enabled=amp_enabled,
-                                            dtype=args.dtype if amp_enabled else torch.float32):
-                            for slide_base in train_layer_window:
-                                # 更新后的input 需要经过[windows_start,windows_start+slide_step)层的输出
-                                if slide_base == train_layer_window[0]+args.slide_step:
-                                    break
-                                layer_idx = slide_base 
-                                # print(f"slide_base {slide_base} layer_idx {layer_idx}")
-                                layer = model.model.layers[layer_idx].to(args.dev,dtype=args.dtype)
-                                next_layer = model.model.layers[layer_idx+args.slide_step].to(args.dev,dtype=args.dtype)
-                                print(f" layer {layer_idx}  update input")
-                                print(f" layer {layer_idx+args.slide_step}  update output")
-                                train_dataset.update_dataset(module=layer, 
-                                                        next_module=next_layer,
-                                                        layer_idx=layer_idx+args.slide_step,
-                                                        batch_size=args.batch_size,
-                                                        attention_mask=attention_mask,
-                                                        position_embeddings=position_embeddings,
-                                                            )
-                                val_dataset.update_dataset(module=layer, 
-                                                        next_module=next_layer,
-                                                        layer_idx=layer_idx+args.slide_step,
-                                                        batch_size=args.batch_size,
-                                                        attention_mask=attention_mask,
-                                                        position_embeddings=position_embeddings,
-                                                            )
-                                layer.cpu()
-                                next_layer.cpu()
+        if not args.with_catcher:
+            if train_layer_window != shedule_list[-1]:
+                with torch.no_grad():
+                    with torch.autocast(device_type=args.dev,
+                                        enabled=amp_enabled,
+                                        dtype=args.dtype if amp_enabled else torch.float32):
+                        for slide_base in train_layer_window:
+                            # 更新后的input 需要经过[windows_start,windows_start+slide_step)层的输出
+                            if slide_base == train_layer_window[0]+args.slide_step:
+                                break
+                            layer_idx = slide_base 
+                            # print(f"slide_base {slide_base} layer_idx {layer_idx}")
+                            layer = model.model.layers[layer_idx].to(args.dev,dtype=args.dtype)
+                            next_layer = model.model.layers[layer_idx+args.slide_step].to(args.dev,dtype=args.dtype)
+                            print(f" layer {layer_idx}  update input")
+                            print(f" layer {layer_idx+args.slide_step}  update output")
+                            train_dataset.update_dataset(module=layer, 
+                                                    next_module=next_layer,
+                                                    layer_idx=layer_idx+args.slide_step,
+                                                    batch_size=args.batch_size,
+                                                    attention_mask=attention_mask,
+                                                    position_embeddings=position_embeddings,
+                                                        )
+                            val_dataset.update_dataset(module=layer, 
+                                                    next_module=next_layer,
+                                                    layer_idx=layer_idx+args.slide_step,
+                                                    batch_size=args.batch_size,
+                                                    attention_mask=attention_mask,
+                                                    position_embeddings=position_embeddings,
+                                                        )
+                            layer.cpu()
+                            next_layer.cpu()
             # attention_mask = attention_mask.to(dtype=_dtype)
             # position_embeddings = (position_embeddings[0].to(dtype=_dtype),position_embeddings[1].to(dtype=_dtype))
             # 保存模型

@@ -9,6 +9,7 @@ import importlib
 from packaging import version
 
 import torch
+import torch.nn as nn
 import transformers
 import argparse
 from transformers import (
@@ -245,8 +246,11 @@ def get_accelerate_model(args, checkpoint_dir):
         max_memory = {'': max_memory[local_rank]}
 
 
-    
-    model, tokenizer = load_quantized_model(args.quant_model_path,args.wbits, args.group_size)
+    if "EfficientQAT" in args.quant_model_path:
+        model, tokenizer = load_quantized_model(args.quant_model_path,args.wbits, args.group_size)
+    elif "GPTQ" in args.quant_model_path:
+        from .quantize.gptq_pipeline import load_model_and_tokenizer
+        model, tokenizer = load_model_and_tokenizer(args.quant_model_path)
     tokenizer.model_max_length = args.pt_context_len
     
     compute_dtype = (torch.float16 if args.fp16 else (torch.bfloat16 if args.bf16 else torch.float32))        
@@ -287,7 +291,21 @@ def get_accelerate_model(args, checkpoint_dir):
                 ),
         })
 
-
+    from gptqmodel.nn_modules.qlinear.qlinear_tritonv2 import TritonV2QuantLinear
+    for name, module in model.named_modules():
+        if isinstance(module, TritonV2QuantLinear):
+            # 创建新的 QuantLinear 模块
+            new_module = QuantLinear.from_TritonV2QuantLinear(module)
+            
+            # 找到父模块并替换子模块
+            parent_name = ".".join(name.split(".")[:-1])  # 获取父模块名称
+            if parent_name:
+                parent_module = dict(model.named_modules())[parent_name]
+            else:
+                parent_module = model  # 顶层模块
+            
+            # 替换模块
+            setattr(parent_module, name.split(".")[-1], new_module)
     for name, param in model.named_parameters():
         # freeze base model's layers
         param.requires_grad = False
@@ -409,14 +427,20 @@ def train():
 
     data_module = make_data_module(tokenizer=tokenizer, args=args)
 
-    
 
     optimizer_grouped_parameters = []
     for name, module in model.named_modules():
         # if isinstance(module, LoraLayer):
-        if isinstance(module, QuantLinear) and not 'head' in name:
-            module.scales.requires_grad = True
-    optimizer_grouped_parameters.append({'params': [p for n, p in model.named_parameters() if 'scale' in n], 'weight_decay': 0.0, 'lr': args.learning_rate})
+        if isinstance(module, QuantLinear) or "proj" in name:
+            if not 'head' in name:
+                # print(f"adding {name} to optimizer")
+                if hasattr(module, 'scale'):
+                    module.scale.requires_grad = True
+                elif hasattr(module, 'scales'):
+                    module.scales = nn.Parameter(module.scales)
+                    module.scales.requires_grad = True
+    optimizer_grouped_parameters.append({'params': [p for n, p in model.state_dict().items() if 'scale' in n ],
+                                          'weight_decay': 0.0, 'lr': args.learning_rate})
     optimizer = AdamW(optimizer_grouped_parameters)
 
     trainer = Seq2SeqTrainer(

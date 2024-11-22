@@ -13,6 +13,8 @@ from accelerate import init_empty_weights, infer_auto_device_map, load_checkpoin
 from .triton_utils.kernels import dequant_dim0, dequant_dim1
 from .utils import get_named_linears,set_op_by_name
 
+from gptqmodel.nn_modules.qlinear.qlinear_tritonv2 import TritonV2QuantLinear
+
 logger = getLogger(__name__)
 
 
@@ -183,9 +185,28 @@ class QuantLinear(nn.Module, TritonModuleMixin):
         out = torch.matmul(x, weight.to(x.dtype))
         # torch.cuda.synchronize()
 
-        out = out + self.bias if self.bias is not None else out
+        # out = out + self.bias.to(x.dtype) if self.bias is not None else out
+        if self.bias is not None:
+            out = out + self.bias.to(out.device, dtype=out.dtype)
         return out
-
+    
+    @classmethod
+    @staticmethod
+    def from_TritonV2QuantLinear(linear: TritonV2QuantLinear):
+        q_linear = QuantLinear(linear.bits, 
+                                linear.group_size, 
+                                linear.infeatures, 
+                                linear.outfeatures, 
+                                linear.bias is not None,
+        )
+        q_linear.qweight = linear.qweight
+        q_linear.qzeros = linear.qzeros
+        q_linear.scales = torch.nn.Parameter(linear.scales).to(linear.scales.dtype)
+        q_linear.g_idx = linear.g_idx
+        if linear.bias is not None:
+            q_linear.bias = torch.nn.Parameter(linear.bias.clone())
+        del linear
+        return q_linear
 
 def load_quantized_model(model_path, wbits, group_size):
     print(f"Loading quantized model from {model_path}")

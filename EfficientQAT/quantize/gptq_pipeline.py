@@ -41,6 +41,11 @@ from accelerate.utils.modeling import get_balanced_memory
 
 from gptqmodel import GPTQModel, QuantizeConfig
 
+def load_model_and_tokenizer(model_path: str):
+    model = GPTQModel.load(model_path)
+    tokenizer = AutoTokenizer.from_pretrained(model_path)
+    return model.model, tokenizer
+
 def gptq_pipeline(
         model: PreTrainedModel,
         train_dataset: List[Tuple[torch.Tensor, torch.Tensor]],

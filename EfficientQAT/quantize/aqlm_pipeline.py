@@ -392,7 +392,7 @@ def aqlm_pipeline(
     args.max_epochs = 1000
     args.relative_mse_tolerance = None
     args.steps_per_epoch = 100
-    args.print_frequency = 40
+    args.logger.info_frequency = 40
     args.finetune_max_epochs = 5
     args.finetune_early_stop = 3
     args.finetune_lr = 1e-5
@@ -429,7 +429,7 @@ def aqlm_pipeline(
     layers = get_layers(model)
 
     for layer_index in range(len(layers)):
-        print(f"\n---------------- Layer {layer_index} of {len(layers)} ----------------")
+        args.logger.info(f"\n---------------- Layer {layer_index} of {len(layers)} ----------------")
         stats_payload = {}
         start_time = time.time()
 
@@ -437,7 +437,7 @@ def aqlm_pipeline(
         layer_device_original = next(layers[layer_index].parameters()).device
         # backup layer dtype
         layer_dtype_original = next(layers[layer_index].parameters()).dtype
-        print(f"{layer_device_original=}")
+        args.logger.info(f"{layer_device_original=}")
         layer = layers[layer_index].to(args.devices[0])
         for k, v in forward_args.items():
             forward_args[k] = v.to(args.devices[0]) if isinstance(v, torch.Tensor) else v
@@ -452,7 +452,7 @@ def aqlm_pipeline(
             assert args.save_quant_dir is not None, "using --resume requires a --save path to resume from"
             layer_save_path = os.path.join(args.save_quant_dir, f"{layer_index}.pth")
             if os.path.exists(layer_save_path):
-                print(f"Loading layer {layer_index} from {layer_save_path}")
+                args.logger.info(f"Loading layer {layer_index} from {layer_save_path}")
                 layer = torch.load(layer_save_path, map_location=args.devices[0])
                 loaded_layer = True
 
@@ -468,7 +468,7 @@ def aqlm_pipeline(
 
         for names in sequential:
             if loaded_layer:
-                print("Skipping quantization: loaded a previously quantized layer")
+                args.logger.info("Skipping quantization: loaded a previously quantized layer")
                 break
             if len(args.devices) == 1:
                 assert len(inps) == len(outs) == 1  # number of per-device inputs/outputs
@@ -497,14 +497,14 @@ def aqlm_pipeline(
                     **forward_args,
                 )
             for sublayer_name in aq_handlers.keys():
-                print(f"Quantizing module {sublayer_name} of layer {layer_index} shape is {aq_handlers[sublayer_name].layer.weight.shape}")
+                args.logger.info(f"Quantizing module {sublayer_name} of layer {layer_index} shape is {aq_handlers[sublayer_name].layer.weight.shape}")
                 if "mixtral" in model.config.model_type.lower() and args.mix_compression:
                     assert "mixtral" in model.config.model_type.lower()
                     if "self_attn" in sublayer_name.lower():
                         args.num_codebooks = 2 * num_codebooks
                     else:
                         args.num_codebooks = num_codebooks
-                    print(sublayer_name.lower(), " mixtral num codebooks", args.num_codebooks)
+                    args.logger.info(sublayer_name.lower(), " mixtral num codebooks", args.num_codebooks)
                 quantized_weight = aq_handlers[sublayer_name].quantize(args=args, verbose=False)
 
                 with torch.no_grad():
@@ -515,7 +515,7 @@ def aqlm_pipeline(
                     new_linear = QuantizedLinear(quantized_weight, aq_handlers[sublayer_name].layer.bias)
                     if args.use_checkpointing:
                         new_linear.use_checkpoint = True
-                        print("ENABLED CHECKPOINTING FOR", sublayer_name)
+                        args.logger.info("ENABLED CHECKPOINTING FOR", sublayer_name)
                     found_original = False
                     for submodule in layer.modules():
                         for child_name, child_module in submodule.named_children():
@@ -528,14 +528,14 @@ def aqlm_pipeline(
                 weight_avg_bits = quantized_weight.estimate_nbits_per_parameter()
                 overall_bits += int(weight_avg_bits * torch.numel(aq_handlers[sublayer_name].layer.weight.data))
                 number_of_quantized_params += torch.numel(aq_handlers[sublayer_name].layer.weight.data)
-                print("curent_avg_bits", overall_bits / number_of_quantized_params)
+                args.logger.info("curent_avg_bits", overall_bits / number_of_quantized_params)
                 quantizers["model.layers.%d.%s" % (layer_index, sublayer_name)] = ()  # to be updated
 
             del aq_handlers
             assert not loaded_layer
 
-            print("PREPARING TO FINETUNE")
-            print(layer)
+            args.logger.info("PREPARING TO FINETUNE")
+            args.logger.info(layer)
             layer = layer.to(dtype=torch.float32)
             with using_tf32(enabled=True):
                 layer = finetune_groupwise(
@@ -548,12 +548,12 @@ def aqlm_pipeline(
                     **forward_args,
                 )
             layer = layer.to(dtype=layer_dtype_original)
-            print("FINISHED FINETUNING")
+            args.logger.info("FINISHED FINETUNING")
 
         if args.save_quant_dir and not loaded_layer:
             os.makedirs(args.save_quant_dir, exist_ok=True)
             layer_save_path = os.path.join(args.save_quant_dir, f"{layer_index}.pth")
-            print(f"Saving layer {layer_index}... to {layer_save_path}")
+            args.logger.info(f"Saving layer {layer_index}... to {layer_save_path}")
             torch.save(layer, layer_save_path)
             # if args.on_save:
             #     exec(args.on_save)  # a callback e.g. to save progress in slurm or similar distributed infrastructure
@@ -591,11 +591,11 @@ def aqlm_pipeline(
         # Logging
         stats_payload["layer_time"] = time.time() - start_time
         stats_payload["Step"] = layer_index
-        print(f"Layer {layer_index} of {len(layers)} done in {stats_payload['layer_time']:.2f}s")
+        args.logger.info(f"Layer {layer_index} of {len(layers)} done in {stats_payload['layer_time']:.2f}s")
         if not loaded_layer:
-            print(stats_payload)
+            args.logger.info(stats_payload)
 
-    print("=====================\nFinal stats:")
+    args.logger.info("=====================\nFinal stats:")
     if args.save_quant_dir:
         torch.save(vars(args), os.path.join(args.save_quant_dir, "args.pt"))
         from llm_aqlm.src.modelutils import save_not_quantized_weights
@@ -624,9 +624,9 @@ def aqlm_pipeline(
     model = AutoModelForCausalLM.from_pretrained(args.save_quant_dir, trust_remote_code=True, torch_dtype=torch.float16)
     shutil.rmtree(args.save_quant_dir)
 
-    print(f"max_cuda_mem_quantize: {round(torch.cuda.max_memory_allocated() / 1e9, 2)}")
+    args.logger.info(f"max_cuda_mem_quantize: {round(torch.cuda.max_memory_allocated() / 1e9, 2)}")
     if number_of_quantized_params > 0:  # do not report avg bits if we load all pre-quantized layers via --resume
-        print(f"Avg_bits: {overall_bits / number_of_quantized_params}")
+        args.logger.info(f"Avg_bits: {overall_bits / number_of_quantized_params}")
     model.config.use_cache = use_cache
-    print(f"quantize: {torch.cuda.max_memory_allocated()=:,}")
+    args.logger.info(f"quantize: {torch.cuda.max_memory_allocated()=:,}")
     return quantizers

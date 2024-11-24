@@ -13,11 +13,15 @@ def round_ste(x: torch.Tensor):
     """
     return (x.round() - x).detach() + x
 
+# 感觉lsq+实现是这样的吗？
+# def clamp_ste(x: torch.Tensor, min, max):
+#     clamped = x.clamp(min, max)
+#     gradient_mask = (x >= min) & (x <= max)  # 仅保留在范围内的梯度
+#     return (clamped - x).detach() + x * gradient_mask
+
+
 def clamp_ste(x: torch.Tensor, min, max):
     return (x.clamp(min,max) - x).detach() + x
-
-# def clamp_ste(x: torch.Tensor, min, max):
-#     return (x.clamp(min,max) - x).detach() + x
 
 
 class ClampMAD(torch.autograd.Function):

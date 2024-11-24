@@ -274,9 +274,6 @@ def train_units_layers(model: PreTrainedModel,
                                         loss.detach().cpu().item())
                 graualWarmupScheduler.update() if args.get("gradual_quant",False) else None
                 loss_list.append(loss.detach().cpu())
-                # 反向传播和优化
-                if not args.loss_func == "KL-Divergence":
-                    optimizer.zero_grad()
                 loss_scaler.scale(loss).backward() if amp_enabled else loss.backward()
                 # debug 检查grad
                 if amp_enabled: loss_scaler.unscale_(optimizer)
@@ -289,6 +286,9 @@ def train_units_layers(model: PreTrainedModel,
                         loss_scaler.update()
                     else:
                         optimizer.step()
+                # 反向传播和优化
+                if not args.loss_func == "KL-Divergence":
+                    optimizer.zero_grad()
                 norm_list.append(norm.data)
                 
                 # adjust lr

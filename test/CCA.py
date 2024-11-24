@@ -299,18 +299,22 @@ def compare_cca_in_quantized_model(base_model:AutoModelForCausalLM,
                                    tokenizer:AutoTokenizer,
                                    valloader:List[Tuple[torch.Tensor,torch.Tensor]]):
     quantized_path = [
-        "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-fast",
         "raw_2bit", # 代表直接执行量化
-        "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-fast-slide2",
-        "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-fast-gradual-quant-slide2-alpaca-4096/checkpoint-10000",
+        "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128",
+        "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-slide2",
+        "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-slide4",
+        "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-slide6",
+        "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-slide8",
+        "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-slide10",
+        "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-slide12",
     ]
     base_model_path = "/home/ubuntu/data/exp/proj2410/model/Qwen2.5-0.5B"
     # 暂时
-    # base_activations = get_activation_in_layers(base_model,tokenizer,valloader)
+    base_activations = get_activation_in_layers(base_model,tokenizer,valloader)
     hidden_size = base_model.config.hidden_size
 
-    test_tensor = torch.randn(64,2048,hidden_size,dtype=torch.float16,device=device)
-    base_activations = get_activation_in_single_layer(base_model,test_tensor)
+    # test_tensor = torch.randn(64,2048,hidden_size,dtype=torch.float16,device=device)
+    # base_activations = get_activation_in_single_layer(base_model,test_tensor)
     
     for path in quantized_path:
         args = edict({
@@ -324,9 +328,9 @@ def compare_cca_in_quantized_model(base_model:AutoModelForCausalLM,
         else:
             compared_model,_ = load_quantized_model(path,args.wbits,args.group_size)
         # 共用模型输入 暂时
-        # compared_activations = get_activation_in_layers(compared_model,tokenizer,valloader)
+        compared_activations = get_activation_in_layers(compared_model,tokenizer,valloader)
         # 共用层输入,生成大小为(64,2048,hidden_size)的fp16张量
-        compared_activations = get_activation_in_single_layer(compared_model,test_tensor)
+        # compared_activations = get_activation_in_single_layer(compared_model,test_tensor)
         cca = CCASimilarity()
 
         # 计算3个cca距离
@@ -359,9 +363,9 @@ def compare_cca_in_quantized_model(base_model:AutoModelForCausalLM,
         name1 = base_model_path.split("/")[-1]
         name2 = path.split("/")[-1]
         # 考虑整个模型
-        # model_cca_path = f"/home/ubuntu/data/exp/proj2410/test/cca/{name1}_{name2}.json"
+        model_cca_path = f"/home/ubuntu/data/exp/proj2410/test/cca/{name1}_{name2}.json"
         # 仅考虑单层
-        model_cca_path = f"/home/ubuntu/data/exp/proj2410/test/cca/layer{name1}_{name2}.json"
+        # model_cca_path = f"/home/ubuntu/data/exp/proj2410/test/cca/layer{name1}_{name2}.json"
         with open(model_cca_path, "w") as f:
             json.dump(res_dict, f, indent=4)
         
@@ -394,15 +398,15 @@ def main():
     # 加载模型参数
     # 暂时
     # 获取训练和验证数据加载器
-    # trainloader, valloader = get_loaders(
-    #     args.calib_dataset,
-    #     tokenizer,
-    #     args.train_size,
-    #     args.val_size,
-    #     seed=args.seed,
-    #     seqlen=args.training_seqlen,
-    # )
-    trainloader, valloader = None, None
+    trainloader, valloader = get_loaders(
+        args.calib_dataset,
+        tokenizer,
+        args.train_size,
+        args.val_size,
+        seed=args.seed,
+        seqlen=args.training_seqlen,
+    )
+    # trainloader, valloader = None, None
     # model.to(device)
     compare_cca_in_quantized_model(base_model,tokenizer,valloader)
     

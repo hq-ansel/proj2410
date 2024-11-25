@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from .quantizer import UniformAffineQuantizer,GradualUniformAffineQuantizer
+from .quantizer import UniformAffineQuantizer,GradualUniformAffineQuantizer,GradualUniformAffineQuantizerV2
 
 
 
@@ -33,10 +33,18 @@ class QuantLinear(nn.Module):
         self.use_weight_quant = False
         # initialize quantizer
         # self.weight_quantizer = UniformAffineQuantizer(wbits, group_size, weight=org_module.weight,args=args)
-        self.weight_quantizer = GradualUniformAffineQuantizer(wbits,
+        if args.get("gradual_quant", False):
+            self.weight_quantizer = GradualUniformAffineQuantizer(wbits,
                                                             group_size,
                                                             weight=org_module.weight,
                                                             args=args)
+        elif args.get("iterative_freezing", False):
+            self.weight_quantizer = GradualUniformAffineQuantizerV2(wbits,
+                                                                     group_size,
+                                                                     weight=org_module.weight,
+                                                                     args=args)
+        else:
+            self.weight_quantizer = UniformAffineQuantizer(wbits, group_size, weight=org_module.weight,args=args)
         self.use_temporary_parameter = False
         self.clamp_input = args.get('clamp_input',False)
 
@@ -75,3 +83,7 @@ class QuantLinear(nn.Module):
         Update the interpolation ratio of the raw weight.
         """
         self.weight_quantizer.update_interpolate_ratio(ratio)
+
+    def get_inferred_params(self):
+        int_weight,scale,zero_point = self.weight_quantizer.get_inferred_params(self.weight)
+        return int_weight,scale,zero_point

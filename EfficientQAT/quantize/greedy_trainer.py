@@ -203,8 +203,8 @@ def train_units_layers(model: PreTrainedModel,
                 def update(self):
                     self.iteration += 1
                     for linear in self.linear_list:
-                        if self.iteration < self.total_iteration/2:
-                            ratio = self.iteration/self.total_iteration/2
+                        if self.iteration < self.total_iteration/4:
+                            ratio = self.iteration/self.total_iteration/4
                             if args.get("gradual_quant",False):
                                 linear.update_position_ratio(ratio)
                             if args.get("interpolate", False):
@@ -479,8 +479,8 @@ def train_units_layers_with_catcher(model: PreTrainedModel,
                 def update(self):
                     self.iteration += 1
                     for linear in self.linear_list:
-                        if self.iteration < self.total_iteration/2:
-                            ratio = self.iteration/self.total_iteration/2
+                        if self.iteration < self.total_iteration/4:
+                            ratio = self.iteration/self.total_iteration/4
                             if args.get("gradual_quant",False):
                                 linear.update_position_ratio(ratio)
                             if args.get("interpolate", False):

@@ -44,7 +44,7 @@ class ClampMAD(torch.autograd.Function):
         alpha = torch.ones_like(x)
         
         # 对于 x > max_val，alpha = max_val / x
-        alpha = torch.where(x.abs() > max_val, max_val/2 / x.abs(), alpha)
+        alpha = torch.where(x.abs() > max_val, max_val / x.abs(), alpha)
         
         # 对于 min_val <= x <= max_val，alpha 保持为 1
         grad_input = grad_output * alpha

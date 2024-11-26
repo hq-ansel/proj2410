@@ -280,6 +280,10 @@ def train_units_layers(model: PreTrainedModel,
                 if args.clip_grad > 0:
                         # print(f"clip grad at {args.clip_grad}")
                         norm = torch.nn.utils.clip_grad_norm_(trainable_parameters(selected_layers), args.clip_grad).cpu()
+                if args.get("sub_space_grad_clean",False):
+                    for layer_idx in trainable_layer_idx_list:
+                        qlayers[layer_idx].sub_space_grad_clean()
+
                 if not args.loss_func == "KL-Divergence":
                     if amp_enabled:
                         loss_scaler.step(optimizer)

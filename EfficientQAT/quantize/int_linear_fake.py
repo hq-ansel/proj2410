@@ -64,6 +64,19 @@ class QuantLinear(nn.Module):
 
 
         return out
+    def get_dampen_loss(self):
+        def clamp_ste(x: torch.Tensor, _min, _max):
+            return (x.clamp(_min,_max) - x).detach() + x
+        zero_point = self.weight_quantizer.zero_point
+        scale = self.weight_quantizer.scale
+        a_min = zero_point*scale
+        a_max = (2**self.weight_quantizer.n_bits-1)*scale+a_min
+
+        return torch.norm(
+            self.weight_quantizer.fake_quant(self.weight).reshape(-1,a_min.shape[-1]) -
+                clamp_ste(self.weight,a_min, a_max),
+            p=2
+        )
 
     def set_quant_state(self, weight_quant: bool = False):
         self.use_weight_quant = weight_quant

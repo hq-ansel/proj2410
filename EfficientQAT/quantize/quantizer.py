@@ -6,6 +6,7 @@ import pdb
 
 CLIPMIN = 1e-4
 
+HighPassThreshold = 1e-1
 
 
 def round_ste(x: torch.Tensor):
@@ -20,6 +21,23 @@ def round_ste(x: torch.Tensor):
 #     gradient_mask = (x >= min) & (x <= max)  # 仅保留在范围内的梯度
 #     return (clamped - x).detach() + x * gradient_mask
 
+class HighPassRoundSTE(torch.autograd.Function):
+    """
+    result = round(x)
+    """
+    @staticmethod
+    def forward(ctx, x):
+        ctx.save_for_backward(x)
+        res = x.round() - x
+        # res \in (-0.5, 0.5)
+        result = torch.where(res.abs() > HighPassThreshold, x.round(), x)
+        return result
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        x, = ctx.saved_tensors
+        grad_input = grad_output
+        return grad_input, None
 
 def clamp_ste(x: torch.Tensor, min, max):
     return (x.clamp(min,max) - x).detach() + x
@@ -211,7 +229,7 @@ class GradualUniformAffineQuantizer(nn.Module):
     def fake_quant(self, x):
 
         scale = self.clamp_method(self.scale, 1e-4, 1e4)
-        round_zero_point = self.clamp_method(self.zero_point, self.qmin, self.qmax)
+        round_zero_point = self.clamp_method( round_ste(self.zero_point), self.qmin, self.qmax)
 
         dim1, dim2 = x.shape
         x = x.reshape(-1, self.group_size)
@@ -300,6 +318,13 @@ class GradualUniformAffineQuantizerV2(nn.Module):
         elif self.clamp_method == "MAD":
             self.clamp_method = clamp_mad
 
+        if args.get("round_method", "ste"):
+            self.round_method = round_ste
+        elif args.get("round_method", "highpass"):
+            self.round_method = HighPassRoundSTE.apply  # 新增高通滤波器
+        print("round_method:", args.get("round_method", "ste"))
+        # self.round_method = lambda x: round_ste(x)
+
         # init scale and zero point through Max-Min quantization
         with torch.no_grad():
             if weight is not None:
@@ -345,7 +370,8 @@ class GradualUniformAffineQuantizerV2(nn.Module):
         """
         隐式要求x.shape[-1] % self.group_size == 0
         """
-        x_int = round_ste(x / scale)
+        # x_int = round_ste(x / scale)
+        x_int = self.round_method(x / scale)
         if zero_point is not None:
             x_int = x_int.add(zero_point)
         # 这个地方有三种写法
@@ -367,7 +393,9 @@ class GradualUniformAffineQuantizerV2(nn.Module):
     def fake_quant(self, x):
 
         scale = self.clamp_method(self.scale, 1e-4, 1e4)
-        round_zero_point = self.clamp_method(self.zero_point, self.qmin, self.qmax)
+        round_zero_point = self.clamp_method(self.round_method(self.zero_point), self.qmin, self.qmax)
+        # round_zero_point = self.clamp_method(self.zero_point.round(), self.qmin, self.qmax)
+        # round_zero_point = self.clamp_method(round_ste(self.zero_point), self.qmin, self.qmax)
 
         dim1, dim2 = x.shape
         x = x.reshape(-1, self.group_size)
@@ -398,9 +426,10 @@ class GradualUniformAffineQuantizerV2(nn.Module):
             return x
         return self.fake_quant(x)
     
+
     def get_inferred_params(self,x):
         scale = clamp_ste(self.scale, 1e-4, 1e4)
-        round_zero_point = clamp_ste(round_ste(self.zero_point), self.qmin, self.qmax)
+        round_zero_point = clamp_ste(self.zero_point.round(), self.qmin, self.qmax)
 
         dim1, dim2 = x.shape
         x = x.reshape(-1, self.group_size)

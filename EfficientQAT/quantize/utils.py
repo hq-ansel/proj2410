@@ -272,6 +272,11 @@ def quant_parameters(model):
             params.append(m)
     return iter(params)  
 
+def sub_space_clean(model):
+    params = []
+    for n, m in model.named_parameters():
+        if m.requires_grad and "weight" in n:
+            
 
 def trainable_parameters(model):
     params = []

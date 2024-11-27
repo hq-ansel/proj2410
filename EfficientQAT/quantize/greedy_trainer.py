@@ -31,7 +31,7 @@ from .utils import (
     quant_parameters,weight_parameters,trainable_parameters,
     set_quant_state,quant_inplace,set_quant_parameters,
     set_weight_parameters,trainable_parameters_num,get_named_linears,set_op_by_name,
-    Catcher,StopException,MultiBlock
+    Catcher,StopException,MultiBlock,sub_space_clean
     )
 from ..datautils_block import BlockTrainDataset,OptimBlockTrainDataset,LazyLoadDataset,generate_block_train_data,LazyLoadDatasetV2
 from ..loss_utils import get_loss_func
@@ -280,10 +280,9 @@ def train_units_layers(model: PreTrainedModel,
                 if args.clip_grad > 0:
                         # print(f"clip grad at {args.clip_grad}")
                         norm = torch.nn.utils.clip_grad_norm_(trainable_parameters(selected_layers), args.clip_grad).cpu()
+                # 使用子空间优化
                 if args.get("sub_space_grad_clean",False):
-                    for layer_idx in trainable_layer_idx_list:
-                        qlayers[layer_idx].sub_space_grad_clean()
-
+                    sub_space_clean(selected_layers)
                 if not args.loss_func == "KL-Divergence":
                     if amp_enabled:
                         loss_scaler.step(optimizer)

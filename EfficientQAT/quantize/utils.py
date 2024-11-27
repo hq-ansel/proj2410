@@ -272,11 +272,29 @@ def quant_parameters(model):
             params.append(m)
     return iter(params)  
 
+@torch.no_grad()
 def sub_space_clean(model):
-    params = []
+
+    percent = 0.1  # 要保留的
     for n, m in model.named_parameters():
-        if m.requires_grad and "weight" in n:
+        if (m.requires_grad and "weight" in n 
+            and "scale" not in n and "zero_point" not in n 
+            and "norm" not in n and not isinstance(m, nn.Linear)):
+            grad = m.grad
+
+            grad_flattened = grad.view(-1)  # 将梯度展平
+            num_params = grad_flattened.numel()  # 获取参数数量
+            _, select_indices = torch.topk(torch.abs(grad_flattened), k=int(percent * num_params))  # 获取绝对值最大的前8个索引
+            # 创建一个零张量，设置前8个最大值的位置为原始梯度值
+            mask = torch.zeros_like(grad_flattened)
+            mask[select_indices] = 1.0  # 标记随机选中的位置
             
+            # 将 mask 还原为原始形状，并应用于梯度
+            mask = mask.view_as(grad)  # 还原为原始形状
+            grad = grad * mask  # 保留前8个最大值，其他位置设置为0
+
+            # 将修改后的梯度重新赋值回模型
+            m.grad = grad
 
 def trainable_parameters(model):
     params = []

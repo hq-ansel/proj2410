@@ -1,8 +1,9 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from .quantizer import UniformAffineQuantizer,GradualUniformAffineQuantizer,GradualUniformAffineQuantizerV2
-
+from .quantizer import (UniformAffineQuantizer,GradualUniformAffineQuantizer,GradualUniformAffineQuantizerV2,
+                        UniformAffineQuantizerV2)
+from . import quantizer,quantizerv2
 
 
 
@@ -33,18 +34,24 @@ class QuantLinear(nn.Module):
         self.use_weight_quant = False
         # initialize quantizer
         # self.weight_quantizer = UniformAffineQuantizer(wbits, group_size, weight=org_module.weight,args=args)
+        quantizer_version = args.get("quantizer_version","v1")
+        if quantizer_version == "v1":
+            quantizer_pkg = quantizer
+        elif quantizer_version == "v2":
+            quantizer_pkg = quantizerv2
         if args.get("gradual_quant", False):
-            self.weight_quantizer = GradualUniformAffineQuantizer(wbits,
+            self.weight_quantizer = quantizer_pkg.GradualUniformAffineQuantizer(wbits,
                                                             group_size,
                                                             weight=org_module.weight,
                                                             args=args)
         elif args.get("iterative_freezing", False):
-            self.weight_quantizer = GradualUniformAffineQuantizerV2(wbits,
+            self.weight_quantizer = quantizer_pkg.GradualUniformAffineQuantizerV2(wbits,
                                                                      group_size,
                                                                      weight=org_module.weight,
                                                                      args=args)
         else:
-            self.weight_quantizer = UniformAffineQuantizer(wbits, group_size, weight=org_module.weight,args=args)
+            self.weight_quantizer = quantizer_pkg.UniformAffineQuantizer(wbits, group_size, weight=org_module.weight,args=args)
+            # self.weight_quantizer = UniformAffineQuantizerV2(wbits, group_size, weight=org_module.weight,args=args)
         self.use_temporary_parameter = False
         self.clamp_input = args.get('clamp_input',False)
 
@@ -67,14 +74,15 @@ class QuantLinear(nn.Module):
     def get_dampen_loss(self):
         def clamp_ste(x: torch.Tensor, _min, _max):
             return (x.clamp(_min,_max) - x).detach() + x
+        group_size = self.weight_quantizer.group_size
         zero_point = self.weight_quantizer.zero_point
         scale = self.weight_quantizer.scale
         a_min = zero_point*scale
         a_max = (2**self.weight_quantizer.n_bits-1)*scale+a_min
 
         return torch.norm(
-            self.weight_quantizer.fake_quant(self.weight).reshape(-1,a_min.shape[-1]) -
-                clamp_ste(self.weight,a_min, a_max),
+            self.weight_quantizer.fake_quant(self.weight).reshape(-1,group_size) -
+                clamp_ste(self.weight.reshape(-1,group_size),a_min, a_max),
             p=2
         )
 

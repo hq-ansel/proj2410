@@ -116,14 +116,11 @@ def train_units_layers(model: PreTrainedModel,
 
     # 使用amp仍然需要权重为float32
     with torch.no_grad():
-        if amp_enabled:
-            selected_layers.to(args.dev, dtype=torch.float32)
-        else:
-            model.model.layers = nn.ModuleList(
-                    [qlayer.to(args.dev, dtype=torch.float32)
-                        if index in layer_idx_set 
-                        else qlayer.half() for index,
-                            qlayer in enumerate(model.model.layers)])
+        model.model.layers = nn.ModuleList(
+                [qlayer.to(args.dev, dtype=torch.float32)
+                    if index in layer_idx_set 
+                    else qlayer.half() for index,
+                        qlayer in enumerate(model.model.layers)])
         
     qlayers = model.model.layers
     selected_layers = [qlayers[i] for i in trainable_layer_idx_list]
@@ -203,8 +200,8 @@ def train_units_layers(model: PreTrainedModel,
                 def update(self):
                     self.iteration += 1
                     for linear in self.linear_list:
-                        if self.iteration < self.total_iteration/4:
-                            ratio = self.iteration/self.total_iteration/4
+                        if self.iteration < self.total_iteration/1:
+                            ratio = self.iteration/self.total_iteration/1
                             if args.get("gradual_quant",False):
                                 linear.update_position_ratio(ratio)
                             if args.get("interpolate", False):
@@ -380,14 +377,11 @@ def train_units_layers_with_catcher(model: PreTrainedModel,
 
     # 使用amp仍然需要权重为float32
     with torch.no_grad():
-        if amp_enabled:
-            selected_layers.to(args.dev, dtype=torch.float32)
-        else:
-            model.model.layers = nn.ModuleList(
-                    [qlayer.to(args.dev, dtype=torch.float32)
-                        if index in layer_idx_set 
-                        else qlayer.half() for index,
-                            qlayer in enumerate(model.model.layers)])
+        model.model.layers = nn.ModuleList(
+                [qlayer.to(args.dev, dtype=torch.float32)
+                    if index in layer_idx_set 
+                    else qlayer.half() for index,
+                        qlayer in enumerate(model.model.layers)])
     fp_layers = target_model.model.layers
     qlayers = model.model.layers
     selected_layers = [qlayers[i] for i in trainable_layer_idx_list]
@@ -482,8 +476,8 @@ def train_units_layers_with_catcher(model: PreTrainedModel,
                 def update(self):
                     self.iteration += 1
                     for linear in self.linear_list:
-                        if self.iteration < self.total_iteration/4:
-                            ratio = self.iteration/self.total_iteration/4
+                        if self.iteration < self.total_iteration/1:
+                            ratio = self.iteration/self.total_iteration/1
                             if args.get("gradual_quant",False):
                                 linear.update_position_ratio(ratio)
                             if args.get("interpolate", False):
@@ -539,6 +533,11 @@ def train_units_layers_with_catcher(model: PreTrainedModel,
                         print(f"input {inp} output {output} target_output {target_output}")
                     loss = loss_func(output, target_output.to(args.dev,dtype=torch.float32))
 
+                    if args.get("dampen_loss",False):
+                        for idx in trainable_layer_idx_list:
+                            for n,m in qlayers[idx].named_modules():
+                                if isinstance(m, int_linear_fake.QuantLinear):
+                                    loss += m.get_dampen_loss()*0.001
                           
                 if not math.isfinite(loss.item()) or loss.item()==0:
                     logger.info("Loss is NAN, stopping training")
@@ -558,6 +557,18 @@ def train_units_layers_with_catcher(model: PreTrainedModel,
                 if args.clip_grad > 0:
                         # print(f"clip grad at {args.clip_grad}")
                         norm = torch.nn.utils.clip_grad_norm_(trainable_parameters(selected_layers), args.clip_grad).cpu()
+                # 临时的检查
+                # with torch.no_grad():
+                #     idx =torch.tensor([[0],[0]])
+                #     q_proj_weight = qlayers[align_index].module.self_attn.q_proj.weight
+                #     quantizer = qlayers[align_index].module.self_attn.q_proj.weight_quantizer
+                #     q_proj_weight_simu = quantizer(qlayers[align_index].module.self_attn.q_proj.weight)
+                #     scale = quantizer.scale
+                #     # 打开文件写入
+                #     with open(f"/home/ubuntu/data/exp/proj2410/test/logs","a+") as f:
+                #         f.write(f"{scale}\n")
+                        # f.write(f"{q_proj_weight[0,:300]},{q_proj_weight_simu[0:,300]}\n")
+                # 更新
                 if not args.loss_func == "KL-Divergence":
                     if amp_enabled:
                         loss_scaler.step(optimizer)
@@ -657,8 +668,9 @@ def custom_shedule_train(model:PreTrainedModel,
                     args):
     # model.to(args.dev)
 
-    target_model = copy.deepcopy(model)
-    target_model.to("cuda:1")
+    if args.with_catcher:
+        target_model = copy.deepcopy(model)
+        target_model.to("cuda:1")
 
     shedule_list= []
     # 暂时调度的内容是直接平移一个
@@ -741,17 +753,29 @@ def custom_shedule_train(model:PreTrainedModel,
                 named_linears = get_named_linears(qlayer, int_linear_fake.QuantLinear)
                 for name, module in named_linears.items():
                     scales = module.weight_quantizer.scale.clamp(1e-4,1e4).detach()
-                    zeros = module.weight_quantizer.zero_point.detach().cuda().round().cpu()
+                    quantizer_version = args.get("quantizer_version","v1")
+                    if quantizer_version == "v1":
+                        zeros = module.weight_quantizer.zero_point.detach().cuda().round().cpu()
+                    elif quantizer_version == "v2":
+                        zeros = module.weight_quantizer.zero_point.detach().cuda().cpu()
                     group_size = module.weight_quantizer.group_size
                     dim0 = module.weight.shape[0]
                     scales = scales.view(dim0,-1).transpose(0,1).contiguous()
                     zeros = zeros.view(dim0,-1).transpose(0,1).contiguous()
-                    q_linear = int_linear_real.QuantLinear(args.wbits,
-                                                group_size,
-                                                module.in_features,
-                                                module.out_features,
-                                                not module.bias is None,
-                                                clamp_input= args.get("clamp_input",False))
+                    if quantizer_version == "v1":
+                        q_linear = int_linear_real.QuantLinear(args.wbits,
+                                                    group_size,
+                                                    module.in_features,
+                                                    module.out_features,
+                                                    not module.bias is None,
+                                                    clamp_input= args.get("clamp_input",False))
+                    elif quantizer_version == "v2":
+                        q_linear = int_linear_real.QuantLinearV2(args.wbits,
+                                                    group_size,
+                                                    module.in_features,
+                                                    module.out_features,
+                                                    not module.bias is None,
+                                                    clamp_input= args.get("clamp_input",False))
                     q_linear.pack(module.cpu(),  scales.float().cpu(), zeros.float().cpu())
                     set_op_by_name(qlayer, name, q_linear)       
                     logger.info(f"pack quantized {name} finished")

@@ -94,6 +94,42 @@ class CommonInputDataset(Dataset):
         return res
 
 
+class BlockKeeper:
+    def __init__(self,save_limit:int=2):
+        self.saved_blocks = []
+        self.save_limit = save_limit
+        pass
+
+    def store_block(self, block:nn.Module,final_loss:float,epoch:int):
+        """
+        保留最好的save_limit个block
+        """
+        if   len(self.saved_blocks) < self.save_limit:
+            self.saved_blocks.append((block,final_loss,epoch))
+        else:
+            min_loss = min(self.saved_blocks,key=lambda x:x[1])[1]
+            if final_loss < min_loss:
+                min_idx = min(range(len(self.saved_blocks)),key=lambda x:self.saved_blocks[x][1])
+                self.saved_blocks[min_idx] = (block,final_loss,epoch)
+                
+    def get_best_block(self):
+        """
+        返回最优的block
+        """
+        if len(self.saved_blocks) == 0:
+            return None
+        best_block,best_loss,best_epoch = min(self.saved_blocks,key=lambda x:x[1])
+        return best_block,best_loss,best_epoch
+    
+    def clear(self):
+        for block,_,_ in self.saved_blocks:
+            del block
+        self.saved_blocks = []
+        torch.cuda.empty_cache()
+        gc.collect()
+                
+
+
 @timer
 def train_units_layers(model: PreTrainedModel,
                         trainable_layer_idx_list: List[int],
@@ -200,8 +236,8 @@ def train_units_layers(model: PreTrainedModel,
                 def update(self):
                     self.iteration += 1
                     for linear in self.linear_list:
-                        if self.iteration < self.total_iteration/1:
-                            ratio = self.iteration/self.total_iteration/1
+                        if self.iteration < self.total_iteration/4:
+                            ratio = self.iteration/self.total_iteration/4
                             if args.get("gradual_quant",False):
                                 linear.update_position_ratio(ratio)
                             if args.get("interpolate", False):
@@ -367,6 +403,7 @@ def train_units_layers_with_catcher(model: PreTrainedModel,
                         logger,
                         args):
     # 解冻当前层，并冻结其它层
+    block_keeper = BlockKeeper(save_limit=args.get("save_limit",2))
     model.to(args.dev)
     total_training_iteration = args.epochs * args.train_size / args.batch_size
     layer_idx_set = set(trainable_layer_idx_list)
@@ -476,8 +513,8 @@ def train_units_layers_with_catcher(model: PreTrainedModel,
                 def update(self):
                     self.iteration += 1
                     for linear in self.linear_list:
-                        if self.iteration < self.total_iteration/1:
-                            ratio = self.iteration/self.total_iteration/1
+                        if self.iteration < self.total_iteration/4:
+                            ratio = self.iteration/self.total_iteration/4
                             if args.get("gradual_quant",False):
                                 linear.update_position_ratio(ratio)
                             if args.get("interpolate", False):
@@ -533,11 +570,6 @@ def train_units_layers_with_catcher(model: PreTrainedModel,
                         print(f"input {inp} output {output} target_output {target_output}")
                     loss = loss_func(output, target_output.to(args.dev,dtype=torch.float32))
 
-                    if args.get("dampen_loss",False):
-                        for idx in trainable_layer_idx_list:
-                            for n,m in qlayers[idx].named_modules():
-                                if isinstance(m, int_linear_fake.QuantLinear):
-                                    loss += m.get_dampen_loss()*0.001
                           
                 if not math.isfinite(loss.item()) or loss.item()==0:
                     logger.info("Loss is NAN, stopping training")
@@ -557,17 +589,8 @@ def train_units_layers_with_catcher(model: PreTrainedModel,
                 if args.clip_grad > 0:
                         # print(f"clip grad at {args.clip_grad}")
                         norm = torch.nn.utils.clip_grad_norm_(trainable_parameters(selected_layers), args.clip_grad).cpu()
-                # 临时的检查
-                # with torch.no_grad():
-                #     idx =torch.tensor([[0],[0]])
-                #     q_proj_weight = qlayers[align_index].module.self_attn.q_proj.weight
-                #     quantizer = qlayers[align_index].module.self_attn.q_proj.weight_quantizer
-                #     q_proj_weight_simu = quantizer(qlayers[align_index].module.self_attn.q_proj.weight)
-                #     scale = quantizer.scale
-                #     # 打开文件写入
-                #     with open(f"/home/ubuntu/data/exp/proj2410/test/logs","a+") as f:
-                #         f.write(f"{scale}\n")
-                        # f.write(f"{q_proj_weight[0,:300]},{q_proj_weight_simu[0:,300]}\n")
+                
+
                 # 更新
                 if not args.loss_func == "KL-Divergence":
                     if amp_enabled:
@@ -630,18 +653,24 @@ def train_units_layers_with_catcher(model: PreTrainedModel,
             val_loss_mean = torch.stack(val_loss_list).mean()
             norm_mean = torch.stack(norm_list).mean()
             logger.info(f"blocks {trainable_layer_idx_list} epoch {epoch} recon_loss:{loss_mean} val_loss:{val_loss_mean} quant_lr:{quant_scheduler.get_lr()[0]} norm:{norm_mean:.8f} max memory_allocated {torch.cuda.max_memory_allocated(args.dev) / 1024**2} time {time.time()-start_time} ")
+            
             if val_loss_mean < best_val_loss:
                 best_val_loss = val_loss_mean
             else:
                 early_stop_flag += 1
                 if args.early_stop > 0 and early_stop_flag >=args.early_stop:
                     break
-
+            
+            block_keeper.saved_blocks(copy.deepcopy(selected_layers),val_loss_mean,epoch)
 
         optimizer.zero_grad()
         del optimizer
         # step 7: pack quantized weights into low-bits format, note that this process is slow on poor CPU or busy CPU
-        
+    best_block, best_val_loss , best_epoch =block_keeper.get_best_block()
+    for idx, select_idx in enumerate(trainable_layer_idx_list):
+        model.model.layers[select_idx] = best_block[idx]
+    block_keeper.clear()
+    logger.info(f"best block {trainable_layer_idx_list} val_loss {best_val_loss} epoch {best_epoch}")
     torch.cuda.empty_cache()
 
 
@@ -668,9 +697,8 @@ def custom_shedule_train(model:PreTrainedModel,
                     args):
     # model.to(args.dev)
 
-    if args.with_catcher:
-        target_model = copy.deepcopy(model)
-        target_model.to("cuda:1")
+    target_model = copy.deepcopy(model)
+    target_model.to("cuda:1")
 
     shedule_list= []
     # 暂时调度的内容是直接平移一个
@@ -753,29 +781,17 @@ def custom_shedule_train(model:PreTrainedModel,
                 named_linears = get_named_linears(qlayer, int_linear_fake.QuantLinear)
                 for name, module in named_linears.items():
                     scales = module.weight_quantizer.scale.clamp(1e-4,1e4).detach()
-                    quantizer_version = args.get("quantizer_version","v1")
-                    if quantizer_version == "v1":
-                        zeros = module.weight_quantizer.zero_point.detach().cuda().round().cpu()
-                    elif quantizer_version == "v2":
-                        zeros = module.weight_quantizer.zero_point.detach().cuda().cpu()
+                    zeros = module.weight_quantizer.zero_point.detach().cuda().round().cpu()
                     group_size = module.weight_quantizer.group_size
                     dim0 = module.weight.shape[0]
                     scales = scales.view(dim0,-1).transpose(0,1).contiguous()
                     zeros = zeros.view(dim0,-1).transpose(0,1).contiguous()
-                    if quantizer_version == "v1":
-                        q_linear = int_linear_real.QuantLinear(args.wbits,
-                                                    group_size,
-                                                    module.in_features,
-                                                    module.out_features,
-                                                    not module.bias is None,
-                                                    clamp_input= args.get("clamp_input",False))
-                    elif quantizer_version == "v2":
-                        q_linear = int_linear_real.QuantLinearV2(args.wbits,
-                                                    group_size,
-                                                    module.in_features,
-                                                    module.out_features,
-                                                    not module.bias is None,
-                                                    clamp_input= args.get("clamp_input",False))
+                    q_linear = int_linear_real.QuantLinear(args.wbits,
+                                                group_size,
+                                                module.in_features,
+                                                module.out_features,
+                                                not module.bias is None,
+                                                clamp_input= args.get("clamp_input",False))
                     q_linear.pack(module.cpu(),  scales.float().cpu(), zeros.float().cpu())
                     set_op_by_name(qlayer, name, q_linear)       
                     logger.info(f"pack quantized {name} finished")
@@ -831,7 +847,7 @@ def custom_shedule_train(model:PreTrainedModel,
     gc.collect()
 
 @timer
-def greedy_local_train(
+def beam_local_train(
     model: PreTrainedModel,
     args,
     trainloader: List[Tuple[torch.Tensor, torch.Tensor]],

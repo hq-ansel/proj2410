@@ -13,13 +13,15 @@ loss_func: MSE # "MSE", "FKLD" , "RKLD", "FKLD_RKLD" ,"MSE_FKLD", "MSE_RKLD", "M
 crossblock_window_size: 1
 train_size:  4096
 slide_step: 1
-clip_grad: 0.3
+clip_grad: 9999
+quantizer_version: v2
+
 
 model: /home/ubuntu/data/exp/proj2410/model/Qwen2.5-0.5B
 # save settings
-output_dir: /home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128/
-log_loss: /home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128/loss.csv
-save_quant_dir: /home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128/
+output_dir: /home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-linearv2/
+log_loss: /home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-linearv2/loss.csv
+save_quant_dir: /home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-linearv2/
 clamp_method: STE
 
 align_type: tail

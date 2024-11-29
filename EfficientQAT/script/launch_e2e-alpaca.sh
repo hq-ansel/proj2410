@@ -29,7 +29,7 @@ for quant_model_path in ${quant_model_paths[@]}; do
         --learning_rate 2e-5 \
         --dataset alpaca \
         --dataset_format alpaca \
-        --output_dir "${quant_model_path}-alpaca-4096" \
+        --output_dir "${quant_model_path}/alpaca-4096" \
         --do_train True \
         --source_max_len 384 \
         --target_max_len 128 \

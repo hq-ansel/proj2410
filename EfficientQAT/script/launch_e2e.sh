@@ -20,7 +20,7 @@ for quant_model_path in ${quant_model_paths[@]}; do
         --learning_rate 2e-5 \
         --dataset redpajama \
         --dataset_format pt \
-        --output_dir "${quant_model_path}-redpajama-4096" \
+        --output_dir "${quant_model_path}/redpajama-4096" \
         --do_train True \
         --pt_context_len 4096 \
         --per_device_train_batch_size 2 \

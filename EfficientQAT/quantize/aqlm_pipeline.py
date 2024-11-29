@@ -180,7 +180,8 @@ def get_inps(
                 batch_inps, *_ = batch_inps
             batch_inps = batch_inps.to(device)
             # call model.forward to trigger the Catcher
-            model(batch_inps, attention_mask=torch.ones_like(batch_inps))
+            model(batch_inps, attention_mask=torch.ones_like(batch_inps,
+                                                                 dtype=torch.long, device=device))
         except CatcherExit:
             pass  # exit after catcher finished without running the rest of the model layers
 

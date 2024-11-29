@@ -105,10 +105,14 @@ class UniformAffineQuantizer(nn.Module):
                     scale = scale.clamp(min=1e-4, max=1e4)
                 elif self.clamp_method == "MAD":
                     scale = clamp_mad(scale, 1e-4, 1e4)
-                zero_point = -(xmin/scale).clamp(min=-1e4, max=1e4) 
+                zero_point = -(xmin).clamp(min=-1e4, max=1e4) 
                 self.scale = nn.Parameter(scale)
-                self.zero_point = nn.Parameter(zero_point.round())
-            
+                self.zero_point = nn.Parameter(zero_point)
+        if self.clamp_method == "STE":
+            self.clamp_method = clamp_ste
+        elif self.clamp_method == "MAD":
+            self.clamp_method = clamp_mad
+
 
     def change_n_bits(self, n_bits):
         self.n_bits = n_bits
@@ -117,23 +121,21 @@ class UniformAffineQuantizer(nn.Module):
         
     def fake_quant(self, x):
         
-        if self.clamp_method == "STE":
-            scale = clamp_ste(self.scale,1e-4, 1e4)
-            round_zero_point = clamp_ste(round_ste(self.zero_point), self.qmin, self.qmax)
-        elif self.clamp_method == "MAD":
-            scale = clamp_mad(self.scale, 1e-4, 1e4)
-            round_zero_point = clamp_mad(round_ste(self.zero_point), self.qmin, self.qmax)
+        scale = self.clamp_method(self.scale,1e-4, 1e4)
+        zero_point = self.zero_point
 
         dim1, dim2 = x.shape
-        x = x.reshape(-1, self.group_size)
-        x_int = round_ste(x / scale)
-        if round_zero_point is not None:
-            x_int = x_int.add(round_zero_point)
+        x_int = x.reshape(-1, self.group_size)
+        if zero_point is not None:
+            x_int = x_int.add(zero_point)
+        # (x+z)/s
+        x_int = round_ste(x_int / scale)
         x_int = x_int.clamp(self.qmin, self.qmax)
         x_dequant = x_int
-        if round_zero_point is not None:
-            x_dequant = x_dequant.sub(round_zero_point)
         x_dequant = x_dequant.mul(scale)
+        # s*x_int - z
+        if zero_point is not None:
+            x_dequant = x_dequant.sub(zero_point)
         if self.group_size:
             x_dequant = x_dequant.reshape(dim1, dim2)
         return x_dequant

@@ -23,7 +23,9 @@ from .quantize.greedy_trainer import greedy_local_train,timer
 from .quantize.awq_pipeline import *
 
 amp_enabled = os.environ.get("AMP_ENABLED", "False").lower() == "true"
-torch.backends.cudnn.benchmark = True
+
+torch.backends.cudnn.benchmark = False
+torch.backends.cudnn.deterministic = True
 
 @torch.no_grad()
 def evaluate(model, tokenizer, args, logger=None):
@@ -142,7 +144,7 @@ def main():
     parser.add_argument("--group_size", type=int, default=128, help="weights quantization group size")
     parser.add_argument("--quant_lr", type=float, default=1e-4, help="lr of quantization parameters (s and z)")
     parser.add_argument("--weight_lr", type=float, default=1e-5, help="lr of full-precision weights")
-    parser.add_argument("--min_lr_factor", type=float, default=20, help="min_lr = lr/min_lr_factor")
+    parser.add_argument("--min_lr_factor", type=float, default=10, help="min_lr = lr/min_lr_factor")
     parser.add_argument("--clip_grad", type=float, default=0.3)
     parser.add_argument("--wd", type=float, default=0,help="weight decay")
     parser.add_argument("--net", type=str, default=None,help="model (family) name, for the easier saving of data cache")
@@ -168,6 +170,7 @@ def main():
     random.seed(args.seed)
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
+    torch.cuda.manual_seed_all(args.seed)
     torch.cuda.manual_seed(args.seed)
 
         

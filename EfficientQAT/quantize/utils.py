@@ -275,7 +275,7 @@ def quant_parameters(model):
 @torch.no_grad()
 def sub_space_clean(model):
 
-    percent = 0.1  # 要保留的
+    percent = 0.5  # 要保留的
     for n, m in model.named_parameters():
         if (m.requires_grad and "weight" in n 
             and "scale" not in n and "zero_point" not in n 

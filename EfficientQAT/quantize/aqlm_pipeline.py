@@ -604,7 +604,7 @@ def aqlm_pipeline(
 
     # if args.wandb:
     # save config
-    old_config = AutoConfig.from_pretrained(args.model, trust_remote_code=args.trust_remote_code)
+    old_config = AutoConfig.from_pretrained(args.model, trust_remote_code=True)
     metadata = {
         "nbits_per_codebook": args.nbits_per_codebook,
         "num_codebooks": args.num_codebooks,
@@ -630,4 +630,4 @@ def aqlm_pipeline(
         args.logger.info(f"Avg_bits: {overall_bits / number_of_quantized_params}")
     model.config.use_cache = use_cache
     args.logger.info(f"quantize: {torch.cuda.max_memory_allocated()=:,}")
-    return quantizers
+    return quantizers,model

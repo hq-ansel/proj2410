@@ -259,9 +259,9 @@ class GradualUniformAffineQuantizer(nn.Module):
                     scale = scale.clamp(min=1e-4, max=1e4)
                 elif self.clamp_method == "MAD":
                     scale = clamp_mad(scale, 1e-4, 1e4)
-                zero_point = -(xmin / scale).clamp(min=-1e4, max=1e4)
+                zero_point = -(xmin).clamp(min=-1e4, max=1e4) 
                 self.scale = nn.Parameter(scale)
-                self.zero_point = nn.Parameter(zero_point.round())
+                self.zero_point = nn.Parameter(zero_point)
 
     def change_n_bits(self, n_bits):
         self.n_bits = n_bits
@@ -286,23 +286,24 @@ class GradualUniformAffineQuantizer(nn.Module):
         """
         隐式要求x.shape[-1] % self.group_size == 0
         """
-        x_int = round_ste(x / scale)
         if zero_point is not None:
-            x_int = x_int.add(zero_point)
+            x_int = x.add(zero_point)
+        x_int = round_ste(x_int / scale)
         x_int = x_int.clamp(self.qmin, self.qmax)
         return x_int
     
     def dequant_int(self, x_int, scale, zero_point):
         x_dequant = x_int
+        x_dequant = x_dequant.mul(scale)
         if zero_point is not None:
             x_dequant = x_dequant.sub(zero_point)
-        x_dequant = x_dequant.mul(scale)
         return x_dequant
     
     def fake_quant(self, x):
 
         scale = self.clamp_method(self.scale, 1e-4, 1e4)
-        round_zero_point = self.clamp_method( round_ste(self.zero_point), self.qmin, self.qmax)
+        # round_zero_point = self.clamp_method( round_ste(self.zero_point), self.qmin, self.qmax)
+        zero_point = self.zero_point
 
         dim1, dim2 = x.shape
         x = x.reshape(-1, self.group_size)
@@ -318,13 +319,13 @@ class GradualUniformAffineQuantizer(nn.Module):
         # if round_zero_point is not None:
         #     x_int = x_int.add(round_zero_point[:quantized_groups])
         # x_int = x_int.clamp(self.qmin, self.qmax)
-        x_int = self.quant_int(x[:quantized_groups], scale[:quantized_groups], round_zero_point[:quantized_groups])
+        x_int = self.quant_int(x[:quantized_groups], scale[:quantized_groups], zero_point[:quantized_groups])
 
         x_dequant = x_int
         # if round_zero_point is not None:
         #     x_dequant = x_dequant.sub(round_zero_point[:quantized_groups])
         # x_dequant = x_dequant.mul(scale[:quantized_groups])
-        x_dequant = self.dequant_int(x_int, scale[:quantized_groups], round_zero_point[:quantized_groups])
+        x_dequant = self.dequant_int(x_int, scale[:quantized_groups], zero_point[:quantized_groups])
 
         # 返回量化后的新张量
         x_quantized[:quantized_groups] = x_dequant
@@ -340,7 +341,7 @@ class GradualUniformAffineQuantizer(nn.Module):
     
     def get_inferred_params(self,x):
         scale = clamp_ste(self.scale, 1e-4, 1e4)
-        round_zero_point = clamp_ste(round_ste(self.zero_point), self.qmin, self.qmax)
+        round_zero_point = clamp_ste((self.zero_point), self.qmin, self.qmax)
 
         dim1, dim2 = x.shape
         x = x.reshape(-1, self.group_size)

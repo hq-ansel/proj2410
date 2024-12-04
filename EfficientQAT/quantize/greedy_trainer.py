@@ -200,8 +200,8 @@ def train_units_layers(model: PreTrainedModel,
                 def update(self):
                     self.iteration += 1
                     for linear in self.linear_list:
-                        if self.iteration < self.total_iteration/1:
-                            ratio = self.iteration/self.total_iteration/1
+                        if self.iteration < (self.total_iteration/2.0):
+                            ratio = self.iteration/(self.total_iteration/2.0)
                             if args.get("gradual_quant",False):
                                 linear.update_position_ratio(ratio)
                             if args.get("interpolate", False):
@@ -476,8 +476,8 @@ def train_units_layers_with_catcher(model: PreTrainedModel,
                 def update(self):
                     self.iteration += 1
                     for linear in self.linear_list:
-                        if self.iteration < self.total_iteration/1:
-                            ratio = self.iteration/self.total_iteration/1
+                        if self.iteration < (self.total_iteration/2.0):
+                            ratio = self.iteration/(self.total_iteration/2.0)
                             if args.get("gradual_quant",False):
                                 linear.update_position_ratio(ratio)
                             if args.get("interpolate", False):
@@ -757,8 +757,9 @@ def custom_shedule_train(model:PreTrainedModel,
                     if quantizer_version == "v1":
                         zeros = module.weight_quantizer.zero_point.detach().cuda().round().cpu()
                     elif quantizer_version == "v2":
-                        zeros = module.weight_quantizer.zero_point.detach().cuda().cpu()
+                        zeros = module.weight_quantizer.zero_point.detach().cpu()
                     group_size = module.weight_quantizer.group_size
+                    print(f"pack quantized {name} with group_size {group_size} and scales {scales} and zeros {zeros}")
                     dim0 = module.weight.shape[0]
                     scales = scales.view(dim0,-1).transpose(0,1).contiguous()
                     zeros = zeros.view(dim0,-1).transpose(0,1).contiguous()

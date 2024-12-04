@@ -741,3 +741,119 @@ c4 perplexity: 29.68
 |winogrande   |      1|none  |     0|acc     |↑  |0.5383|±  |0.0140|
 
 Average Acc: 45.01%
+AMP enabled: False
+Loading quantized model from /home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-linearv2/redpajama-4096/checkpoint-256
+Loading pre-computed quantized weights...
+Loading pre-computed quantized weights Successfully
+device_map: OrderedDict([('', 0)])
+Loading Wikitext-2 dataset...
+wikitext2: 29.811843872070312
+get_c4
+c4: 29.689878463745117
+wikitext2 perplexity: 29.81
+c4 perplexity: 29.69
+|    Tasks    |Version|Filter|n-shot| Metric |   |Value |   |Stderr|
+|-------------|------:|------|-----:|--------|---|-----:|---|-----:|
+|arc_challenge|      1|none  |     0|acc     |↑  |0.2261|±  |0.0122|
+|             |       |none  |     0|acc_norm|↑  |0.2517|±  |0.0127|
+|arc_easy     |      1|none  |     0|acc     |↑  |0.5345|±  |0.0102|
+|             |       |none  |     0|acc_norm|↑  |0.4760|±  |0.0102|
+|hellaswag    |      1|none  |     0|acc     |↑  |0.3225|±  |0.0047|
+|             |       |none  |     0|acc_norm|↑  |0.3674|±  |0.0048|
+|piqa         |      1|none  |     0|acc     |↑  |0.6284|±  |0.0113|
+|             |       |none  |     0|acc_norm|↑  |0.6284|±  |0.0113|
+|winogrande   |      1|none  |     0|acc     |↑  |0.5375|±  |0.0140|
+
+Average Acc: 44.98%
+Loading quantized model from /home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-lr1/redpajama-4096/checkpoint-256
+Loading pre-computed quantized weights...
+Loading pre-computed quantized weights Successfully
+device_map: OrderedDict([('', 0)])
+Loading Wikitext-2 dataset...
+wikitext2: 30.06536102294922
+get_c4
+c4: 30.342979431152344
+wikitext2 perplexity: 30.07
+c4 perplexity: 30.34
+|    Tasks    |Version|Filter|n-shot| Metric |   |Value |   |Stderr|
+|-------------|------:|------|-----:|--------|---|-----:|---|-----:|
+|arc_challenge|      1|none  |     0|acc     |↑  |0.2210|±  |0.0121|
+|             |       |none  |     0|acc_norm|↑  |0.2491|±  |0.0126|
+|arc_easy     |      1|none  |     0|acc     |↑  |0.5274|±  |0.0102|
+|             |       |none  |     0|acc_norm|↑  |0.4735|±  |0.0102|
+|hellaswag    |      1|none  |     0|acc     |↑  |0.3141|±  |0.0046|
+|             |       |none  |     0|acc_norm|↑  |0.3575|±  |0.0048|
+|piqa         |      1|none  |     0|acc     |↑  |0.6262|±  |0.0113|
+|             |       |none  |     0|acc_norm|↑  |0.6213|±  |0.0113|
+|winogrande   |      1|none  |     0|acc     |↑  |0.5099|±  |0.0140|
+
+Average Acc: 43.97%
+Loading quantized model from /home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128/redpajama-4096/checkpoint-256
+Loading pre-computed quantized weights...
+Loading pre-computed quantized weights Successfully
+device_map: OrderedDict([('', 0)])
+Loading Wikitext-2 dataset...
+wikitext2: 34.32837677001953
+get_c4
+c4: 33.177093505859375
+wikitext2 perplexity: 34.33
+c4 perplexity: 33.18
+|    Tasks    |Version|Filter|n-shot| Metric |   |Value |   |Stderr|
+|-------------|------:|------|-----:|--------|---|-----:|---|-----:|
+|arc_challenge|      1|none  |     0|acc     |↑  |0.2150|±  |0.0120|
+|             |       |none  |     0|acc_norm|↑  |0.2483|±  |0.0126|
+|arc_easy     |      1|none  |     0|acc     |↑  |0.5088|±  |0.0103|
+|             |       |none  |     0|acc_norm|↑  |0.4680|±  |0.0102|
+|hellaswag    |      1|none  |     0|acc     |↑  |0.3111|±  |0.0046|
+|             |       |none  |     0|acc_norm|↑  |0.3508|±  |0.0048|
+|piqa         |      1|none  |     0|acc     |↑  |0.6202|±  |0.0113|
+|             |       |none  |     0|acc_norm|↑  |0.6338|±  |0.0112|
+|winogrande   |      1|none  |     0|acc     |↑  |0.5122|±  |0.0140|
+
+Average Acc: 43.35%
+Loading quantized model from /home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-subspace-lr1/redpajama-4096/checkpoint-256
+Loading pre-computed quantized weights...
+Loading pre-computed quantized weights Successfully
+device_map: OrderedDict([('', 0)])
+Loading Wikitext-2 dataset...
+wikitext2: 30.212926864624023
+get_c4
+c4: 30.43874168395996
+wikitext2 perplexity: 30.21
+c4 perplexity: 30.44
+|    Tasks    |Version|Filter|n-shot| Metric |   |Value |   |Stderr|
+|-------------|------:|------|-----:|--------|---|-----:|---|-----:|
+|arc_challenge|      1|none  |     0|acc     |↑  |0.2167|±  |0.0120|
+|             |       |none  |     0|acc_norm|↑  |0.2449|±  |0.0126|
+|arc_easy     |      1|none  |     0|acc     |↑  |0.5152|±  |0.0103|
+|             |       |none  |     0|acc_norm|↑  |0.4600|±  |0.0102|
+|hellaswag    |      1|none  |     0|acc     |↑  |0.3142|±  |0.0046|
+|             |       |none  |     0|acc_norm|↑  |0.3547|±  |0.0048|
+|piqa         |      1|none  |     0|acc     |↑  |0.6230|±  |0.0113|
+|             |       |none  |     0|acc_norm|↑  |0.6213|±  |0.0113|
+|winogrande   |      1|none  |     0|acc     |↑  |0.5233|±  |0.0140|
+
+Average Acc: 43.85%
+Loading quantized model from /home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-gradual-quant-nocli/redpajama-4096/checkpoint-256
+Loading pre-computed quantized weights...
+Loading pre-computed quantized weights Successfully
+device_map: OrderedDict([('', 0)])
+Loading Wikitext-2 dataset...
+wikitext2: 29.64362907409668
+get_c4
+c4: 31.30796241760254
+wikitext2 perplexity: 29.64
+c4 perplexity: 31.31
+|    Tasks    |Version|Filter|n-shot| Metric |   |Value |   |Stderr|
+|-------------|------:|------|-----:|--------|---|-----:|---|-----:|
+|arc_challenge|      1|none  |     0|acc     |↑  |0.2218|±  |0.0121|
+|             |       |none  |     0|acc_norm|↑  |0.2466|±  |0.0126|
+|arc_easy     |      1|none  |     0|acc     |↑  |0.5286|±  |0.0102|
+|             |       |none  |     0|acc_norm|↑  |0.4937|±  |0.0103|
+|hellaswag    |      1|none  |     0|acc     |↑  |0.3151|±  |0.0046|
+|             |       |none  |     0|acc_norm|↑  |0.3631|±  |0.0048|
+|piqa         |      1|none  |     0|acc     |↑  |0.6273|±  |0.0113|
+|             |       |none  |     0|acc_norm|↑  |0.6279|±  |0.0113|
+|winogrande   |      1|none  |     0|acc     |↑  |0.4996|±  |0.0141|
+
+Average Acc: 43.85%

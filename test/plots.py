@@ -44,13 +44,13 @@ def args_parser():
     )
     parser.add_argument(
         "--loss_path",
-        default="/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-fast/loss.csv",
+        default="/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-linearv2/loss.csv",
         type=str,
         help="path to loss file"
     )
     parser.add_argument(
         "--loss_contrast_path",
-        default="/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-fast-gradual-quant/loss.csv",
+        default="/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-linearv2/loss.csv",
         type=str,
         help="path to contrast loss file"
     )
@@ -59,6 +59,7 @@ def args_parser():
 
 def plot_loss(loss_path,loss_contrast_path,args):
     recorder = BlockLossRecorder(loss_path)
+    recorder._load_from_file()
     def drill_data(_recorder):
         data = []
         for i in _recorder.loss_data.keys():
@@ -68,6 +69,7 @@ def plot_loss(loss_path,loss_contrast_path,args):
         return data
     pivot_data = drill_data(recorder)
     recorder_contrast = BlockLossRecorder(loss_contrast_path)
+    recorder_contrast._load_from_file()
     contrast_data = drill_data(recorder_contrast)
     out_dir = args.out_dir
     loss = np.array(pivot_data)
@@ -84,13 +86,13 @@ def plot_loss(loss_path,loss_contrast_path,args):
         ax = axes[i//2,i%2]
         for blk in range(i*blocks_per_plot,(i+1)*blocks_per_plot):
             ax.plot(range(steps),loss[blk], label=f"block {blk}")
-            ax.plot(range(steps),contrast_loss[blk], label=f"contrast block {blk}")
+            # ax.plot(range(steps),contrast_loss[blk], label=f"contrast block {blk}")
         ax.set_title(f'Loss for Blocks {i*blocks_per_plot } to {(i+1)*blocks_per_plot-1}')
         ax.set_xlabel('Steps')
         ax.set_ylabel('Loss')
         ax.legend()
     plt.tight_layout()
-    plt.savefig(f"{out_dir}/loss_plot_interploate.pdf")
+    plt.savefig(f"{out_dir}/loss_plot_v2.pdf")
 
 def main(args):
     if args.plot_type == "loss":

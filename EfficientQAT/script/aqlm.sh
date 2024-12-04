@@ -3,10 +3,9 @@
 # 定义配置文件列表
 # )
 config_files=(
-    # /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/qwen2.5-0.5b/gradual-study/qwen2.5-0.5b-b2gs128-gradual-quant-cli1.yaml
-    # /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/qwen2.5-0.5b/gradual-study/qwen2.5-0.5b-b2gs128-gradual-quant-nocli.yaml
-    # /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/qwen2.5-0.5b/gradual-study/qwen2.5-0.5b-b2gs128-gradual-quant.yaml
-    /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/qwen2.5-0.5b/gradual-study/qwen2.5-0.5b-b2gs128-gradual-quant-cli1-v2yaml
+    # /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/qwen2.5-0.5b-b2gs128-aqlm.yaml
+    /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/Llama2-7b/baseline/Llama2-7b-b2gs128-aqlm.yaml
+
 )
 # 循环遍历每个配置文件并执行 Python 命令
 # 设置并行参数，True 为并行，False 为串行
@@ -45,7 +44,6 @@ for config_path in "${config_files[@]}"; do
                 --real_quant \
                 --eval_ppl \
                 --epochs 2 \
-                --with_catcher \
                 --save_quant_dir $SAVE_PATH
 
             echo "Finished running with config: $CONFIG_PATH"

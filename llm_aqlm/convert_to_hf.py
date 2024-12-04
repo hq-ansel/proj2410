@@ -47,7 +47,7 @@ def get_layers_prefix(config) -> str:
             raise NotImplementedError(f"Can't get layers prefix for {unknown_type}")
 
 
-def get_converted_state_dict(config, nbits: int, in_path: os.PathLike) -> [dict, list[str]]:
+def get_converted_state_dict(config, nbits: int, in_path: os.PathLike) -> tuple[dict, list[str]]:
     state_dict = {}
     linear_weights_not_to_quantize = []
 

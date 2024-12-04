@@ -257,7 +257,7 @@ def main():
                 )
             elif args.quant_method == "aqlm":
                 from .quantize.aqlm_pipeline import aqlm_pipeline
-                model = aqlm_pipeline(
+                _,model = aqlm_pipeline(
                     model,
                     trainloader,
                     valloader,

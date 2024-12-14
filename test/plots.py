@@ -44,7 +44,7 @@ def args_parser():
     )
     parser.add_argument(
         "--loss_path",
-        default="/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-linearv2/loss.csv",
+        default="/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128/loss.csv",
         type=str,
         help="path to loss file"
     )
@@ -92,7 +92,7 @@ def plot_loss(loss_path,loss_contrast_path,args):
         ax.set_ylabel('Loss')
         ax.legend()
     plt.tight_layout()
-    plt.savefig(f"{out_dir}/loss_plot_v2.pdf")
+    plt.savefig(f"{out_dir}/loss_plot.pdf")
 
 def main(args):
     if args.plot_type == "loss":

@@ -524,7 +524,7 @@ def train_units_layers_with_catcher(model: PreTrainedModel,
                     output = qlayers[align_index].outs[0] # outs[0] is out tensor
                     with torch.no_grad():
                         try:
-                            target_output = target_model(inp.to("cuda:1"))[0]
+                            target_output = target_model(inp.to(args.cuda[-1]))[0]
                         except StopException as e:
                             pass
                         target_output = fp_layers[align_index].outs[0]
@@ -611,7 +611,7 @@ def train_units_layers_with_catcher(model: PreTrainedModel,
                             pass
                         output = qlayers[align_index].outs[0] # outs[0] is out tensor
                         try:
-                            target_output = target_model(inp.to("cuda:1"))[0]
+                            target_output = target_model(inp.to(args.cuda[-1]))[0]
                         except StopException:
                             pass
                         target_output = fp_layers[align_index].outs[0].to(torch.float32)
@@ -670,7 +670,7 @@ def custom_shedule_train(model:PreTrainedModel,
 
     if args.with_catcher:
         target_model = copy.deepcopy(model)
-        target_model.to("cuda:1")
+        target_model.to(args.cuda[-1])
 
     shedule_list= []
     # 暂时调度的内容是直接平移一个
@@ -851,7 +851,8 @@ def greedy_local_train(
     if args.off_load_to_disk:
         logger.info("offload the training dataset to disk, saving CPU memory, but may slowdown the training due to additional I/O...")
     
-    dev ="cuda" if torch.cuda.is_available() else "cpu"
+    # dev =args.cuda[0] if torch.cuda.is_available() else "cpu"
+    dev = args.cuda[0]
     dtype = torch.float16 if amp_enabled else torch.float32
     args.dev = dev
     args.dtype = dtype
@@ -882,9 +883,9 @@ def greedy_local_train(
         if train_dataset.attention_mask is None:
             attention_mask = train_dataset.attention_mask
         else:
-            attention_mask = train_dataset.attention_mask.to("cuda")
-        position_embeddings = (train_dataset.position_embeddings[0].to("cuda"),
-                            train_dataset.position_embeddings[1].to("cuda"))
+            attention_mask = train_dataset.attention_mask.to(args.cuda[0])
+        position_embeddings = (train_dataset.position_embeddings[0].to(args.cuda[0]),
+                            train_dataset.position_embeddings[1].to(args.cuda[0]))
 
         del trainloader, valloader
         gc.collect()

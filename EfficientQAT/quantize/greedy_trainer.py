@@ -353,6 +353,7 @@ def train_units_layers(model: PreTrainedModel,
         # step 7: pack quantized weights into low-bits format, note that this process is slow on poor CPU or busy CPU
         
     torch.cuda.empty_cache()
+    gc.collect()
 
 
 
@@ -873,12 +874,14 @@ def greedy_local_train(
             model=model,
             dataloader=trainloader,
             crossblock_window_size=args.crossblock_window_size,
+            device=args.cuda[0],
         )
         # 准备验证集
         val_dataset = LazyLoadDatasetV2(
             model=model,
             dataloader=valloader,
             crossblock_window_size=args.crossblock_window_size,
+            device=args.cuda[0],
         )
         if train_dataset.attention_mask is None:
             attention_mask = train_dataset.attention_mask

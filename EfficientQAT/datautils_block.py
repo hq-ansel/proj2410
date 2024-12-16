@@ -48,6 +48,7 @@ class LazyLoadDatasetV2(Dataset):
             model: PreTrainedModel,
             dataloader: List[Tuple[torch.Tensor, torch.Tensor]],
             crossblock_window_size: int,
+            device: str = "cuda", 
              ):
         """
         仅接收输入为get loader的内容
@@ -84,10 +85,10 @@ class LazyLoadDatasetV2(Dataset):
         layers = model.model.layers
         for n, m in model.named_modules():
             if "norm" in n or "head" in n or "emb" in n:
-                m.to("cuda")
+                m.to(device)
         # 设置截取的层
         for i in range(0,crossblock_window_size):
-            layers[i].to("cuda")
+            layers[i].to(device)
         layers[0] = Cacher(layers[0])
         layers[0].store_input = True
         if crossblock_window_size>1:
@@ -97,7 +98,7 @@ class LazyLoadDatasetV2(Dataset):
         with torch.no_grad():
             for inp,tar in dataloader:
                 try:
-                    model(inp.to("cuda"))
+                    model(inp.to(device))
                 except StopException:
                     pass
         tmp_dict["data_list"] = []
@@ -156,21 +157,41 @@ class LazyLoadDatasetV2(Dataset):
         # 确保 position_embeddings 移动到正确的设备
         position_embeddings = tuple(it.to(device) for it in position_embeddings)
 
-        for idx in range(len(self.data_list)):
-            input_sample,output_sample = self.data_list[idx]
-            input_sample = input_sample.to(device).unsqueeze(0)
-            output_sample = output_sample.to(device).unsqueeze(0)
-            # 前向传播
-            output = module(input_sample, attention_mask=attention_mask,
-                            position_embeddings=position_embeddings)[0].squeeze(0)
-            next_output = next_module(output_sample, attention_mask=attention_mask,
-                                    position_embeddings=position_embeddings)[0].squeeze(0)
+        # for idx in range(len(self.data_list)):
+        #     input_sample,output_sample = self.data_list[idx]
+        #     input_sample = input_sample.to(device).unsqueeze(0)
+        #     output_sample = output_sample.to(device).unsqueeze(0)
+        #     # 前向传播
+        #     output = module(input_sample, attention_mask=attention_mask,
+        #                     position_embeddings=position_embeddings)[0].squeeze(0)
+        #     next_output = next_module(output_sample, attention_mask=attention_mask,
+        #                             position_embeddings=position_embeddings)[0].squeeze(0)
+        #     # 更新数据
+        #     self.data_list[idx] = (output.detach().cpu(),next_output.detach().cpu())
+        #     # 释放内存
+        #     del input_sample, output_sample, output, next_output
+        #     gc.collect()
+        batch_size = 32
+        for start_idx in range(0,len(self.data_list),batch_size):
+            end_idx = min(start_idx+batch_size,len(self.data_list))
+            input_samples,output_samples = [],[]
+            for idx in range(start_idx,end_idx):
+                  input_sample,output_sample = self.data_list[idx]
+                  input_samples.append(input_sample.unsqueeze(0))
+                  output_samples.append(output_sample.unsqueeze(0))
+            inp_tensor = torch.cat(input_samples,dim=0).to(device)
+            out_tensor = torch.cat(output_samples,dim=0).to(device)
+            outputs = module(inp_tensor, attention_mask=attention_mask,
+                            position_embeddings=position_embeddings)[0]
+            next_outputs = next_module(out_tensor, attention_mask=attention_mask,
+                                    position_embeddings=position_embeddings)[0]
             # 更新数据
-            self.data_list[idx] = (output.detach().cpu(),next_output.detach().cpu())
+            for idx in range(start_idx,end_idx):
+                  self.data_list[idx] = (outputs[idx-start_idx].detach().cpu(),next_outputs[idx-start_idx].detach().cpu())
             # 释放内存
-            del input_sample, output_sample, output, next_output
+            del input_samples, output_samples, outputs, next_outputs,inp_tensor,out_tensor
             gc.collect()
-
+        torch.cuda.empty_cache()
         # # for idx in range(0, (len(self.data_list)+batch_size-1 )//batch_size):
         # for idx in tqdm(range(0, len(self.data_list)//batch_size),
         #                  total=len(self.data_list)//batch_size, desc="update_dataset"):

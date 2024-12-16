@@ -445,9 +445,9 @@ class GradualUniformAffineQuantizerV2(nn.Module):
         隐式要求x.shape[-1] % self.group_size == 0
         """
         # x_int = round_ste(x / scale)
-        x_int = self.round_method(x / scale)
         if zero_point is not None:
             x_int = x_int.add(zero_point)
+        x_int = self.round_method(x / scale)
         # 这个地方有三种写法
         # 1. x_int = x_int.clamp(self.qmin, self.qmax) 代表着范围意外的梯度截断
         # 2. x_int = clamp_ste(x_int, self.qmin, self.qmax) 代表着基本ste
@@ -459,9 +459,9 @@ class GradualUniformAffineQuantizerV2(nn.Module):
     
     def dequant_int(self, x_int, scale, zero_point):
         x_dequant = x_int
+        x_dequant = x_dequant.mul(scale)
         if zero_point is not None:
             x_dequant = x_dequant.sub(zero_point)
-        x_dequant = x_dequant.mul(scale)
         return x_dequant
     
     def fake_quant(self, x):

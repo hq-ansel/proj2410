@@ -378,8 +378,9 @@ class GradualUniformAffineQuantizerV2(nn.Module):
         self.quantization_position_ratio = quantization_position_ratio  # 量化比例
         self.interpolate = 1.0 if args.get("interpolate", False) else 0  # 插值比例 0 代表没有前权重 1代表全是前权重
 
+        self.is_tracking = args.get("iterative_freezing", False)
         self.weight_freeze_tracker = TrackOscillation(
-            momentum=args.get("freeze_momentum",0.01),
+            momentum=args.get("freeze_momentum",0.004),
             freeze_threshold=args.get("freeze_threshold",0.0),
             use_ema_x_int=True
             )

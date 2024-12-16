@@ -3,12 +3,12 @@
 # 定义配置文件列表
 # )
 config_files=(
-    EfficientQAT/yaml/qwen2.5-0.5b/hyperpara-study/qwen2.5-0.5b-b2gs128-batch1.yaml
-    # EfficientQAT/yaml/qwen2.5-0.5b/hyperpara-study/qwen2.5-0.5b-b2gs128-batch2.yaml
+    /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/qwen2.5-0.5b/gradual-study/qwen2.5-0.5b-b2gs128-gradual-quant-cli1-v2.yaml
+    /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/qwen2.5-0.5b/gradual-study/qwen2.5-0.5b-b2gs128-gradual-quant-cli1.yaml
 )
 # 循环遍历每个配置文件并执行 Python 命令
 # 设置并行参数，True 为并行，False 为串行
-PARALLEL=False
+PARALLEL=True
 
 # 循环遍历每个配置文件并执行 Python 命令
 for config_path in "${config_files[@]}"; do
@@ -29,7 +29,7 @@ for config_path in "${config_files[@]}"; do
             export CONFIG_PATH="$config_path"
             OUTPUT_DIR="/home/ubuntu/data/exp/proj2410/EfficientQAT/output/block_ap_log/Llama-2-7b-w4g128"
             export PYTHONPATH=$PYTHONPATH:/home/ubuntu/data/exp/proj2410/EfficientQAT
-            export AMP_ENABLED=True
+            # export AMP_ENABLED=True
             echo "Running with config: $CONFIG_PATH"
 
             # 执行 python 脚本
@@ -43,7 +43,6 @@ for config_path in "${config_files[@]}"; do
                 --real_quant \
                 --eval_ppl \
                 --epochs 2 \
-                --with_catcher \
                 --save_quant_dir $SAVE_PATH
 
             echo "Finished running with config: $CONFIG_PATH"

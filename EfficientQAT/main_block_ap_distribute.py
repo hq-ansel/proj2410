@@ -30,7 +30,7 @@ from .datautils_block import get_loaders, test_ppl
 from .quantize.int_linear_real import load_quantized_model
 from .quantize.block_ap import block_ap
 from .quantize.crossblockquant import cross_block_quantization
-from .quantize.greedy_trainer import greedy_local_train
+from .quantize.greedy_trainer_distribute import greedy_local_train
 
 
 
@@ -120,19 +120,37 @@ def update_config_with_args(config, args):
             config[key] = value
     if "cuda_ids" in config:
         os.environ["CUDA_VISIBLE_DEVICES"]=config.cuda_ids
+        config.cuda = [int(i) for i in config.cuda_ids.split(',')]
     return config
 
-def setup(rank, world_size):
-    dist.init_process_group("nccl")
+# 初始化分布式训练环境
+def init_process(rank: int, size: int, fn: callable, backend: str = 'nccl') -> None:
+    """
+    初始化分布式训练环境
 
-def cleanup():
+    :param rank: 当前进程的编号
+    :param size: 总进程数
+    :param fn: 训练函数
+    :param backend: 分布式后端，默认为 'nccl'
+    """
+    dist.init_process_group(backend, rank=rank, world_size=size)
+    fn(rank, size)
+
+
+# 清理分布式环境
+def cleanup() -> None:
+    """清理分布式训练环境"""
     dist.destroy_process_group()
-
 
 def main():
     import argparse
 
     parser = argparse.ArgumentParser()
+    # 分布式训练参数
+    parser.add_argument('--rank', type=int, help='Rank of the current process')
+    parser.add_argument('--world_size', type=int, help='Total number of processes')
+    parser.add_argument('--backend', type=str, default='nccl', help='Distributed backend')
+
     parser.add_argument("--config_path", type=str, help="path of config file")
     parser.add_argument("--model", type=str, help="model name of model path")
     parser.add_argument("--cache_dir", default="./cache", type=str, help="direction of cached dataset, leading to faster debug")
@@ -182,7 +200,9 @@ def main():
     random.seed(args.seed)
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
+    torch.cuda.manual_seed_all(args.seed)
     torch.cuda.manual_seed(args.seed)
+
 
         
     # init logger
@@ -243,15 +263,17 @@ def main():
                 valloader,
                 logger,
             )
-            cleanup()
             logger.info(time.time() - tick)
     torch.cuda.empty_cache()
-    if args.save_quant_dir:
-        logger.info("start saving model")
-        model.save_pretrained(args.save_quant_dir)  
-        tokenizer.save_pretrained(args.save_quant_dir) 
-        logger.info("save model success")
-    evaluate(model, tokenizer, args,logger)
+    rank = int(os.environ.get('RANK', 0))
+    if rank == 0:
+        if args.save_quant_dir:
+            logger.info("start saving model")
+            model.save_pretrained(args.save_quant_dir)  
+            tokenizer.save_pretrained(args.save_quant_dir) 
+            logger.info("save model success")
+        evaluate(model, tokenizer, args,logger)
+    cleanup()
 
 
 

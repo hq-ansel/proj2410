@@ -98,7 +98,7 @@ class LazyLoadDatasetV2(Dataset):
         with torch.no_grad():
             for inp,tar in dataloader:
                 try:
-                    model(inp.to(device))
+                    model(inp.squeeze(0).to(device))
                 except StopException:
                     pass
         tmp_dict["data_list"] = []

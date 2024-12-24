@@ -2,12 +2,15 @@
 wbits: 2
 group_size: 128
 # training settings
-cuda_ids: "0,1"
+cuda_ids: "2,3,4,5"
+rank: 4
+world_size: 4
 epochs: 5
+min_lr_factor: 1
 net: Qwen2.5-0.5B
-batch_size: 2
+batch_size: 8
 quant_lr: 0.0001
-weight_lr: 0.00005
+weight_lr: 0.0001
 off_load_to_disk: False
 loss_func: MSE # "MSE", "FKLD" , "RKLD", "FKLD_RKLD" ,"MSE_FKLD", "MSE_RKLD", "MSE_FKLD_RKLD"
 crossblock_window_size: 1

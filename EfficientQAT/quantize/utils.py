@@ -303,12 +303,17 @@ def trainable_parameters(model):
             params.append(m)
     return iter(params)  
 
-def trainable_parameters_num(model):
-    params = []
+def trainable_parameters_num(model:Union[List[nn.Module], nn.Module]):
     total = 0
-    for n, m in model.named_parameters():
-        if m.requires_grad:
-            total += m.numel()
+    if isinstance(model, list):
+        for layer in model:
+            for n, m in layer.named_parameters():
+                if m.requires_grad:
+                    total += m.numel()
+    else:
+        for n, m in model.named_parameters():
+            if m.requires_grad:
+                total += m.numel()
     return total
 
 def set_quant_state(model, weight_quant: bool = False):

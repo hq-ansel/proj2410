@@ -3,11 +3,11 @@
 # 定义配置文件列表
 # )
 config_files=(
-/home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/Llama2-7b/baseline/Llama2-7b-b2gs128.yaml
+   /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/Llama2-7b/gradual-study/Llama2-7b-b2gs128.yaml
 )
 # 循环遍历每个配置文件并执行 Python 命令
 # 设置并行参数，True 为并行，False 为串行
-PARALLEL=False
+PARALLEL=True
 
 # 循环遍历每个配置文件并执行 Python 命令
 for config_path in "${config_files[@]}"; do

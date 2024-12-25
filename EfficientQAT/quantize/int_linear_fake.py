@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from .quantizer import (UniformAffineQuantizer,GradualUniformAffineQuantizer,GradualUniformAffineQuantizerV2,
                         UniformAffineQuantizerV2)
-from . import quantizer,quantizerv2
+from . import quantizer,quantizerv2,quantizerv3
 
 
 
@@ -39,6 +39,10 @@ class QuantLinear(nn.Module):
             quantizer_pkg = quantizer
         elif quantizer_version == "v2":
             quantizer_pkg = quantizerv2
+        elif quantizer_version == "v3":
+            quantizer_pkg = quantizerv3
+        else:
+            raise ValueError("Invalid quantizer version: {}".format(quantizer_version))
         if args.get("gradual_quant", False):
             self.weight_quantizer = quantizer_pkg.GradualUniformAffineQuantizer(wbits,
                                                             group_size,
@@ -54,7 +58,14 @@ class QuantLinear(nn.Module):
             # self.weight_quantizer = UniformAffineQuantizerV2(wbits, group_size, weight=org_module.weight,args=args)
         self.use_temporary_parameter = False
         self.clamp_input = args.get('clamp_input',False)
+        self.post_init(args)
 
+    def post_init(self, args):
+        quantizer_version = args.get("quantizer_version","v1")
+        if quantizer_version == "v3":
+            with torch.no_grad():
+                updated_weight = self.weight_quantizer.post_init(self.weight)
+                self.weight.data.copy_(updated_weight)
     
     
     def forward(self, input: torch.Tensor):

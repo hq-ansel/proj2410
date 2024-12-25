@@ -214,15 +214,19 @@ def main():
         Path(args.save_quant_dir).mkdir(parents=True, exist_ok=True)
     output_dir = Path(args.output_dir)
     logger = utils.create_logger(output_dir)
-    logger.info(args)
+    rank = int(os.environ.get('RANK', 0))
+    if rank == 0:
+        logger.info(args)
     
     if args.net is None:
         args.net = args.model.split('/')[-1]
-        logger.info(f"net is None, setting as {args.net}")
+        if rank == 0:
+            logger.info(f"net is None, setting as {args.net}")
     if args.resume_quant:
         # directly load quantized model for evaluation
         model, tokenizer = load_quantized_model(args.resume_quant,args.wbits, args.group_size)
-        logger.info(f"memory footprint after loading quantized model: {torch.cuda.max_memory_allocated('cuda') / 1024**3:.2f}GiB")
+        if rank == 0:
+            logger.info(f"memory footprint after loading quantized model: {torch.cuda.max_memory_allocated('cuda') / 1024**3:.2f}GiB")
     else:
         # load fp quantized model
         config = AutoConfig.from_pretrained(args.model)
@@ -233,16 +237,19 @@ def main():
 
         # quantization
         if args.wbits < 16:
-            logger.info("=== start quantization ===")
+            if rank == 0:
+                logger.info("=== start quantization ===")
             tick = time.time()     
             # load calibration dataset
             cache_trainloader = f'{args.cache_dir}/dataloader_{args.net}_{args.calib_dataset}_{args.train_size}_{args.val_size}_{args.training_seqlen}_train.cache'
             cache_valloader = f'{args.cache_dir}/dataloader_{args.net}_{args.calib_dataset}_{args.train_size}_{args.val_size}_{args.training_seqlen}_val.cache'
             if os.path.exists(cache_trainloader) and os.path.exists(cache_valloader):
                 trainloader = torch.load(cache_trainloader)
-                logger.info(f"load trainloader from {cache_trainloader}")
+                if rank == 0:
+                    logger.info(f"load trainloader from {cache_trainloader}")
                 valloader = torch.load(cache_valloader)
-                logger.info(f"load valloader from {cache_valloader}")
+                if rank == 0:
+                    logger.info(f"load valloader from {cache_valloader}")
             else:
                 trainloader, valloader = get_loaders(
                     args.calib_dataset,
@@ -263,7 +270,8 @@ def main():
                 valloader,
                 logger,
             )
-            logger.info(time.time() - tick)
+            if rank == 0:
+                logger.info(time.time() - tick)
     torch.cuda.empty_cache()
     rank = int(os.environ.get('RANK', 0))
     if rank == 0:

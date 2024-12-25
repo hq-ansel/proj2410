@@ -14,17 +14,17 @@ weight_lr: 0.0001
 off_load_to_disk: False
 loss_func: MSE # "MSE", "FKLD" , "RKLD", "FKLD_RKLD" ,"MSE_FKLD", "MSE_RKLD", "MSE_FKLD_RKLD"
 crossblock_window_size: 1
-train_size:  4096
+train_size:  128
 slide_step: 1
 clip_grad: 9999
-dampen_loss: True
 
+quantizer_version: v3
 
 model: /home/ubuntu/data/exp/proj2410/model/Qwen2.5-0.5B
 # save settings
-output_dir: /home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-dampenloss/
-log_loss: /home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-dampenloss/loss.csv
-save_quant_dir: /home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-dampenloss/
+output_dir: /home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-v3/
+log_loss: /home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-v3/loss.csv
+save_quant_dir: /home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-v3/
 clamp_method: STE
 
 align_type: tail

@@ -389,7 +389,9 @@ def train_units_layers(model: PreTrainedModel,
             loss_mean = torch.stack(loss_list)[-(train_mean_num-1):].mean()
             val_loss_mean = torch.stack(val_loss_list).mean()
             norm_mean = torch.stack(norm_list).mean()
-            logger.info(f"blocks {trainable_layer_idx_list} epoch {epoch} recon_loss:{loss_mean} val_loss:{val_loss_mean} quant_lr:{quant_scheduler.get_lr()[0]} norm:{norm_mean:.8f} max memory_allocated {torch.cuda.max_memory_allocated(args.dev) / 1024**2} time {time.time()-start_time} ")
+            logger.info(f"blocks {trainable_layer_idx_list} epoch {epoch} recon_loss:{loss_mean} val_loss:{val_loss_mean} ")
+            logger.info(f"quant_lr:{quant_scheduler.get_lr()[0]} weight_lr:{weight_scheduler.get_lr()[0]} norm:{norm_mean:.8f}  ")
+            logger.info(f"max memory_allocated {torch.cuda.max_memory_allocated(args.dev) / 1024**2} time {time.time()-start_time} ")
             if val_loss_mean < best_val_loss:
                 best_val_loss = val_loss_mean
             else:
@@ -803,12 +805,12 @@ def custom_shedule_train(model:PreTrainedModel,
                 for name, module in named_linears.items():
                     scales = module.weight_quantizer.scale.clamp(1e-4,1e4).detach()
                     quantizer_version = args.get("quantizer_version","v1")
-                    if quantizer_version == "v1":
+                    if quantizer_version == "v1" or quantizer_version == "v3":
                         zeros = module.weight_quantizer.zero_point.detach().cuda().round().cpu()
                     elif quantizer_version == "v2":
                         zeros = module.weight_quantizer.zero_point.detach().cpu()
                     group_size = module.weight_quantizer.group_size
-                    print(f"pack quantized {name} with group_size {group_size} and scales {scales} and zeros {zeros}")
+                    # print(f"pack quantized {name} with group_size {group_size} and scales {scales} and zeros {zeros}")
                     dim0 = module.weight.shape[0]
                     scales = scales.view(dim0,-1).transpose(0,1).contiguous()
                     zeros = zeros.view(dim0,-1).transpose(0,1).contiguous()
@@ -821,6 +823,13 @@ def custom_shedule_train(model:PreTrainedModel,
                                                     clamp_input= args.get("clamp_input",False))
                     elif quantizer_version == "v2":
                         q_linear = int_linear_real.QuantLinearV2(args.wbits,
+                                                    group_size,
+                                                    module.in_features,
+                                                    module.out_features,
+                                                    not module.bias is None,
+                                                    clamp_input= args.get("clamp_input",False))
+                    elif quantizer_version == "v3":
+                        q_linear = int_linear_real.QuantLinearV3(args.wbits,
                                                     group_size,
                                                     module.in_features,
                                                     module.out_features,

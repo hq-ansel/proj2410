@@ -24,8 +24,6 @@ from .quantize.awq_pipeline import *
 
 amp_enabled = os.environ.get("AMP_ENABLED", "False").lower() == "true"
 
-torch.backends.cudnn.benchmark = False
-torch.backends.cudnn.deterministic = True
 
 @torch.no_grad()
 def evaluate(model, tokenizer, args, logger=None):
@@ -137,7 +135,7 @@ def main():
     parser.add_argument("--batch_size", type=int, default=2, help="batch size.")
     parser.add_argument("--epochs", type=int, default=2)
     parser.add_argument("--ppl_seqlen", type=int, default=2048, help="input sequence length for evaluating perplexity")
-    parser.add_argument("--seed", type=int, default=2, help="Seed for sampling the calibration data.")
+    parser.add_argument("--seed", type=int, default=42, help="Seed for sampling the calibration data.")
     parser.add_argument("--eval_ppl", action="store_true",help="evaluate perplexity on wikitext2 and c4")
     parser.add_argument("--eval_tasks", type=str,default="", help="exampe:piqa,arc_easy,arc_challenge,hellaswag,winogrande")
     parser.add_argument("--eval_batch_size", type=int, default=16)
@@ -172,8 +170,12 @@ def main():
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
     torch.cuda.manual_seed_all(args.seed)
-    torch.cuda.manual_seed(args.seed)
-
+    # torch.cuda.manual_seed(args.seed)
+    os.environ['PYTHONHASHSEED'] = str(args.seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    torch.backends.cudnn.enabled = True
+    # torch.use_deterministic_algorithms(True)
         
     # init logger
     if args.output_dir:

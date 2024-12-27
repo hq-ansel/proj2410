@@ -267,13 +267,13 @@ def train_units_layers(model: PreTrainedModel,
             norm_list = []
             start_time = time.time()
             # used for debug
-            torch.autograd.set_detect_anomaly(True)
+            # torch.autograd.set_detect_anomaly(True)
             dataloader = DataLoader(train_dataset,
                                     batch_size=args.batch_size,
-                                    num_workers=8,
+                                    num_workers=0,
                                     pin_memory=True,
-                                    prefetch_factor=16,  
-                                    shuffle=True
+                                    # prefetch_factor=32,  
+                                    shuffle=False
                                     )
             # step 6.4: training                   
             for index, input_data in enumerate(dataloader):
@@ -353,9 +353,9 @@ def train_units_layers(model: PreTrainedModel,
             val_loss_list = []
             dataloader = DataLoader(val_dataset,
                                     batch_size=args.batch_size,
-                                    num_workers=8,
+                                    num_workers=0,
                                     pin_memory=True,
-                                    prefetch_factor=4,  
+                                    # prefetch_factor=32,  
                                     shuffle=False
                                     )
             # if not args.loss_func == "KL-Divergence":
@@ -556,10 +556,10 @@ def train_units_layers_with_catcher(model: PreTrainedModel,
             # torch.autograd.set_detect_anomaly(True)
             dataloader = DataLoader(train_dataset,
                                     batch_size=args.batch_size,
-                                    num_workers=8,
+                                    num_workers=0,
                                     pin_memory=True,
-                                    prefetch_factor=16,  
-                                    shuffle=True
+                                    # prefetch_factor=32,  
+                                    shuffle=False
                                     )
             # step 6.4: training                   
             for index, input_data in enumerate(dataloader):
@@ -642,9 +642,9 @@ def train_units_layers_with_catcher(model: PreTrainedModel,
             val_loss_list = []
             dataloader = DataLoader(val_dataset,
                                     batch_size=args.batch_size,
-                                    num_workers=8,
+                                    num_workers=0,
                                     pin_memory=True,
-                                    prefetch_factor=4,  
+                                    # prefetch_factor=32,  
                                     shuffle=False
                                     )
             # if not args.loss_func == "KL-Divergence":
@@ -796,49 +796,55 @@ def custom_shedule_train(model:PreTrainedModel,
                         args=args)
             selected_layers= nn.ModuleList([model.model.layers[i] for i in train_layer_window])
         quant_inplace(selected_layers)
-        for layer_idx in train_layer_window:
-            qlayer = model.model.layers[layer_idx]
-            set_quant_state(qlayer,False)
-            # step 7: pack quantized weights into low-bits format, note that this process is slow on poor CPU or busy CPU
-            if args.real_quant:
-                named_linears = get_named_linears(qlayer, int_linear_fake.QuantLinear)
-                for name, module in named_linears.items():
-                    scales = module.weight_quantizer.scale.clamp(1e-4,1e4).detach()
-                    quantizer_version = args.get("quantizer_version","v1")
-                    if quantizer_version == "v1" or quantizer_version == "v3":
-                        zeros = module.weight_quantizer.zero_point.detach().cuda().round().cpu()
-                    elif quantizer_version == "v2":
-                        zeros = module.weight_quantizer.zero_point.detach().cpu()
-                    group_size = module.weight_quantizer.group_size
-                    # print(f"pack quantized {name} with group_size {group_size} and scales {scales} and zeros {zeros}")
-                    dim0 = module.weight.shape[0]
-                    scales = scales.view(dim0,-1).transpose(0,1).contiguous()
-                    zeros = zeros.view(dim0,-1).transpose(0,1).contiguous()
-                    if quantizer_version == "v1":
-                        q_linear = int_linear_real.QuantLinear(args.wbits,
-                                                    group_size,
-                                                    module.in_features,
-                                                    module.out_features,
-                                                    not module.bias is None,
-                                                    clamp_input= args.get("clamp_input",False))
-                    elif quantizer_version == "v2":
-                        q_linear = int_linear_real.QuantLinearV2(args.wbits,
-                                                    group_size,
-                                                    module.in_features,
-                                                    module.out_features,
-                                                    not module.bias is None,
-                                                    clamp_input= args.get("clamp_input",False))
-                    elif quantizer_version == "v3":
-                        q_linear = int_linear_real.QuantLinearV3(args.wbits,
-                                                    group_size,
-                                                    module.in_features,
-                                                    module.out_features,
-                                                    not module.bias is None,
-                                                    clamp_input= args.get("clamp_input",False))
-                    q_linear.pack(module.cpu(),  scales.float().cpu(), zeros.float().cpu())
-                    set_op_by_name(qlayer, name, q_linear)       
-                    logger.info(f"pack quantized {name} finished")
-                    del module
+        print(f"q_proj",selected_layers[0].self_attn.q_proj.weight)
+        print(f"q_proj scale",selected_layers[0].self_attn.q_proj.weight_quantizer.scale)
+
+        with torch.no_grad():
+            for layer_idx in train_layer_window:
+                qlayer = model.model.layers[layer_idx]
+                set_quant_state(qlayer,False)
+                # step 7: pack quantized weights into low-bits format, note that this process is slow on poor CPU or busy CPU
+                if args.real_quant:
+                    named_linears = get_named_linears(qlayer, int_linear_fake.QuantLinear)
+                    for name, module in named_linears.items():
+                        scales = module.weight_quantizer.scale.clamp(1e-4,1e4).detach()
+                        quantizer_version = args.get("quantizer_version","v1")
+                        if quantizer_version == "v1":
+                            zeros = module.weight_quantizer.zero_point.detach().cuda().round().cpu()
+                        elif quantizer_version == "v2" or quantizer_version == "v3":
+                            zeros = module.weight_quantizer.zero_point.detach().cpu()
+                        group_size = module.weight_quantizer.group_size
+                        # print(f"pack quantized {name} with group_size {group_size} and scales {scales} and zeros {zeros}")
+                        print(f"pack quantized {name} with group_size {group_size} and scales max {scales.max()} zeros max {zeros.max()}")
+                        dim0 = module.weight.shape[0]
+                        scales = scales.view(dim0,-1).transpose(0,1).contiguous()
+                        zeros = zeros.view(dim0,-1).transpose(0,1).contiguous()
+                        if quantizer_version == "v1":
+                            q_linear = int_linear_real.QuantLinear(args.wbits,
+                                                        group_size,
+                                                        module.in_features,
+                                                        module.out_features,
+                                                        not module.bias is None,
+                                                        clamp_input= args.get("clamp_input",False))
+                        elif quantizer_version == "v2":
+                            q_linear = int_linear_real.QuantLinearV2(args.wbits,
+                                                        group_size,
+                                                        module.in_features,
+                                                        module.out_features,
+                                                        not module.bias is None,
+                                                        clamp_input= args.get("clamp_input",False))
+                        elif quantizer_version == "v3":
+                            q_linear = int_linear_real.QuantLinearV3(args.wbits,
+                                                        group_size,
+                                                        module.in_features,
+                                                        module.out_features,
+                                                        not module.bias is None,
+                                                        clamp_input= args.get("clamp_input",False))
+                        q_linear.pack(module.cpu(),  scales.cpu().half().float(), zeros.cpu())
+                        set_op_by_name(qlayer, name, q_linear)       
+                        logger.info(f"pack quantized {name} finished")
+                        # import pdb;pdb.set_trace()
+                        del module
             torch.cuda.empty_cache()
             gc.collect()
         if amp_enabled:

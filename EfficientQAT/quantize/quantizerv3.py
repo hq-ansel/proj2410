@@ -77,7 +77,6 @@ def clamp_mad(x: torch.Tensor, min_val, max_val):
 
 class UniformAffineQuantizer(nn.Module):
     """
-    在动力学层面切断w与s的交互
     """
     def __init__(
         self,
@@ -108,9 +107,9 @@ class UniformAffineQuantizer(nn.Module):
                     scale = scale.clamp(min=1e-4, max=1e4)
                 elif self.clamp_method == "MAD":
                     scale = clamp_mad(scale, 1e-4, 1e4)
-                zero_point = -(xmin/scale).clamp(min=-1e4, max=1e4) 
+                zero_point = -(xmin).clamp(min=-1e4, max=1e4) 
                 self.scale = nn.Parameter(scale)
-                self.zero_point = nn.Parameter(zero_point.round())
+                self.zero_point = nn.Parameter(zero_point)
             
 
     def change_n_bits(self, n_bits):
@@ -119,34 +118,53 @@ class UniformAffineQuantizer(nn.Module):
         self.qmax = int(2 ** (n_bits) - 1)
 
     def post_init(self, weight):
-        ori_shape = weight.shape
-        with torch.no_grad():
-            weight = weight.reshape(-1,self.group_size)
-            scale = clamp_ste(self.scale,1e-4, 1e4)
-            zero_point = clamp_ste(self.zero_point, -1e4, 1e4)
-            weight = ((weight/scale)+zero_point).reshape(ori_shape)
+        # ori_shape = weight.shape
+        # with torch.no_grad():
+        #     weight = weight.reshape(-1,self.group_size)
+        #     scale = clamp_ste(self.scale,1e-4, 1e4)
+        #     zero_point = clamp_ste(self.zero_point, -1e4, 1e4)
+        #     weight = ((weight/scale)+zero_point).reshape(ori_shape)
         return weight
             
-
-    def fake_quant(self, x):
-        """
-        初始化的时候应该就使得W-> W/S + Z，
-        所以fake quant就转换为
-        x_int = round_ste(x')
-        x_dequant = [(x_int)_clamp -z]* s 
-        """
-        
+    def get_int_weight(self, x):
         if self.clamp_method == "STE":
             scale = clamp_ste(self.scale,1e-4, 1e4)
-            round_zero_point = clamp_ste(round_ste(self.zero_point), self.qmin, self.qmax)
+            round_zero_point = clamp_ste(round_ste(self.zero_point/scale), self.qmin, self.qmax)
         elif self.clamp_method == "MAD":
             scale = clamp_mad(self.scale, 1e-4, 1e4)
-            round_zero_point = clamp_mad(round_ste(self.zero_point), self.qmin, self.qmax)
+            round_zero_point = clamp_mad(round_ste(self.zero_point/scale), self.qmin, self.qmax)
 
         dim1, dim2 = x.shape
         x = x.reshape(-1, self.group_size)
-        x_int = round_ste(x)
+        x_int = round_ste(x / scale)
+        if round_zero_point is not None:
+            x_int = x_int.add(round_zero_point)
+        x_int = x_int.clamp(self.qmin, self.qmax)
+        return x_int.reshape(dim1, dim2)
+
+    def get_zero_point(self):
+        scale = clamp_ste(self.scale,1e-4, 1e4)
+        return clamp_ste(round_ste(self.zero_point/scale), self.qmin, self.qmax)
+
+    def fake_quant(self, x):
+        """
+        设置为LSQ
+        \bar{x} = round(\frac{x+zero_point}{scale} )
+        \hat{x} = \bar{x} * scale - zero_point
+        """
         
+        if self.clamp_method == "STE":
+            scale = clamp_ste(self.scale,1e-4, 1e4).half().float()
+            round_zero_point = clamp_ste(round_ste(self.zero_point/scale), self.qmin, self.qmax)
+        elif self.clamp_method == "MAD":
+            scale = clamp_mad(self.scale, 1e-4, 1e4)
+            round_zero_point = clamp_mad(round_ste(self.zero_point/scale), self.qmin, self.qmax)
+
+        dim1, dim2 = x.shape
+        x = x.reshape(-1, self.group_size)
+        x_int = round_ste(x / scale)
+        if round_zero_point is not None:
+            x_int = x_int.add(round_zero_point)
         x_int = x_int.clamp(self.qmin, self.qmax)
         x_dequant = x_int
         if round_zero_point is not None:

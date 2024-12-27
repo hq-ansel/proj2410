@@ -103,7 +103,7 @@ class QuantLinear(nn.Module, TritonModuleMixin):
     def pack(self, linear, scales, zeros, g_idx=None):
         """
         Args:
-            linear: nn.Linear 
+            linear: nn.Linear allready quantized and dequantized
             scales: scales tensor of shape (infeatures//group_size, outfeatures)
             zeros: zeros tensor of shape (infeatures//group_size, outfeatures)
         """
@@ -116,9 +116,9 @@ class QuantLinear(nn.Module, TritonModuleMixin):
         g_idx = torch.tensor([i // self.group_size for i in range(self.infeatures)], dtype=torch.int32)
 
         scale_zeros = zeros * scales
-        self.scales = nn.Parameter(scales.half())
+        self.scales = nn.Parameter(scales)
         if linear.bias is not None:
-            self.bias = linear.bias.clone().half()
+            self.bias = linear.bias.clone()
 
         intweight = []
         for idx in range(self.infeatures):
@@ -167,6 +167,16 @@ class QuantLinear(nn.Module, TritonModuleMixin):
         qzeros = qzeros.astype(np.int32)
         self.qzeros = torch.from_numpy(qzeros)
 
+        self.scales.data = self.scales.data.half()
+        if self.bias is not None:
+            self.bias.data = self.bias.data.half()
+
+    def _dequant_dim0(self):
+        return dequant_dim0(self.qweight, self.bits, self.maxq, self.infeatures, self.outfeatures)
+
+    def _dequant_dim1(self):
+        return dequant_dim1(self.qzeros, self.bits, self.maxq, self.zeros_dim0, self.zeros_dim1)
+
     def forward(self, x):
         if self.use_fake:
             weight = self.weight
@@ -182,6 +192,7 @@ class QuantLinear(nn.Module, TritonModuleMixin):
         # torch.cuda.synchronize()
         # if self.clamp_input:
         #     x = torch.clamp(x, -128, 127)
+        # import pdb; pdb.set_trace()
         out = torch.matmul(x, weight.to(x.dtype))
         # torch.cuda.synchronize()
 
@@ -404,27 +415,33 @@ class QuantLinearV3(QuantLinear):
             zeros: zeros tensor of shape (infeatures//group_size, outfeatures)
         """
         W = linear.weight.data.clone()
+        # (out,in)
         if isinstance(linear, nn.Conv2d):
             W = W.flatten(1)
         if isinstance(linear, transformers.pytorch_utils.Conv1D):
             W = W.t()
     
         g_idx = torch.tensor([i // self.group_size for i in range(self.infeatures)], dtype=torch.int32)
-
-        scale_zeros = zeros * scales
-        self.scales = nn.Parameter(scales.half())
+        # (in) -> (i//group_size)
+        # (in//group_size, out) 
+        self.scales = nn.Parameter(scales)
         if linear.bias is not None:
-            self.bias = linear.bias.clone().half()
+            self.bias = linear.bias.clone()
 
+        round_zero_point = torch.clamp((zeros/self.scales).round(),0,self.maxq)
         intweight = []
         for idx in range(self.infeatures):
             intweight.append(
-                torch.round(
-                    W[:, idx]
+                torch.clamp(torch.round(
+                    (W[:, idx]) / self.scales[g_idx[idx]]
+                )+round_zero_point[g_idx[idx]]
+                ,0,self.maxq
                 ).to(torch.int)[:, None]
             )
         intweight = torch.cat(intweight, dim=1)
         intweight = intweight.t().contiguous()
+        # debug
+        # self.intweight = intweight
         intweight = intweight.numpy().astype(np.uint32)
 
         i = 0
@@ -441,13 +458,14 @@ class QuantLinearV3(QuantLinear):
             else:
                 raise NotImplementedError("Only 2,3,4,8 bits are supported.")
 
-        qweight = qweight.astype(np.int32)
+        qweight = qweight.astype(np.uint32)
         self.qweight = torch.from_numpy(qweight)
 
-        zeros = zeros.numpy().astype(np.uint32)
         self.zeros_dim0, self.zeros_dim1 = zeros.shape
         # qzeros (infeatures//group_size, outfeatures//(32//bits))
         qzeros = np.zeros((zeros.shape[0], math.ceil(zeros.shape[1] / (32 // self.bits))), dtype=np.uint32)
+        zeros = round_zero_point.numpy().astype(np.uint32)
+        # self.zeors = zeros
         i = 0
         col = 0
         while col < qzeros.shape[1]:
@@ -459,9 +477,42 @@ class QuantLinearV3(QuantLinear):
             else:
                 raise NotImplementedError("Only 2,3,4,8 bits are supported.")
                 
-        qzeros = qzeros.astype(np.int32)
+        qzeros = qzeros.astype(np.uint32)
         self.qzeros = torch.from_numpy(qzeros)
+        # 转换为half
+        self.scales.data = self.scales.half()
+        if linear.bias is not None:
+            self.bias = linear.bias.clone().half()
+    def _dequant_dim0(self):
+        return dequant_dim0(self.qweight, self.bits, self.maxq, self.infeatures, self.outfeatures)
 
+    def _dequant_dim1(self):
+        return dequant_dim1(self.qzeros, self.bits, self.maxq, self.zeros_dim0, self.zeros_dim1)
+    
+    def forward(self, x):
+        if self.use_fake:
+            weight = self.weight
+            if self.fake_transpose:
+                weight = weight.transpose(0,1)
+        else:
+            weight = dequant_dim0(self.qweight, self.bits, self.maxq, self.infeatures, self.outfeatures)
+            dim0, dim1 = weight.shape
+            # dim2 = (dim1*dim0)//self.group_size
+            zeros = dequant_dim1(self.qzeros, self.bits, self.maxq, self.zeros_dim0, self.zeros_dim1)
+            weight = ((weight.view(-1, self.group_size, dim1) - zeros.view(-1, 1, dim1))
+                       * self.scales.view(-1, 1, dim1)).reshape(dim0, dim1)
+            # import pdb;pdb.set_trace()
+        # out = torch.matmul(x, weight)
+        # torch.cuda.synchronize()
+        # if self.clamp_input:
+        #     x = torch.clamp(x, -128, 127)
+        out = torch.matmul(x, weight.to(x.dtype))
+        # torch.cuda.synchronize()
+
+        # out = out + self.bias.to(x.dtype) if self.bias is not None else out
+        if self.bias is not None:
+            out = out + self.bias.to(out.device, dtype=out.dtype)
+        return out
 
 def load_quantized_model(model_path, wbits, group_size):
     print(f"Loading quantized model from {model_path}")

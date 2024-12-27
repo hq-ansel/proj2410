@@ -123,7 +123,7 @@ class UniformAffineQuantizer(nn.Module):
     def fake_quant(self, x):
         
         if self.clamp_method == "STE":
-            scale = clamp_ste(self.scale,1e-4, 1e4)
+            scale = clamp_ste(self.scale,1e-4, 1e4).half().float()
             round_zero_point = clamp_ste(round_ste(self.zero_point), self.qmin, self.qmax)
         elif self.clamp_method == "MAD":
             scale = clamp_mad(self.scale, 1e-4, 1e4)
@@ -136,7 +136,8 @@ class UniformAffineQuantizer(nn.Module):
             x_int = x_int.add(round_zero_point)
         x_int = x_int.clamp(self.qmin, self.qmax)
         # freezing weights
-        x_int = self.weight_freeze_tracker(x_int,skip_tracking=False)
+        if self.is_tracking:
+            x_int = self.weight_freeze_tracker(x_int,skip_tracking=False)
         x_dequant = x_int
         if round_zero_point is not None:
             x_dequant = x_dequant.sub(round_zero_point)
@@ -255,7 +256,7 @@ class UniformAffineQuantizerV3(nn.Module):
                     scale = scale.clamp(min=1e-4, max=1e4)
                 elif self.clamp_method == "MAD":
                     scale = clamp_mad(scale, 1e-4, 1e4)
-                zero_point = -(xmin/scale).clamp(min=-1e4, max=1e4) 
+                zero_point = -(xmin).clamp(min=-1e4, max=1e4) 
                 self.scale = nn.Parameter(scale)
                 self.zero_point = nn.Parameter(zero_point.round())
             
@@ -275,14 +276,14 @@ class UniformAffineQuantizerV3(nn.Module):
         
         if self.clamp_method == "STE":
             scale = clamp_ste(self.scale,1e-4, 1e4)
-            round_zero_point = clamp_ste(round_ste(self.zero_point), self.qmin, self.qmax)
+            round_zero_point = clamp_ste(round_ste(self.zero_point)/scale, self.qmin, self.qmax)
         elif self.clamp_method == "MAD":
             scale = clamp_mad(self.scale, 1e-4, 1e4)
-            round_zero_point = clamp_mad(round_ste(self.zero_point), self.qmin, self.qmax)
+            round_zero_point = clamp_mad(round_ste(self.zero_point)/scale, self.qmin, self.qmax)
 
         dim1, dim2 = x.shape
         x = x.reshape(-1, self.group_size)
-        x_int = round_ste(x)
+        x_int = round_ste(x / scale)
         if round_zero_point is not None:
             x_int = x_int.add(round_zero_point)
         x_int = x_int.clamp(self.qmin, self.qmax)
@@ -567,7 +568,8 @@ class GradualUniformAffineQuantizerV2(nn.Module):
         x_dequant = x_int
 
         # freezing weights
-        x_int = self.weight_freeze_tracker(x_int,skip_tracking=False)
+        if self.is_tracking:
+            x_int = self.weight_freeze_tracker(x_int,skip_tracking=False)
         x_dequant = self.dequant_int(x_int, scale[:quantized_groups], round_zero_point[:quantized_groups])
 
         # 返回量化后的新张量

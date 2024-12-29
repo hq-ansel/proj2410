@@ -137,8 +137,6 @@ def train_units_layers(model: PreTrainedModel,
                         loss_recorder,
                         logger,
                         args):
-    # 解冻当前层，并冻结其它层
-    # model.to(args.dev)
     total_training_iteration = args.epochs * args.train_size / args.batch_size
     layer_idx_set = set(trainable_layer_idx_list)
     step = 0
@@ -158,54 +156,39 @@ def train_units_layers(model: PreTrainedModel,
     selected_layers = [qlayers[i] for i in trainable_layer_idx_list]
     selected_layers = nn.ModuleList(selected_layers)
 
-    # 暂时没有更好的假设，直接使用selected_layers 中的最后一个层作为对齐层
-    align_index = trainable_layer_idx_list[-1]
-    last_block_idx = len(model.model.layers) - 1
-    if args.loss_func == "KL-Divergence":
-        qlayer_idxs = []
-        fp_layer_idxs = []
-    else:
-        qlayer_idxs = [align_index,last_block_idx]
-        fp_layer_idxs = [align_index,last_block_idx]
-
-        for name, param in model.named_parameters():
-            param.requires_grad = False
-        for layer_idx in trainable_layer_idx_list:
-            qlayer = model.model.layers[layer_idx]
-            set_quant_state(qlayer,True)
-            if args.quant_lr > 0:
-                set_quant_parameters(qlayer,True)
-                param_groups.append({"params":quant_parameters(qlayer),
-                                    "lr":args.quant_lr})
-                empty_optimizer_1 = torch.optim.AdamW([torch.tensor(0)],
-                                                    lr=args.quant_lr)
-                quant_scheduler = CosineAnnealingLR(empty_optimizer_1,
+    for name, param in model.named_parameters():
+        param.requires_grad = False
+    for layer_idx in trainable_layer_idx_list:
+        qlayer = model.model.layers[layer_idx]
+        set_quant_state(qlayer,True)
+        if args.quant_lr > 0:
+            set_quant_parameters(qlayer,True)
+            param_groups.append({"params":quant_parameters(qlayer),
+                                "lr":args.quant_lr})
+            empty_optimizer_1 = torch.optim.AdamW([torch.tensor(0)],
+                                                lr=args.quant_lr)
+            quant_scheduler = CosineAnnealingLR(empty_optimizer_1,
+                                        T_max=total_training_iteration,
+                                        eta_min=args.quant_lr/args.min_lr_factor)
+            quant_index = param_group_index
+            param_group_index += 1
+        else:
+            set_quant_parameters(qlayer,False)
+            
+        if args.weight_lr > 0:
+            set_weight_parameters(qlayer,True)
+            param_groups.append({"params":weight_parameters(qlayer),
+                                "lr":args.weight_lr})
+            empty_optimizer_2 = torch.optim.AdamW([torch.tensor(0)],
+                                                lr=args.weight_lr)
+            weight_scheduler = CosineAnnealingLR(empty_optimizer_2,
                                             T_max=total_training_iteration,
-                                            eta_min=args.quant_lr/args.min_lr_factor)
-                quant_index = param_group_index
-                param_group_index += 1
-            else:
-                set_quant_parameters(qlayer,False)
-                
-            if args.weight_lr > 0:
-                set_weight_parameters(qlayer,True)
-                param_groups.append({"params":weight_parameters(qlayer),
-                                    "lr":args.weight_lr})
-                empty_optimizer_2 = torch.optim.AdamW([torch.tensor(0)],
-                                                    lr=args.weight_lr)
-                weight_scheduler = CosineAnnealingLR(empty_optimizer_2,
-                                                T_max=total_training_iteration,
-                                                eta_min=args.weight_lr/args.min_lr_factor)
-                weight_index = param_group_index
-                param_group_index += 1
-            else:
-                set_weight_parameters(qlayer,False)
+                                            eta_min=args.weight_lr/args.min_lr_factor)
+            weight_index = param_group_index
+            param_group_index += 1
+        else:
+            set_weight_parameters(qlayer,False)
         
-        if args.loss_func == "AFFINE_MSE":
-            print("using AFFINE_MSE loss function")
-            loss_func.reinitialize_A()
-            loss_func = loss_func.to(args.dev)
-            param_groups.append({"params":loss_func.parameters(),"lr":args.weight_lr})
         optimizer =torch.optim.AdamW(param_groups,
                                     weight_decay=args.wd,
                                     foreach=True)
@@ -213,13 +196,9 @@ def train_units_layers(model: PreTrainedModel,
         loss_scaler= torch.amp.GradScaler(device=args.dev)
         trainable_number = trainable_parameters_num(selected_layers)
         print(f"trainable parameter number: {trainable_number/1e6}M")
-        # 参数内存（float32），每个参数 4 字节
-        # 混合精度 AMP 梯度内存 (bfloat16)，每个参数 2 字节
-        # AdamW 动量状态内存（float32），每个状态 4 字节，共两个状态 (m, v)
-        print(f"estimated memory usage: {trainable_number*(4+2+2*4)/(1024**3)}G")
-        print(f"estimated data usage: {args.batch_size*args.training_seqlen*model.config.hidden_size*4/(1024**3)}G")
         best_val_loss = 1e6
         early_stop_flag = 0
+
         if args.get("gradual_quant",False) or args.get("interpolate",False):
             class GradualWarmupScheduler:
                 def __init__(self,
@@ -271,7 +250,7 @@ def train_units_layers(model: PreTrainedModel,
             dataloader = DataLoader(train_dataset,
                                     batch_size=args.batch_size,
                                     num_workers=0,
-                                    pin_memory=True,
+                                    # pin_memory=True,
                                     # prefetch_factor=32,  
                                     shuffle=False
                                     )
@@ -291,14 +270,15 @@ def train_units_layers(model: PreTrainedModel,
                             position_embeddings=position_embeddings
                         )
                         hidden_state = layer_outputs[0]
-                    if index == 0:
+                    loss = loss_func(hidden_state, target.to(args.dev,dtype=torch.float32))
+                    if index == 32:
                         tmp = {
                             "hidden_state":inp,
-                            "attention_mask":attention_mask,
-                            "position_embeddings":position_embeddings,
+                            # "attention_mask":attention_mask,
+                            # "position_embeddings":position_embeddings,
                         }
                         print(f"layers {trainable_layer_idx_list} input_data {tmp} output {hidden_state} target {target} ")
-                    loss = loss_func(hidden_state, target.to(args.dev,dtype=torch.float32))
+                    print(f"index {index} loss {loss}")
                     
                     if args.get("dampen_loss",False):
                         dampen_loss = torch.zeros_like(loss).to(loss.device)
@@ -378,11 +358,6 @@ def train_units_layers(model: PreTrainedModel,
                             hidden_state = layer_outputs[0]
                         loss = loss_func(hidden_state, target.to(args.dev,dtype=torch.float32))
                 val_loss_list.append(loss.cpu())
-
-                # if not args.loss_func == "KL-Divergence":
-                #     final_val_list.append(final_loss.cpu())
-            if not args.loss_func and  args.align_type == "tail":
-                qlayers[align_index].set_forward_state(stop_forward=True)
 
             train_mean_num = min(len(loss_list),64) 
             # calculate the average training loss of last train_mean_num samples
@@ -744,12 +719,7 @@ def custom_shedule_train(model:PreTrainedModel,
     
     logger.info(f"use loss func {args.loss_func} ")
 
-    if args.loss_func == "KL-Divergence":
-        loss_func = None
-    elif args.loss_func == "AFFINE_MSE":
-        loss_func = get_loss_func(args.loss_func)(model.config.hidden_size)
-    else:
-        loss_func = get_loss_func(args.loss_func)
+    loss_func = get_loss_func(args.loss_func)
     loss_recorder = utils.BlockLossRecorder(file_path=args.log_loss,)
     
     for train_layer_window in shedule_list:
@@ -925,10 +895,6 @@ def greedy_local_train(
 
     # step 2: init dataset 改回原来的模式，存入当前层的输入
     # 首先准备需要位置编码和embedding的部分
-    cache_dir = os.path.join(args.cache_dir, args.net)
-    cache_dir = os.path.join(cache_dir, f"{args.calib_dataset}_{args.train_size}_{args.val_size}_{args.training_seqlen}")
-    print(f"try to load traindata from cache {cache_dir}")
-    train_dataset_path = os.path.join(cache_dir, "train_dataset.pt")
 
     model = model.cpu()
     if not args.with_catcher:

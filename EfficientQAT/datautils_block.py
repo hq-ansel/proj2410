@@ -191,8 +191,9 @@ class LazyLoadDatasetV2(Dataset):
                                     position_embeddings=position_embeddings)[0]
             # 更新数据
             for idx in range(start_idx,end_idx):
-                  self.data_list[idx] = (outputs[idx-start_idx].detach().cpu(),next_outputs[idx-start_idx].detach().cpu())
+                self.data_list[idx] = (outputs[idx-start_idx].cpu(),next_outputs[idx-start_idx].cpu())
             # 释放内存
+            torch.cuda.synchronize()
             del input_samples, output_samples, outputs, next_outputs,inp_tensor,out_tensor
             gc.collect()
         torch.cuda.empty_cache()

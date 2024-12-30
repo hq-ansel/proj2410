@@ -75,9 +75,9 @@ class QuantLinear(nn.Module):
         else:
             weight = self.weight
             bias = self.bias
+        # weight = self.weight
+        # bias = self.bias
 
-        if self.clamp_input:
-            input = torch.clamp(input,-128,127)
         out = self.fwd_func(input, weight, bias, **self.fwd_kwargs)
 
 

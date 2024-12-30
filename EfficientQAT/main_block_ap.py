@@ -169,12 +169,12 @@ def main():
     random.seed(args.seed)
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
+    torch.cuda.manual_seed(args.seed)
     torch.cuda.manual_seed_all(args.seed)
-    # torch.cuda.manual_seed(args.seed)
     os.environ['PYTHONHASHSEED'] = str(args.seed)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
-    torch.backends.cudnn.enabled = True
+    # torch.backends.cudnn.enabled = True
     # torch.use_deterministic_algorithms(True)
         
     # init logger
@@ -201,6 +201,7 @@ def main():
         config = AutoConfig.from_pretrained(args.model)
         tokenizer = AutoTokenizer.from_pretrained(args.model, use_fast=False,legacy=False)
         model = AutoModelForCausalLM.from_pretrained(args.model,
+                                        attn_implementation="eager",
                                         config=config,
                                         device_map='cpu',
                                         torch_dtype=torch.float16 if amp_enabled else torch.float32)

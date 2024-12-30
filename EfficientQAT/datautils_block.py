@@ -7,6 +7,8 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 import shutil
 from concurrent.futures import ThreadPoolExecutor
 import gc
+import pdb
+
 
 import asyncio
 import torch
@@ -71,6 +73,7 @@ class LazyLoadDatasetV2(Dataset):
             def forward(self, hidden_states: torch.Tensor, 
                         **kwargs):
                 output = self.module(hidden_states, **kwargs)
+                # pdb.set_trace()
                 if self.store_input:
                     self.inp_data_list.append(hidden_states.squeeze(0).detach().cpu())
                 if self.store_output:

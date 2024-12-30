@@ -192,6 +192,15 @@ def train_units_layers(model: PreTrainedModel,
         optimizer =torch.optim.AdamW(param_groups,
                                     weight_decay=args.wd,
                                     foreach=True)
+        # optimizer = torch.optim.Adam(
+        #     param_groups,
+        #     weight_decay=args.wd,
+        #     fused=True,
+        # )
+        # 很神奇，用sgd就没有不可复现性,为什么?
+        # optimizer = torch.optim.SGD(param_groups,
+        #                             weight_decay=args.wd,
+        # )
         qlayers = model.model.layers
         loss_scaler= torch.amp.GradScaler(device=args.dev)
         trainable_number = trainable_parameters_num(selected_layers)
@@ -237,10 +246,10 @@ def train_units_layers(model: PreTrainedModel,
                                                                      total_steps=total_training_iteration,
                                                                       ascend=True)
         # step 6.3: training loop
-        # without catcher 引入的position_ids会影响数值吗？
         position_ids = torch.arange(args.training_seqlen, dtype=torch.long, device=args.dev)
         position_ids = position_ids.unsqueeze(0).expand(args.batch_size, -1).contiguous()
         # print(f" data size {len(train_dataset)}")
+
         for epoch in range(args.epochs):
             loss_list = []
             norm_list = []
@@ -249,19 +258,21 @@ def train_units_layers(model: PreTrainedModel,
             # torch.autograd.set_detect_anomaly(True)
             dataloader = DataLoader(train_dataset,
                                     batch_size=args.batch_size,
-                                    num_workers=0,
+                                    # num_workers=1,
                                     # pin_memory=True,
                                     # prefetch_factor=32,  
                                     shuffle=False
                                     )
             # step 6.4: training                   
             for index, input_data in enumerate(dataloader):
+                optimizer.zero_grad()
                 with torch.autocast(device_type=args.dev,
                                     enabled=amp_enabled,
                                     dtype=args.dtype if amp_enabled else torch.float32):
                     inp,target = input_data
-                    hidden_state = inp.to(args.dev,dtype=args.dtype)
-
+                    inp = inp.to(args.dev,dtype=args.dtype)
+                    hidden_state = inp
+                    trg = target.to(args.dev,dtype=torch.float32)
                     for layer_idx in trainable_layer_idx_list:
                         layer_outputs = qlayers[layer_idx](
                             hidden_states=hidden_state,
@@ -269,8 +280,9 @@ def train_units_layers(model: PreTrainedModel,
                             position_ids=position_ids,
                             position_embeddings=position_embeddings
                         )
+                        assert isinstance(layer_outputs, tuple)
                         hidden_state = layer_outputs[0]
-                    loss = loss_func(hidden_state, target.to(args.dev,dtype=torch.float32))
+                    loss = loss_func(hidden_state, trg)
                     if index == 32:
                         tmp = {
                             "hidden_state":inp,
@@ -279,7 +291,6 @@ def train_units_layers(model: PreTrainedModel,
                         }
                         print(f"layers {trainable_layer_idx_list} input_data {tmp} output {hidden_state} target {target} ")
                     print(f"index {index} loss {loss}")
-                    
                     if args.get("dampen_loss",False):
                         dampen_loss = torch.zeros_like(loss).to(loss.device)
                         for layer_idx in trainable_layer_idx_list:
@@ -296,28 +307,38 @@ def train_units_layers(model: PreTrainedModel,
                 if args.log_loss:
                     loss_recorder.record(f"blk{trainable_layer_idx_list}",
                                         step,
-                                        loss.detach().cpu().item())
-                graualWarmupScheduler.update() if args.get("gradual_quant",False) else None
-                loss_list.append(loss.detach().cpu())
-                loss_scaler.scale(loss).backward() if amp_enabled else loss.backward()
+                                        loss.data.cpu().item())
+                    
+                if args.get("gradual_quant",False):
+                    graualWarmupScheduler.update() 
+                else: 
+                    None
+                loss_list.append(loss.data.cpu())
+                if amp_enabled:
+                    loss_scaler.scale(loss).backward()
+                else:
+                    loss.backward()
+                torch.cuda.synchronize()
+                # torch.save(qlayers[0].self_attn.q_proj.weight.grad,
+                torch.save(qlayers[0].mlp.gate_proj.weight.grad,
+                # torch.save(inp,
+                # torch.save(position_embeddings[0],
+                            f"/home/ubuntu/data/exp/proj2410/test/cache/0_weight_{index}"
+                            )
                 # debug 检查grad
                 if amp_enabled: loss_scaler.unscale_(optimizer)
                 if args.clip_grad > 0:
-                        # print(f"clip grad at {args.clip_grad}")
-                        norm = torch.nn.utils.clip_grad_norm_(trainable_parameters(selected_layers), args.clip_grad).cpu()
+                    norm = torch.nn.utils.clip_grad_norm_(trainable_parameters(selected_layers)
+                                                            , args.clip_grad).cpu()
+                    norm_list.append(norm.data)
                 # 使用子空间优化
                 if args.get("sub_space_grad_clean",False):
                     sub_space_clean(selected_layers)
-                if not args.loss_func == "KL-Divergence":
-                    if amp_enabled:
-                        loss_scaler.step(optimizer)
-                        loss_scaler.update()
-                    else:
-                        optimizer.step()
-                # 反向传播和优化
-                if not args.loss_func == "KL-Divergence":
-                    optimizer.zero_grad()
-                norm_list.append(norm.data)
+                if amp_enabled:
+                    loss_scaler.step(optimizer)
+                    loss_scaler.update()
+                else:
+                    optimizer.step()
                 
                 # adjust lr
                 if args.quant_lr > 0:
@@ -328,27 +349,23 @@ def train_units_layers(model: PreTrainedModel,
                     optimizer.param_groups[weight_index]['lr'] = weight_scheduler.get_lr()[0]
                 step += 1
 
-
             # step 6.5: calculate validation loss
-            val_loss_list = []
-            dataloader = DataLoader(val_dataset,
-                                    batch_size=args.batch_size,
-                                    num_workers=0,
-                                    pin_memory=True,
-                                    # prefetch_factor=32,  
-                                    shuffle=False
-                                    )
-            # if not args.loss_func == "KL-Divergence":
-            #     qlayers[align_index].set_forward_state(stop_forward=False)
-            for index, input_data in enumerate(dataloader):  
-                # obtain output of quantization model
-                with torch.no_grad():
+            with torch.no_grad():
+                val_loss_list = []
+                dataloader = DataLoader(val_dataset,
+                                        batch_size=args.batch_size,
+                                        num_workers=0,
+                                        pin_memory=True,
+                                        # prefetch_factor=32,  
+                                        shuffle=False
+                                        )
+                for index, input_data in enumerate(dataloader):  
+                    # obtain output of quantization model
                     with torch.autocast(device_type=args.dev,
                                     enabled=amp_enabled,
                                     dtype=args.dtype if amp_enabled else torch.float32):
                         inp,target = input_data
                         hidden_state = inp.to(args.dev,dtype=args.dtype)
-                        # assert hidden_state.requires_grad == True, "hidden_state.requires_grad is False"
                         for layer_idx in trainable_layer_idx_list:
                             layer_outputs = qlayers[layer_idx](
                                 hidden_states=hidden_state,
@@ -357,29 +374,31 @@ def train_units_layers(model: PreTrainedModel,
                             )
                             hidden_state = layer_outputs[0]
                         loss = loss_func(hidden_state, target.to(args.dev,dtype=torch.float32))
-                val_loss_list.append(loss.cpu())
+                    val_loss_list.append(loss.cpu())
 
-            train_mean_num = min(len(loss_list),64) 
-            # calculate the average training loss of last train_mean_num samples
-            loss_mean = torch.stack(loss_list)[-(train_mean_num-1):].mean()
-            val_loss_mean = torch.stack(val_loss_list).mean()
-            norm_mean = torch.stack(norm_list).mean()
-            logger.info(f"blocks {trainable_layer_idx_list} epoch {epoch} recon_loss:{loss_mean} val_loss:{val_loss_mean} ")
-            logger.info(f"quant_lr:{quant_scheduler.get_lr()[0]} weight_lr:{weight_scheduler.get_lr()[0]} norm:{norm_mean:.8f}  ")
-            logger.info(f"max memory_allocated {torch.cuda.max_memory_allocated(args.dev) / 1024**2} time {time.time()-start_time} ")
-            if val_loss_mean < best_val_loss:
-                best_val_loss = val_loss_mean
-            else:
-                early_stop_flag += 1
-                if args.early_stop > 0 and early_stop_flag >=args.early_stop:
-                    break
+                train_mean_num = min(len(loss_list),64) 
+                # calculate the average training loss of last train_mean_num samples
+                loss_mean = torch.stack(loss_list)[-(train_mean_num-1):].mean()
+                val_loss_mean = torch.stack(val_loss_list).mean()
+                norm_mean = torch.stack(norm_list).mean()
+                logger.info(f"blocks {trainable_layer_idx_list} epoch {epoch} recon_loss:{loss_mean} val_loss:{val_loss_mean} ")
+                logger.info(f"quant_lr:{quant_scheduler.get_lr()[0]} weight_lr:{weight_scheduler.get_lr()[0]} norm:{norm_mean:.8f}  ")
+                logger.info(f"max memory_allocated {torch.cuda.max_memory_allocated(args.dev) / 1024**2} time {time.time()-start_time} ")
+                if val_loss_mean < best_val_loss:
+                    best_val_loss = val_loss_mean
+                else:
+                    early_stop_flag += 1
+                    if args.early_stop > 0 and early_stop_flag >=args.early_stop:
+                        break
+            
+            exit(0)
+
         optimizer.zero_grad()
         del optimizer
         # step 7: pack quantized weights into low-bits format, note that this process is slow on poor CPU or busy CPU
         
     torch.cuda.empty_cache()
     gc.collect()
-
 
 
 @timer
@@ -571,9 +590,9 @@ def train_units_layers_with_catcher(model: PreTrainedModel,
                 if args.log_loss:
                     loss_recorder.record(f"blk{trainable_layer_idx_list}",
                                         step,
-                                        loss.detach().cpu().item())
+                                        loss.data.cpu().item())
                 graualWarmupScheduler.update() if args.get("gradual_quant",False) else None
-                loss_list.append(loss.detach().cpu())
+                loss_list.append(loss.data.cpu())
                 # 反向传播和优化
                 if not args.loss_func == "KL-Divergence":
                     optimizer.zero_grad()

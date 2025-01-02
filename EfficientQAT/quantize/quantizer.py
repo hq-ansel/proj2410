@@ -384,7 +384,7 @@ class GradualUniformAffineQuantizer(nn.Module):
     
     def fake_quant(self, x):
 
-        scale = self.clamp_method(self.scale, 1e-4, 1e4)
+        scale = self.clamp_method(self.scale, 1e-4, 1e4).half().float()
         round_zero_point = self.clamp_method( round_ste(self.zero_point), self.qmin, self.qmax)
 
         dim1, dim2 = x.shape
@@ -549,7 +549,7 @@ class GradualUniformAffineQuantizerV2(nn.Module):
     
     def fake_quant(self, x):
 
-        scale = self.clamp_method(self.scale, 1e-4, 1e4)
+        scale = self.clamp_method(self.scale, 1e-4, 1e4).half().float()
         round_zero_point = self.clamp_method(self.round_method(self.zero_point), self.qmin, self.qmax)
         # round_zero_point = self.clamp_method(self.zero_point.round(), self.qmin, self.qmax)
         # round_zero_point = self.clamp_method(round_ste(self.zero_point), self.qmin, self.qmax)

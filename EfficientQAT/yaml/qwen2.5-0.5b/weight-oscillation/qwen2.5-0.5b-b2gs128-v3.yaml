@@ -14,7 +14,7 @@ weight_lr: 0.0001
 off_load_to_disk: False
 loss_func: MSE # "MSE", "FKLD" , "RKLD", "FKLD_RKLD" ,"MSE_FKLD", "MSE_RKLD", "MSE_FKLD_RKLD"
 crossblock_window_size: 1
-train_size:  128
+train_size:  4096
 slide_step: 1
 clip_grad: 9999
 

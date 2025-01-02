@@ -290,7 +290,7 @@ def train_units_layers(model: PreTrainedModel,
                             # "position_embeddings":position_embeddings,
                         }
                         print(f"layers {trainable_layer_idx_list} input_data {tmp} output {hidden_state} target {target} ")
-                    print(f"index {index} loss {loss}")
+                    # print(f"index {index} loss {loss}")
                     if args.get("dampen_loss",False):
                         dampen_loss = torch.zeros_like(loss).to(loss.device)
                         for layer_idx in trainable_layer_idx_list:
@@ -318,14 +318,11 @@ def train_units_layers(model: PreTrainedModel,
                     loss_scaler.scale(loss).backward()
                 else:
                     loss.backward()
-                torch.cuda.synchronize()
-                # torch.save(qlayers[0].self_attn.q_proj.weight.grad,
-                torch.save(qlayers[0].mlp.gate_proj.weight.grad,
-                # torch.save(inp,
-                # torch.save(position_embeddings[0],
-                            f"/home/ubuntu/data/exp/proj2410/test/cache/0_weight_{index}"
-                            )
                 # debug 检查grad
+                # torch.cuda.synchronize()
+                # torch.save(qlayers[0].mlp.gate_proj.weight.grad,
+                #             f"/home/ubuntu/data/exp/proj2410/test/cache/0_weight_{index}"
+                #             )
                 if amp_enabled: loss_scaler.unscale_(optimizer)
                 if args.clip_grad > 0:
                     norm = torch.nn.utils.clip_grad_norm_(trainable_parameters(selected_layers)
@@ -391,8 +388,6 @@ def train_units_layers(model: PreTrainedModel,
                     if args.early_stop > 0 and early_stop_flag >=args.early_stop:
                         break
             
-            exit(0)
-
         optimizer.zero_grad()
         del optimizer
         # step 7: pack quantized weights into low-bits format, note that this process is slow on poor CPU or busy CPU
@@ -746,6 +741,8 @@ def custom_shedule_train(model:PreTrainedModel,
             for layer_idx in train_layer_window:
                 if not is_quant_layer[layer_idx]:
                     is_quant_layer[layer_idx] = True
+                    if args.get("keep_fp_weight",False):
+                        fp_layer = copy.deepcopy(model.model.layers[layer_idx])
                     model.model.layers[layer_idx] = trans_quant_block(
                                             qlayer=model.model.layers[layer_idx],
                                                                       args=args)
@@ -860,20 +857,38 @@ def custom_shedule_train(model:PreTrainedModel,
                             next_layer = model.model.layers[layer_idx+args.slide_step].to(args.dev,dtype=args.dtype)
                             print(f" layer {layer_idx}  update input")
                             print(f" layer {layer_idx+args.slide_step}  update output")
-                            train_dataset.update_dataset(module=layer, 
+                            if args.get("keep_fp_weight",False):
+                                fp_layer = fp_layer.to(args.dev,dtype=args.dtype)
+                                train_dataset.update_dataset(module=fp_layer, 
                                                     next_module=next_layer,
                                                     layer_idx=layer_idx+args.slide_step,
                                                     batch_size=args.batch_size,
                                                     attention_mask=attention_mask,
                                                     position_embeddings=position_embeddings,
                                                         )
-                            val_dataset.update_dataset(module=layer, 
-                                                    next_module=next_layer,
-                                                    layer_idx=layer_idx+args.slide_step,
-                                                    batch_size=args.batch_size,
-                                                    attention_mask=attention_mask,
-                                                    position_embeddings=position_embeddings,
-                                                        )
+                                val_dataset.update_dataset(module=fp_layer, 
+                                                        next_module=next_layer,
+                                                        layer_idx=layer_idx+args.slide_step,
+                                                        batch_size=args.batch_size,
+                                                        attention_mask=attention_mask,
+                                                        position_embeddings=position_embeddings,
+                                                            )
+                                del fp_layer
+                            else:
+                                train_dataset.update_dataset(module=layer, 
+                                                        next_module=next_layer,
+                                                        layer_idx=layer_idx+args.slide_step,
+                                                        batch_size=args.batch_size,
+                                                        attention_mask=attention_mask,
+                                                        position_embeddings=position_embeddings,
+                                                            )
+                                val_dataset.update_dataset(module=layer, 
+                                                        next_module=next_layer,
+                                                        layer_idx=layer_idx+args.slide_step,
+                                                        batch_size=args.batch_size,
+                                                        attention_mask=attention_mask,
+                                                        position_embeddings=position_embeddings,
+                                                            )
                             layer.cpu()
                             next_layer.cpu()
             # attention_mask = attention_mask.to(dtype=_dtype)

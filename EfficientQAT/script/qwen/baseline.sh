@@ -3,8 +3,8 @@
 # 定义配置文件列表
 # )
 config_files=(
-    # /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/qwen2.5-0.5b/qwen2.5-0.5b-b2gs128.yaml
-    /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/qwen2.5-0.5b/weight-oscillation/qwen2.5-0.5b-b2gs128-gradual-quant.yaml
+    /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/qwen2.5-0.5b/qwen2.5-0.5b-b2gs128.yaml
+    # /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/qwen2.5-0.5b/weight-oscillation/qwen2.5-0.5b-b2gs128-gradual-quant.yaml
     # /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/qwen2.5-0.5b/gradual-study/qwen2.5-0.5b-b2gs128-gradual-quant-cli1-v2.yaml
     # /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/qwen2.5-0.5b/gradual-study/qwen2.5-0.5b-b2gs128-gradual-quant-cli1.yaml
 )

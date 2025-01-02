@@ -146,7 +146,7 @@ class LazyLoadDatasetV2(Dataset):
     def update_dataset(self, module: Callable,
                        next_module: Callable,
                     layer_idx: int,
-                    batch_size: int = 1,
+                    batch_size: int = 32,
                     attention_mask: torch.Tensor = None,
                     position_embeddings: Tuple[torch.Tensor, torch.Tensor] = None):
         """
@@ -178,7 +178,7 @@ class LazyLoadDatasetV2(Dataset):
         #     # 释放内存
         #     del input_sample, output_sample, output, next_output
         #     gc.collect()
-        batch_size = 32
+        # batch_size = 32
         for start_idx in range(0,len(self.data_list),batch_size):
             end_idx = min(start_idx+batch_size,len(self.data_list))
             input_samples,output_samples = [],[]
@@ -199,7 +199,7 @@ class LazyLoadDatasetV2(Dataset):
             torch.cuda.synchronize()
             del input_samples, output_samples, outputs, next_outputs,inp_tensor,out_tensor
             gc.collect()
-        torch.cuda.empty_cache()
+            torch.cuda.empty_cache()
         # # for idx in range(0, (len(self.data_list)+batch_size-1 )//batch_size):
         # for idx in tqdm(range(0, len(self.data_list)//batch_size),
         #                  total=len(self.data_list)//batch_size, desc="update_dataset"):

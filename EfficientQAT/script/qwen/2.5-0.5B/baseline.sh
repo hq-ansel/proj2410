@@ -3,18 +3,10 @@
 # 定义配置文件列表
 # )
 config_files=(
-    # /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/qwen2.5-0.5b/b2gs128.yaml
-    # /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/qwen2.5-0.5b/gradual-study/b2gs128-gradual-quant.yaml
-    /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/qwen2.5-1.5b/b2gs128.yaml
-    /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/qwen2.5-1.5b/gradual-study/b2gs128-gradual-quant.yaml
-    /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/qwen2.5-3b/b2gs128.yaml
-    /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/qwen2.5-3b/gradual-study/b2gs128-gradual-quant.yaml
-    /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/qwen2.5-7b/b2gs128.yaml
-    /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/qwen2.5-7b/gradual-study/b2gs128-gradual-quant.yaml
-    /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/qwen2.5-14b/b2gs128.yaml
-    /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/qwen2.5-14b/gradual-study/b2gs128-gradual-quant.yaml
-    /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/qwen2.5-32b/b2gs128.yaml
-    /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/qwen2.5-32b/gradual-study/b2gs128-gradual-quant.yaml
+    /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/qwen2.5-0.5b/qwen2.5-0.5b-b2gs128.yaml
+    # /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/qwen2.5-0.5b/weight-oscillation/qwen2.5-0.5b-b2gs128-gradual-quant.yaml
+    # /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/qwen2.5-0.5b/gradual-study/qwen2.5-0.5b-b2gs128-gradual-quant-cli1-v2.yaml
+    # /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/qwen2.5-0.5b/gradual-study/qwen2.5-0.5b-b2gs128-gradual-quant-cli1.yaml
 )
 # 循环遍历每个配置文件并执行 Python 命令
 # 设置并行参数，True 为并行，False 为串行
@@ -32,7 +24,7 @@ for config_path in "${config_files[@]}"; do
 
             # 设置环境变量
             export HF_HOME="/home/ubuntu/data/exp/proj2410/hf_home"
-            # export CUDA_VISIBLE_DEVICES=1  # or e.g. 0,1,2,3
+            export CUDA_VISIBLE_DEVICES=1,2,3,4  # or e.g. 0,1,2,3
             export MODEL_PATH=/home/ubuntu/data/exp/proj2410/model/Llama2-7b
             export DATASET_PATH=pajama
             export SAVE_PATH=/home/ubuntu/data/exp/proj2410/quant_model/EfficientQAT/w4gs128/Llama2-7b
@@ -43,7 +35,10 @@ for config_path in "${config_files[@]}"; do
             echo "Running with config: $CONFIG_PATH"
 
             # 执行 python 脚本
-            python -m EfficientQAT.main_block_ap \
+            torchrun --nproc_per_node=4 \
+                    --nnodes=1 \
+                    --node_rank=0 \
+                -m EfficientQAT.main_block_ap_distribute \
                 --config_path $CONFIG_PATH \
                 --wbits 4 \
                 --group_size 128 \

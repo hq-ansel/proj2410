@@ -276,9 +276,9 @@ def train_units_layers(model: PreTrainedModel,
                     for layer_idx in trainable_layer_idx_list:
                         layer_outputs = qlayers[layer_idx](
                             hidden_states=hidden_state,
-                            attention_mask=attention_mask,
+                            attention_mask=attention_mask.float(),
                             position_ids=position_ids,
-                            position_embeddings=position_embeddings
+                            position_embeddings=(position_embeddings[0].float(),position_embeddings[1].float())
                         )
                         assert isinstance(layer_outputs, tuple)
                         hidden_state = layer_outputs[0]
@@ -366,8 +366,8 @@ def train_units_layers(model: PreTrainedModel,
                         for layer_idx in trainable_layer_idx_list:
                             layer_outputs = qlayers[layer_idx](
                                 hidden_states=hidden_state,
-                                attention_mask=attention_mask,
-                                position_embeddings=position_embeddings
+                                attention_mask=attention_mask.float(),
+                                position_embeddings=(position_embeddings[0].float(),position_embeddings[1].float())
                             )
                             hidden_state = layer_outputs[0]
                         loss = loss_func(hidden_state, target.to(args.dev,dtype=torch.float32))
@@ -801,7 +801,7 @@ def custom_shedule_train(model:PreTrainedModel,
                             zeros = module.weight_quantizer.zero_point.detach().cpu()
                         group_size = module.weight_quantizer.group_size
                         # print(f"pack quantized {name} with group_size {group_size} and scales {scales} and zeros {zeros}")
-                        print(f"pack quantized {name} with group_size {group_size} and scales max {scales.max()} zeros max {zeros.max()}")
+                        print(f"pack quantized {name} with group_size {group_size} and scales max {scales.max()}")
                         dim0 = module.weight.shape[0]
                         scales = scales.view(dim0,-1).transpose(0,1).contiguous()
                         zeros = zeros.view(dim0,-1).transpose(0,1).contiguous()
@@ -862,14 +862,14 @@ def custom_shedule_train(model:PreTrainedModel,
                                 train_dataset.update_dataset(module=fp_layer, 
                                                     next_module=next_layer,
                                                     layer_idx=layer_idx+args.slide_step,
-                                                    batch_size=args.batch_size,
+                                                    # batch_size=args.batch_size,
                                                     attention_mask=attention_mask,
                                                     position_embeddings=position_embeddings,
                                                         )
                                 val_dataset.update_dataset(module=fp_layer, 
                                                         next_module=next_layer,
                                                         layer_idx=layer_idx+args.slide_step,
-                                                        batch_size=args.batch_size,
+                                                        # batch_size=args.batch_size,
                                                         attention_mask=attention_mask,
                                                         position_embeddings=position_embeddings,
                                                             )
@@ -878,14 +878,14 @@ def custom_shedule_train(model:PreTrainedModel,
                                 train_dataset.update_dataset(module=layer, 
                                                         next_module=next_layer,
                                                         layer_idx=layer_idx+args.slide_step,
-                                                        batch_size=args.batch_size,
+                                                        # batch_size=args.batch_size,
                                                         attention_mask=attention_mask,
                                                         position_embeddings=position_embeddings,
                                                             )
                                 val_dataset.update_dataset(module=layer, 
                                                         next_module=next_layer,
                                                         layer_idx=layer_idx+args.slide_step,
-                                                        batch_size=args.batch_size,
+                                                        # batch_size=args.batch_size,
                                                         attention_mask=attention_mask,
                                                         position_embeddings=position_embeddings,
                                                             )

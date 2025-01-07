@@ -111,10 +111,11 @@ class LazyLoadDatasetV2(Dataset):
         tmp_dict["data_list"] = []
         for i,(inp,out) in enumerate(zip(layers[0].inp_data_list,
                                         layers[crossblock_window_size-1].out_data_list)):
-            self.data_list.append((inp,out))
+            self.data_list.append((inp.half(),out.half()))
 
-        tmp_dict["attention_mask"] = layers[0].attention_mask
+        tmp_dict["attention_mask"] = layers[0].attention_mask.half()
         tmp_dict["position_embeddings"] = layers[0].position_embeddings
+        tmp_dict["position_embeddings"] = (tmp_dict["position_embeddings"][0].half(),tmp_dict["position_embeddings"][1].half())
         self.attention_mask = tmp_dict["attention_mask"]
         self.position_embeddings = tmp_dict["position_embeddings"]
 
@@ -146,7 +147,7 @@ class LazyLoadDatasetV2(Dataset):
     def update_dataset(self, module: Callable,
                        next_module: Callable,
                     layer_idx: int,
-                    batch_size: int = 32,
+                    batch_size: int = 8,
                     attention_mask: torch.Tensor = None,
                     position_embeddings: Tuple[torch.Tensor, torch.Tensor] = None):
         """
@@ -159,7 +160,7 @@ class LazyLoadDatasetV2(Dataset):
 
         new_file_list = []
         device = next(module.parameters()).device
-        # _dtype = next(module.parameters()).dtype
+        _dtype = next(module.parameters()).dtype
 
         # 确保 position_embeddings 移动到正确的设备
         position_embeddings = tuple(it.to(device) for it in position_embeddings)

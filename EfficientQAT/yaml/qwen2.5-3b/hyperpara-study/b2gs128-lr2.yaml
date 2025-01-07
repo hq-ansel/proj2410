@@ -13,7 +13,7 @@ loss_func: MSE # "MSE", "FKLD" , "RKLD", "FKLD_RKLD" ,"MSE_FKLD", "MSE_RKLD", "M
 crossblock_window_size: 1
 train_size:  4096
 slide_step: 1
-clip_grad: 9999
+clip_grad: 1
 
 model: /home/ubuntu/data/exp/proj2410/model/Qwen2.5-3B
 # save settings

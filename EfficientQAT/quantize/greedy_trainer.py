@@ -198,6 +198,7 @@ def train_units_layers(model: PreTrainedModel,
         #     fused=True,
         # )
         # 很神奇，用sgd就没有不可复现性,为什么?
+        # 已解决，是由于Adam和torch的Attention实现相互作用导致的
         # optimizer = torch.optim.SGD(param_groups,
         #                             weight_decay=args.wd,
         # )
@@ -857,6 +858,7 @@ def custom_shedule_train(model:PreTrainedModel,
                             next_layer = model.model.layers[layer_idx+args.slide_step].to(args.dev,dtype=args.dtype)
                             print(f" layer {layer_idx}  update input")
                             print(f" layer {layer_idx+args.slide_step}  update output")
+                            # keep_fp_weight 代表用使用原权重更新作为训练输入而不是使用量化后权重进行更新
                             if args.get("keep_fp_weight",False):
                                 fp_layer = fp_layer.to(args.dev,dtype=args.dtype)
                                 train_dataset.update_dataset(module=fp_layer, 

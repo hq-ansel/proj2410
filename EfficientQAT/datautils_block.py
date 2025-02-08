@@ -75,11 +75,11 @@ class LazyLoadDatasetV2(Dataset):
                 output = self.module(hidden_states, **kwargs)
                 # pdb.set_trace()
                 if self.store_input:
-                    self.inp_data_list.append(hidden_states.squeeze(0).detach().cpu())
+                    self.inp_data_list.append(hidden_states.half().squeeze(0).detach().cpu())
                 if self.store_output:
-                    self.out_data_list.append(output[0].squeeze(0).detach().cpu())
-                self.attention_mask = kwargs.get("attention_mask", None)
-                self.position_embeddings = kwargs.get("position_embeddings", None)
+                    self.out_data_list.append(output[0].half().squeeze(0).detach().cpu())
+                self.attention_mask = kwargs.get("attention_mask", None) if self.attention_mask is None else self.attention_mask
+                self.position_embeddings = kwargs.get("position_embeddings", None) if self.position_embeddings is None else self.position_embeddings
                 if self.store_output:
                     raise StopException()
                 else:
@@ -109,9 +109,23 @@ class LazyLoadDatasetV2(Dataset):
                 except StopException:
                     pass
         tmp_dict["data_list"] = []
-        for i,(inp,out) in enumerate(zip(layers[0].inp_data_list,
-                                        layers[crossblock_window_size-1].out_data_list)):
-            self.data_list.append((inp.half(),out.half()))
+        # import pdb;pdb.set_trace()
+        # for i,(inp,out) in enumerate(zip(layers[0].inp_data_list,
+        #                                 layers[crossblock_window_size-1].out_data_list)):
+        #     self.data_list.append((inp.half(),out.half()))
+        # self.data_list = [(inp.half(), out.half()) 
+        #           for inp, out in zip(layers[0].inp_data_list,
+        #                               layers[crossblock_window_size - 1].out_data_list)]
+        for i, (inp, out) in enumerate(zip(layers[0].inp_data_list,
+                                   layers[crossblock_window_size - 1].out_data_list)):
+            inp = inp.half()
+            out = out.half()
+            self.data_list.append((inp, out))
+
+        # 删除原始数据，释放内存
+        del layers[0].inp_data_list
+        del layers[crossblock_window_size - 1].out_data_list
+        gc.collect()
 
         tmp_dict["attention_mask"] = layers[0].attention_mask.half()
         tmp_dict["position_embeddings"] = layers[0].position_embeddings
@@ -195,7 +209,7 @@ class LazyLoadDatasetV2(Dataset):
                                     position_embeddings=position_embeddings)[0]
             # 更新数据
             for idx in range(start_idx,end_idx):
-                self.data_list[idx] = (outputs[idx-start_idx].cpu(),next_outputs[idx-start_idx].cpu())
+                self.data_list[idx] = (outputs[idx-start_idx].half().cpu(),next_outputs[idx-start_idx].half().cpu())
             # 释放内存
             torch.cuda.synchronize()
             del input_samples, output_samples, outputs, next_outputs,inp_tensor,out_tensor

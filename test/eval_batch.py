@@ -57,11 +57,13 @@ quant_path_list = [
     # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-subspace-lr1/redpajama-4096/checkpoint-256",
     # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-gradual-quant-nocli/redpajama-4096/checkpoint-256",
 
-    "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128",
-    "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-freeze-weight",
-    "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-dampenloss",
-    "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-gradual-quant",
+    # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128",
+    # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-freeze-weight",
+    # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-dampenloss",
+    # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-gradual-quant",
     # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-gradual-quant-cli1-v2",
+    # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen2.5-7B/EfficientQAT/w2gs128",
+    "/home/ubuntu/data/exp/proj2410/quant_model/Qwen2.5-7B/EfficientQAT/w2gs128-gradual-quant",
 ]
 # CUDA_VISIBLE_DEVICES=3 python -m test.eval_batch
 for quant_path in quant_path_list:

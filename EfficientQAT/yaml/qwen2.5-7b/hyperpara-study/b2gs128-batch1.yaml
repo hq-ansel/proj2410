@@ -3,7 +3,7 @@ wbits: 2
 group_size: 128
 # training settings
 cuda_ids: "4,5"
-epochs: 5
+epochs: 4
 net: Qwen2.5-7B
 batch_size: 8
 quant_lr: 0.0001

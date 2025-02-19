@@ -2,10 +2,10 @@
 wbits: 2
 group_size: 128
 # training settings
-cuda_ids: "2,3,4,5"
+cuda_ids: "0,1"
 rank: 4
 world_size: 4
-epochs: 5
+epochs: 4
 min_lr_factor: 1
 net: Qwen2.5-3B
 batch_size: 8

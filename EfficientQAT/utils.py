@@ -78,8 +78,15 @@ class NativeScalerWithGradNormCount:
 def create_logger(output_dir, dist_rank=0, name=''):
     # create logger
     logger = logging.getLogger(name)
+
+    # Remove existing handlers if any
+    if logger.hasHandlers():
+        for handler in logger.handlers[:]:
+            logger.removeHandler(handler)
+
     logger.setLevel(logging.INFO)
     logger.propagate = False
+
 
     # create formatter
     fmt = '[%(asctime)s %(name)s] (%(filename)s %(lineno)d): %(levelname)s %(message)s'

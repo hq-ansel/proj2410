@@ -16,7 +16,7 @@ slide_step: 1
 clip_grad: 1
 quant_method: aqlm
 
-model: /home/ubuntu/data/exp/proj2410/model/Llama2-7b
+model: /home/ubuntu/data/exp/proj2410/model/Llama2-7B
 # save settings
 output_dir: /home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/aqlm/w2gs128/
 log_loss: /home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/aqlm/w2gs128/loss.csv

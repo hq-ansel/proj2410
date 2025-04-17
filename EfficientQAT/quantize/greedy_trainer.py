@@ -24,6 +24,7 @@ from torch.optim.lr_scheduler import CosineAnnealingLR
 from torch.utils.data import DataLoader
 from transformers import PreTrainedModel
 import logging
+import bitsandbytes as bnb
 
 from .. import utils
 from . import int_linear_fake, int_linear_real
@@ -35,6 +36,7 @@ from .utils import (
     )
 from ..datautils_block import BlockTrainDataset,OptimBlockTrainDataset,LazyLoadDataset,generate_block_train_data,LazyLoadDatasetV2
 from ..loss_utils import get_loss_func
+
 
 
 amp_enabled = os.environ.get("AMP_ENABLED", "False").lower() == "true"
@@ -192,6 +194,51 @@ def train_units_layers(model: PreTrainedModel,
         optimizer =torch.optim.AdamW(param_groups,
                                     weight_decay=args.wd,
                                     foreach=True)
+        
+        # 导致训练崩溃
+        # logger.info("using AdaW 8bit optimizer")
+        # optimizer =bnb.optim.AdamW8bit(
+        #     param_groups,
+        #     weight_decay=args.wd,
+        #     # foreach=True
+        # )
+        # logger.info(f"using Muon optimizer")
+        # class UnionOptimizer(torch.optim.Optimizer):
+        #     def __init__(self, params, weight_decay=0.0):
+        #         super(UnionOptimizer, self).__init__(params=params,defaults={ "weight_decay": weight_decay})
+        #         # 将参数分为 muon_params 和 adamw_params
+        #         muon_params = []
+        #         adamw_params = []
+        #         lr = None
+        #         for p in params:  # 仅遍历一次参数列表
+        #             param_tensors = p["params"]
+        #             if lr is None:
+        #                 lr = p["lr"]
+        #             for param_tensor in param_tensors:
+        #                 if param_tensor.ndim >= 2:
+        #                     muon_params.append(param_tensor)
+        #                 else:
+        #                     adamw_params.append({"params": param_tensor, "lr": p["lr"]})
+        #         # muon_params = [p for p in params if p["params"].ndim >= 2]
+        #         # adamw_params = [p for p in params if p["params"].ndim < 2]
+
+        #         # 创建 Muon 和 AdamW 优化器
+        #         self.muon_optimizer = Muon(muon_params,lr=lr,weight_decay=weight_decay)
+        #         self.adamw_optimizer = torch.optim.AdamW(adamw_params,weight_decay=weight_decay)
+
+        #         # 将两个优化器的 param_groups 合并
+        #         param_groups = self.muon_optimizer.param_groups + self.adamw_optimizer.param_groups
+        #         self.param_groups = param_groups
+
+        #     def zero_grad(self, set_to_none=False):
+        #         self.muon_optimizer.zero_grad(set_to_none)
+        #         self.adamw_optimizer.zero_grad(set_to_none)
+
+        #     def step(self, closure=None):
+        #         self.muon_optimizer.step()
+        #         self.adamw_optimizer.step()
+        # optimizer = UnionOptimizer(param_groups,args.wd)
+        
         # optimizer = torch.optim.Adam(
         #     param_groups,
         #     weight_decay=args.wd,
@@ -251,6 +298,11 @@ def train_units_layers(model: PreTrainedModel,
         position_ids = position_ids.unsqueeze(0).expand(args.batch_size, -1).contiguous()
         # print(f" data size {len(train_dataset)}")
 
+        # try torch.compile
+        # qlayers = torch.nn.ModuleList(
+        #     [torch.compile(qlayer,mode="reduce-overhead") for qlayer in qlayers]
+        # )
+
         for epoch in range(args.epochs):
             loss_list = []
             norm_list = []
@@ -259,10 +311,10 @@ def train_units_layers(model: PreTrainedModel,
             # torch.autograd.set_detect_anomaly(True)
             dataloader = DataLoader(train_dataset,
                                     batch_size=args.batch_size,
-                                    # num_workers=1,
-                                    # pin_memory=True,
-                                    # prefetch_factor=32,  
-                                    shuffle=False
+                                    num_workers=1,
+                                    pin_memory=True,
+                                    prefetch_factor=32,  
+                                    shuffle=True
                                     )
             # step 6.4: training                   
             for index, input_data in enumerate(dataloader):
@@ -274,6 +326,12 @@ def train_units_layers(model: PreTrainedModel,
                     inp = inp.to(args.dev,dtype=args.dtype)
                     hidden_state = inp
                     trg = target.to(args.dev,dtype=torch.float32)
+                    # estimate memory usage unit GB
+                    # inp_memory = inp.numel() * inp.element_size() / 1024**3
+                    # hidden_state_memory = hidden_state.numel() * hidden_state.element_size() / 1024**3
+                    # target_memory = trg.numel() * trg.element_size() / 1024**3
+                    # logger.info(f"index {index} input_memory {inp_memory:.4f} hidden_state_memory {hidden_state_memory:.4f} target_memory {target_memory:.4f} ")
+                    # import pdb;pdb.set_trace()
                     for layer_idx in trainable_layer_idx_list:
                         layer_outputs = qlayers[layer_idx](
                             hidden_states=hidden_state,
@@ -305,16 +363,17 @@ def train_units_layers(model: PreTrainedModel,
                 if not math.isfinite(loss.item()) or loss.item()==0:
                     logger.info("Loss is NAN, stopping training")
                     pdb.set_trace()
+                loss_cpu = loss.data.cpu()
                 if args.log_loss:
                     loss_recorder.record(f"blk{trainable_layer_idx_list}",
                                         step,
-                                        loss.data.cpu().item())
+                                        loss_cpu.item())
                     
                 if args.get("gradual_quant",False):
                     graualWarmupScheduler.update() 
                 else: 
                     None
-                loss_list.append(loss.data.cpu())
+                loss_list.append(loss_cpu)
                 if amp_enabled:
                     loss_scaler.scale(loss).backward()
                 else:
@@ -353,9 +412,9 @@ def train_units_layers(model: PreTrainedModel,
                 dataloader = DataLoader(val_dataset,
                                         batch_size=args.batch_size,
                                         num_workers=0,
-                                        pin_memory=True,
+                                        # pin_memory=True,
                                         # prefetch_factor=32,  
-                                        shuffle=False
+                                        shuffle=True
                                         )
                 for index, input_data in enumerate(dataloader):  
                     # obtain output of quantization model
@@ -547,9 +606,9 @@ def train_units_layers_with_catcher(model: PreTrainedModel,
             dataloader = DataLoader(train_dataset,
                                     batch_size=args.batch_size,
                                     num_workers=0,
-                                    pin_memory=True,
+                                    # pin_memory=True,
                                     # prefetch_factor=32,  
-                                    shuffle=False
+                                    shuffle=True
                                     )
             # step 6.4: training                   
             for index, input_data in enumerate(dataloader):
@@ -633,9 +692,9 @@ def train_units_layers_with_catcher(model: PreTrainedModel,
             dataloader = DataLoader(val_dataset,
                                     batch_size=args.batch_size,
                                     num_workers=0,
-                                    pin_memory=True,
+                                    # pin_memory=True,
                                     # prefetch_factor=32,  
-                                    shuffle=False
+                                    shuffle=True
                                     )
             # if not args.loss_func == "KL-Divergence":
             #     qlayers[align_index].set_forward_state(stop_forward=False)
@@ -923,7 +982,7 @@ def greedy_local_train(
     
     # dev =args.cuda[0] if torch.cuda.is_available() else "cpu"
     dev = args.cuda[0]
-    dtype = torch.float16 if amp_enabled else torch.float32
+    dtype = torch.bfloat16 if amp_enabled else torch.float32
     args.dev = dev
     args.dtype = dtype
     use_cache = model.config.use_cache

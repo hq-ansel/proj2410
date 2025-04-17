@@ -1,93 +1,120 @@
 AMP enabled: False
-Loading quantized model from /home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128
+device_map: OrderedDict([('', 0)])
+Loading Wikitext-2 dataset...
+wikitext2: 8.030269622802734
+get_c4
+c4: 11.67180061340332
+wikitext2 perplexity: 8.03
+c4 perplexity: 11.67
+Evaluating on tasks: ['piqa', 'arc_easy', 'arc_challenge', 'hellaswag', 'winogrande']
+|    Tasks    |Version|Filter|n-shot| Metric |   |Value |   |Stderr|
+|-------------|------:|------|-----:|--------|---|-----:|---|-----:|
+|arc_challenge|      1|none  |     0|acc     |↑  |0.4497|±  |0.0145|
+|             |       |none  |     0|acc_norm|↑  |0.4744|±  |0.0146|
+|arc_easy     |      1|none  |     0|acc     |↑  |0.7744|±  |0.0086|
+|             |       |none  |     0|acc_norm|↑  |0.7315|±  |0.0091|
+|hellaswag    |      1|none  |     0|acc     |↑  |0.5492|±  |0.0050|
+|             |       |none  |     0|acc_norm|↑  |0.7352|±  |0.0044|
+|piqa         |      1|none  |     0|acc     |↑  |0.7862|±  |0.0096|
+|             |       |none  |     0|acc_norm|↑  |0.7884|±  |0.0095|
+|winogrande   |      1|none  |     0|acc     |↑  |0.6851|±  |0.0131|
+
+Average Acc: 64.89%
+
+AMP enabled: False
+Loading quantized model from /home/ubuntu/data/exp/proj2410/quant_model/Qwen2.5-3B/EfficientQAT/w2gs128
 Loading pre-computed quantized weights...
 Loading pre-computed quantized weights Successfully
 device_map: OrderedDict([('', 0)])
 Loading Wikitext-2 dataset...
-wikitext2: 32.20756530761719
+wikitext2: 13.794421195983887
 get_c4
-c4: 31.431217193603516
-wikitext2 perplexity: 32.21
-c4 perplexity: 31.43
+c4: 17.19541358947754
+wikitext2 perplexity: 13.79
+c4 perplexity: 17.20
+Evaluating on tasks: ['piqa', 'arc_easy', 'arc_challenge', 'hellaswag', 'winogrande']
 |    Tasks    |Version|Filter|n-shot| Metric |   |Value |   |Stderr|
 |-------------|------:|------|-----:|--------|---|-----:|---|-----:|
-|arc_challenge|      1|none  |     0|acc     |↑  |0.2099|±  |0.0119|
-|             |       |none  |     0|acc_norm|↑  |0.2415|±  |0.0125|
-|arc_easy     |      1|none  |     0|acc     |↑  |0.5025|±  |0.0103|
-|             |       |none  |     0|acc_norm|↑  |0.4600|±  |0.0102|
-|hellaswag    |      1|none  |     0|acc     |↑  |0.3109|±  |0.0046|
-|             |       |none  |     0|acc_norm|↑  |0.3516|±  |0.0048|
-|piqa         |      1|none  |     0|acc     |↑  |0.6251|±  |0.0113|
-|             |       |none  |     0|acc_norm|↑  |0.6181|±  |0.0113|
-|winogrande   |      1|none  |     0|acc     |↑  |0.5257|±  |0.0140|
+|arc_challenge|      1|none  |     0|acc     |↑  |0.3422|±  |0.0139|
+|             |       |none  |     0|acc_norm|↑  |0.3592|±  |0.0140|
+|arc_easy     |      1|none  |     0|acc     |↑  |0.6801|±  |0.0096|
+|             |       |none  |     0|acc_norm|↑  |0.6368|±  |0.0099|
+|hellaswag    |      1|none  |     0|acc     |↑  |0.4306|±  |0.0049|
+|             |       |none  |     0|acc_norm|↑  |0.5647|±  |0.0049|
+|piqa         |      1|none  |     0|acc     |↑  |0.7198|±  |0.0105|
+|             |       |none  |     0|acc_norm|↑  |0.7182|±  |0.0105|
+|winogrande   |      1|none  |     0|acc     |↑  |0.6172|±  |0.0137|
 
-Average Acc: 43.48%
-Loading quantized model from /home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-freeze-weight
+Average Acc: 55.80%
+Loading quantized model from /home/ubuntu/data/exp/proj2410/quant_model/Qwen2.5-3B/EfficientQAT/w2gs128-gradual-quant
 Loading pre-computed quantized weights...
 Loading pre-computed quantized weights Successfully
 device_map: OrderedDict([('', 0)])
 Loading Wikitext-2 dataset...
-wikitext2: 72.278564453125
+wikitext2: 13.582012176513672
 get_c4
-c4: 55.506412506103516
-wikitext2 perplexity: 72.28
-c4 perplexity: 55.51
+c4: 17.005651473999023
+wikitext2 perplexity: 13.58
+c4 perplexity: 17.01
+Evaluating on tasks: ['piqa', 'arc_easy', 'arc_challenge', 'hellaswag', 'winogrande']
 |    Tasks    |Version|Filter|n-shot| Metric |   |Value |   |Stderr|
 |-------------|------:|------|-----:|--------|---|-----:|---|-----:|
-|arc_challenge|      1|none  |     0|acc     |↑  |0.1852|±  |0.0114|
-|             |       |none  |     0|acc_norm|↑  |0.2295|±  |0.0123|
-|arc_easy     |      1|none  |     0|acc     |↑  |0.4335|±  |0.0102|
-|             |       |none  |     0|acc_norm|↑  |0.3931|±  |0.0100|
-|hellaswag    |      1|none  |     0|acc     |↑  |0.2836|±  |0.0045|
-|             |       |none  |     0|acc_norm|↑  |0.3053|±  |0.0046|
-|piqa         |      1|none  |     0|acc     |↑  |0.6023|±  |0.0114|
-|             |       |none  |     0|acc_norm|↑  |0.5876|±  |0.0115|
-|winogrande   |      1|none  |     0|acc     |↑  |0.5264|±  |0.0140|
+|arc_challenge|      1|none  |     0|acc     |↑  |0.3515|±  |0.0140|
+|             |       |none  |     0|acc_norm|↑  |0.3575|±  |0.0140|
+|arc_easy     |      1|none  |     0|acc     |↑  |0.6848|±  |0.0095|
+|             |       |none  |     0|acc_norm|↑  |0.6410|±  |0.0098|
+|hellaswag    |      1|none  |     0|acc     |↑  |0.4389|±  |0.0050|
+|             |       |none  |     0|acc_norm|↑  |0.5717|±  |0.0049|
+|piqa         |      1|none  |     0|acc     |↑  |0.7225|±  |0.0104|
+|             |       |none  |     0|acc_norm|↑  |0.7220|±  |0.0105|
+|winogrande   |      1|none  |     0|acc     |↑  |0.6188|±  |0.0137|
 
-Average Acc: 40.62%
-Loading quantized model from /home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-dampenloss
+Average Acc: 56.33%
+Loading quantized model from /home/ubuntu/data/exp/proj2410/quant_model/Qwen2.5-3B/EfficientQAT/w3gs128
 Loading pre-computed quantized weights...
 Loading pre-computed quantized weights Successfully
 device_map: OrderedDict([('', 0)])
 Loading Wikitext-2 dataset...
-wikitext2: 456.0574035644531
+wikitext2: 9.154098510742188
 get_c4
-c4: 216.751953125
-wikitext2 perplexity: 456.06
-c4 perplexity: 216.75
+c4: 12.811882972717285
+wikitext2 perplexity: 9.15
+c4 perplexity: 12.81
+Evaluating on tasks: ['piqa', 'arc_easy', 'arc_challenge', 'hellaswag', 'winogrande']
 |    Tasks    |Version|Filter|n-shot| Metric |   |Value |   |Stderr|
 |-------------|------:|------|-----:|--------|---|-----:|---|-----:|
-|arc_challenge|      1|none  |     0|acc     |↑  |0.1715|±  |0.0110|
-|             |       |none  |     0|acc_norm|↑  |0.2005|±  |0.0117|
-|arc_easy     |      1|none  |     0|acc     |↑  |0.3329|±  |0.0097|
-|             |       |none  |     0|acc_norm|↑  |0.3093|±  |0.0095|
-|hellaswag    |      1|none  |     0|acc     |↑  |0.2632|±  |0.0044|
-|             |       |none  |     0|acc_norm|↑  |0.2622|±  |0.0044|
-|piqa         |      1|none  |     0|acc     |↑  |0.5696|±  |0.0116|
-|             |       |none  |     0|acc_norm|↑  |0.5593|±  |0.0116|
-|winogrande   |      1|none  |     0|acc     |↑  |0.5146|±  |0.0140|
+|arc_challenge|      1|none  |     0|acc     |↑  |0.4258|±  |0.0144|
+|             |       |none  |     0|acc_norm|↑  |0.4377|±  |0.0145|
+|arc_easy     |      1|none  |     0|acc     |↑  |0.7597|±  |0.0088|
+|             |       |none  |     0|acc_norm|↑  |0.7323|±  |0.0091|
+|hellaswag    |      1|none  |     0|acc     |↑  |0.5164|±  |0.0050|
+|             |       |none  |     0|acc_norm|↑  |0.6953|±  |0.0046|
+|piqa         |      1|none  |     0|acc     |↑  |0.7650|±  |0.0099|
+|             |       |none  |     0|acc_norm|↑  |0.7715|±  |0.0098|
+|winogrande   |      1|none  |     0|acc     |↑  |0.6811|±  |0.0131|
 
-Average Acc: 37.04%
-Loading quantized model from /home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-gradual-quant
+Average Acc: 62.96%
+Loading quantized model from /home/ubuntu/data/exp/proj2410/quant_model/Qwen2.5-3B/EfficientQAT/w3gs128-gradual-quant
 Loading pre-computed quantized weights...
 Loading pre-computed quantized weights Successfully
 device_map: OrderedDict([('', 0)])
 Loading Wikitext-2 dataset...
-wikitext2: 30.445409774780273
+wikitext2: 9.165616035461426
 get_c4
-c4: 30.615924835205078
-wikitext2 perplexity: 30.45
-c4 perplexity: 30.62
+c4: 12.761350631713867
+wikitext2 perplexity: 9.17
+c4 perplexity: 12.76
+Evaluating on tasks: ['piqa', 'arc_easy', 'arc_challenge', 'hellaswag', 'winogrande']
 |    Tasks    |Version|Filter|n-shot| Metric |   |Value |   |Stderr|
 |-------------|------:|------|-----:|--------|---|-----:|---|-----:|
-|arc_challenge|      1|none  |     0|acc     |↑  |0.2227|±  |0.0122|
-|             |       |none  |     0|acc_norm|↑  |0.2474|±  |0.0126|
-|arc_easy     |      1|none  |     0|acc     |↑  |0.5160|±  |0.0103|
-|             |       |none  |     0|acc_norm|↑  |0.4777|±  |0.0102|
-|hellaswag    |      1|none  |     0|acc     |↑  |0.3145|±  |0.0046|
-|             |       |none  |     0|acc_norm|↑  |0.3598|±  |0.0048|
-|piqa         |      1|none  |     0|acc     |↑  |0.6170|±  |0.0113|
-|             |       |none  |     0|acc_norm|↑  |0.6202|±  |0.0113|
-|winogrande   |      1|none  |     0|acc     |↑  |0.5272|±  |0.0140|
+|arc_challenge|      1|none  |     0|acc     |↑  |0.4352|±  |0.0145|
+|             |       |none  |     0|acc_norm|↑  |0.4676|±  |0.0146|
+|arc_easy     |      1|none  |     0|acc     |↑  |0.7715|±  |0.0086|
+|             |       |none  |     0|acc_norm|↑  |0.7521|±  |0.0089|
+|hellaswag    |      1|none  |     0|acc     |↑  |0.5184|±  |0.0050|
+|             |       |none  |     0|acc_norm|↑  |0.6946|±  |0.0046|
+|piqa         |      1|none  |     0|acc     |↑  |0.7780|±  |0.0097|
+|             |       |none  |     0|acc_norm|↑  |0.7753|±  |0.0097|
+|winogrande   |      1|none  |     0|acc     |↑  |0.6756|±  |0.0132|
 
-Average Acc: 43.95%
+Average Acc: 63.57%

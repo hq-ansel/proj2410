@@ -2,25 +2,26 @@
 wbits: 2
 group_size: 128
 # training settings
-cuda_ids: "0,1"
-epochs: 4
+cuda_ids: "5,1"
+epochs: 2
 net: Llama2-7B
 batch_size: 2
+min_lr_factor: 20
 quant_lr: 0.0001
-weight_lr: 0.0001
+weight_lr: 0.0002
 off_load_to_disk: False
 loss_func: MSE # "MSE", "FKLD" , "RKLD", "FKLD_RKLD" ,"MSE_FKLD", "MSE_RKLD", "MSE_FKLD_RKLD"
 crossblock_window_size: 1
 train_size:  4096
 slide_step: 1
-clip_grad: 1
-
+clip_grad: 0.3
 
 model: /home/ubuntu/data/exp/proj2410/model/Llama2-7B
 # save settings
-output_dir: /home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/EfficientQAT/w2gs128/
-log_loss: /home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/EfficientQAT/w2gs128/loss.csv
-save_quant_dir: /home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/EfficientQAT/w2gs128/
+output_dir: /home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/EfficientQAT/w2gs128-gradual-quant/
+log_loss: /home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/EfficientQAT/w2gs128-gradual-quant/loss.csv
+save_quant_dir: /home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/EfficientQAT/w2gs128-gradual-quant/
 clamp_method: STE
+gradual_quant: True
 
 align_type: tail

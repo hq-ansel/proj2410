@@ -1,6 +1,6 @@
 accelerate
 bitsandbytes
-datasets
+datasets==2.18.0
 lm_eval==0.4.4
 numpy
 torch
@@ -10,3 +10,7 @@ triton
 termcolor
 sentencepiece
 protobuf
+easydict
+matplotlib
+ninja
+gptqmodel

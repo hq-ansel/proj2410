@@ -3,16 +3,24 @@
 # 定义配置文件列表
 # )
 config_files=(
-    /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/Llama2-7b/b2gs128.yaml
-    /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/Llama2-7b/gradual-study/b2gs128-gradual-quant.yaml
-    /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/qwen2.5-0.5b/b2gs128.yaml
-    /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/qwen2.5-0.5b/gradual-study/b2gs128-gradual-quant.yaml
-    /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/qwen2.5-1.5b/b2gs128.yaml
-    /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/qwen2.5-1.5b/gradual-study/b2gs128-gradual-quant.yaml
-    /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/qwen2.5-3b/b2gs128.yaml
-    /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/qwen2.5-3b/gradual-study/b2gs128-gradual-quant.yaml
-    /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/qwen2.5-7b/b2gs128.yaml
-    /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/qwen2.5-7b/gradual-study/b2gs128-gradual-quant.yaml
+    # /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/qwen2.5-3b/b4gs128.yaml
+    # /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/qwen2.5-3b/gradual-study/b4gs128-gradual-quant.yaml
+
+    # /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/qwen2.5-3b/b3gs128.yaml
+    # /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/qwen2.5-3b/gradual-study/b3gs128-gradual-quant.yaml
+
+    /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/Llama3-8b/b2gs128.yaml
+    /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/Llama3-8b/gradual-study/b2gs128-gradual-quant.yaml
+    # /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/Llama2-7b/b2gs128.yaml
+    # /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/Llama2-7b/gradual-study/b2gs128-gradual-quant.yaml
+    # /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/qwen2.5-0.5b/b2gs128.yaml
+    # /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/qwen2.5-0.5b/gradual-study/b2gs128-gradual-quant.yaml
+    # /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/qwen2.5-1.5b/b2gs128.yaml
+    # /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/qwen2.5-1.5b/gradual-study/b2gs128-gradual-quant.yaml
+    # /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/qwen2.5-3b/b2gs128.yaml
+    # /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/qwen2.5-3b/gradual-study/b2gs128-gradual-quant.yaml
+    # /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/qwen2.5-7b/b2gs128.yaml
+    # /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/qwen2.5-7b/gradual-study/b2gs128-gradual-quant.yaml
 )
 # 循环遍历每个配置文件并执行 Python 命令
 # 设置并行参数，True 为并行，False 为串行
@@ -29,7 +37,8 @@ for config_path in "${config_files[@]}"; do
             cd /home/ubuntu/data/exp/proj2410/
 
             # 设置环境变量
-            export HF_HOME="/home/ubuntu/data/exp/proj2410/hf_home"
+            # export HF_HOME="/home/ubuntu/data/exp/proj2410/hf_home"
+            # export HF_ENDPOINT=https://hf-mirror.com 
             # export CUDA_VISIBLE_DEVICES=1  # or e.g. 0,1,2,3
             export MODEL_PATH=/home/ubuntu/data/exp/proj2410/model/Llama2-7b
             export DATASET_PATH=pajama

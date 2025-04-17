@@ -13,7 +13,10 @@ from accelerate import init_empty_weights, infer_auto_device_map, load_checkpoin
 from .triton_utils.kernels import dequant_dim0, dequant_dim1
 from .utils import get_named_linears,set_op_by_name
 
-from gptqmodel.nn_modules.qlinear.qlinear_tritonv2 import TritonV2QuantLinear
+try:
+    from gptqmodel.nn_modules.qlinear.qlinear_tritonv2 import TritonV2QuantLinear
+except ImportError:
+    from gptqmodel.nn_modules.qlinear.tritonv2 import TritonV2QuantLinear
 
 logger = getLogger(__name__)
 
@@ -38,7 +41,7 @@ class QuantLinear(nn.Module, TritonModuleMixin):
         **kwargs
     ):
         super().__init__()
-        if bits not in [2, 4, 8]:
+        if bits not in [2, 3, 4, 8]:
             raise NotImplementedError("Only 2,4,8 bits are supported.")
         if infeatures % 32 != 0 or outfeatures % 32 != 0:
             raise NotImplementedError("in_feature and out_feature must be divisible by 32.")
@@ -235,7 +238,7 @@ class QuantLinearV2(nn.Module, TritonModuleMixin):
         **kwargs
     ):
         super().__init__()
-        if bits not in [2, 4, 8]:
+        if bits not in [2, 3,4, 8]:
             raise NotImplementedError("Only 2,4,8 bits are supported.")
         if infeatures % 32 != 0 or outfeatures % 32 != 0:
             raise NotImplementedError("in_feature and out_feature must be divisible by 32.")
@@ -518,7 +521,7 @@ def load_quantized_model(model_path, wbits, group_size):
     print(f"Loading quantized model from {model_path}")
 
     # import pdb;pdb.set_trace()
-    tokenizer = AutoTokenizer.from_pretrained(model_path, use_fast=False)
+    tokenizer = AutoTokenizer.from_pretrained(model_path)
     config = AutoConfig.from_pretrained(model_path)
     with init_empty_weights():
         model = AutoModelForCausalLM.from_config(config=config,torch_dtype=torch.float16, trust_remote_code=True)
@@ -538,7 +541,11 @@ def load_quantized_model(model_path, wbits, group_size):
     # print("Loading pre-computed quantized weights...",model)
     model.tie_weights()
     # kwargs = {"max_memory": "16GB"} 
+    total_gpu = torch.cuda.device_count()
+    max_memory = {k:"20GiB" for k in range(total_gpu)}
+    # import pdb;pdb.set_trace()
     device_map = infer_auto_device_map(model,
+        max_memory=max_memory,
         no_split_module_classes=[
             "OPTDecoderLayer",
             "LlamaDecoderLayer",
@@ -549,11 +556,12 @@ def load_quantized_model(model_path, wbits, group_size):
         ],                               
         # **kwargs
         )
-    print("Loading pre-computed quantized weights...")
+    # import pdb;pdb.set_trace()
+    # print("Loading pre-computed quantized weights...")
+    print(device_map)
     load_checkpoint_in_model(model,
         checkpoint=model_path,
-        device_map=device_map,
-        offload_state_dict=True)
+        device_map=device_map)
     print("Loading pre-computed quantized weights Successfully")
 
     return model, tokenizer

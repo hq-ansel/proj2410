@@ -20,10 +20,10 @@ from .quantize.int_linear_real import load_quantized_model
 from .quantize.block_ap import block_ap
 from .quantize.crossblockquant import cross_block_quantization
 from .quantize.greedy_trainer import greedy_local_train,timer
-from .quantize.awq_pipeline import *
+# from .quantize.awq_pipeline import *
 
 amp_enabled = os.environ.get("AMP_ENABLED", "False").lower() == "true"
-
+torch.set_float32_matmul_precision('high')
 
 @torch.no_grad()
 def evaluate(model, tokenizer, args, logger=None):
@@ -34,12 +34,15 @@ def evaluate(model, tokenizer, args, logger=None):
     '''
     # import pdb;pdb.set_trace()
     block_class_name = model.model.layers[0].__class__.__name__
-    device_map = infer_auto_device_map(model, max_memory={i: args.max_memory for i in range(torch.cuda.device_count())}, no_split_module_classes=[block_class_name])
-    if logger is not None:
-        logger.info(f"device_map: {device_map}")
-    else:
-        print(f"device_map: {device_map}")
-    model = dispatch_model(model, device_map=device_map)
+    # os.environ['CUDA_VISIBLE_DEVICES'] = args.cuda_ids
+    # device_map = infer_auto_device_map(model, max_memory={i: args.max_memory for i in range(torch.cuda.device_count())}, no_split_module_classes=[block_class_name])
+    # cuda_ids = [2,3]
+    # device_map = infer_auto_device_map(model, max_memory={i: args.max_memory for i in cuda_ids}, no_split_module_classes=[block_class_name])
+    # if logger is not None:
+    #     logger.info(f"device_map: {device_map}")
+    # else:
+    #     print(f"device_map: {device_map}")
+    # model = dispatch_model(model, device_map=device_map)
     results = {}
 
     if args.eval_ppl:
@@ -57,6 +60,7 @@ def evaluate(model, tokenizer, args, logger=None):
         from lm_eval.utils import make_table
         task_list = args.eval_tasks.split(',')
         model = HFLM(pretrained=model, batch_size=args.eval_batch_size)
+        print(f"Evaluating on tasks: {task_list}")
         task_manager = lm_eval.tasks.TaskManager()
         results = lm_eval.simple_evaluate(
         model=model,
@@ -279,6 +283,7 @@ def main():
             model.save_pretrained(args.save_quant_dir)  
         tokenizer.save_pretrained(args.save_quant_dir) 
         logger.info("save model success")
+    model.to(args.cuda[0])
     evaluate(model, tokenizer, args,logger)
 
 

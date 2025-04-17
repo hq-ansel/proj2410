@@ -75,7 +75,74 @@ def clamp_mad(x: torch.Tensor, min_val, max_val):
     return ClampMAD.apply(x, torch.tensor(min_val, device=x.device), torch.tensor(max_val, device=x.device))
 
 
-class UniformAffineQuantizer(nn.Module):
+class BaseQuantizer(nn.Module):
+    def __init__(self, 
+        n_bits: int = 8,
+        group_size=None,
+    ):
+        super().__init__()
+        assert 2 <= n_bits <= 16, "bitwidth not supported"
+        self.n_bits = n_bits
+        self.qmin = 0
+        self.qmax = 2 ** (n_bits) - 1
+        self.group_size = group_size 
+
+    def change_n_bits(self, n_bits):
+        self.n_bits = n_bits
+        self.qmin = 0
+        self.qmax = int(2 ** (n_bits) - 1)
+
+    @staticmethod
+    def init_with_weight(weight, n_bits, group_size, clamp_method="STE"):
+        with torch.no_grad():
+            x = weight.reshape(-1,group_size)
+            xmin = x.amin([-1], keepdim=True)
+            xmax =  x.amax([-1], keepdim=True)
+            x_range = xmax - xmin
+            scale = x_range / (2**n_bits-1)
+            if clamp_method == "STE":
+                scale = scale.clamp(min=1e-4, max=1e4)
+            elif clamp_method == "MAD":
+                scale = clamp_mad(scale, 1e-4, 1e4)
+            zero_point = -xmin/scale
+            return scale, zero_point.round()
+        
+    def cal_qparams(self,scale,zero_point,clamp_method="STE"):
+        if clamp_method == "STE":
+            scale = clamp_ste(scale,1e-4, 1e4).half().float()
+            round_zero_point = clamp_ste(round_ste(zero_point), self.qmin, self.qmax)
+        elif clamp_method == "MAD":
+            scale = clamp_mad(scale, 1e-4, 1e4)
+            round_zero_point = clamp_mad(round_ste(zero_point), self.qmin, self.qmax)
+        return scale, round_zero_point
+
+    def _quantize(self, x, scale, round_zero_point):
+        x_int = round_ste(x / scale)
+        if round_zero_point is not None:
+            x_int = x_int.add(round_zero_point)
+        x_int = x_int.clamp(self.qmin, self.qmax)
+        return x_int
+    
+    def _dequantize(self, x_int, scale, round_zero_point):
+        if round_zero_point is not None:
+            x_int = x_int.sub(round_zero_point)
+        x_float = x_int * scale
+        return x_float
+    
+    def fake_quant(self, x):
+        scale, round_zero_point = self.cal_qparams(self.scale,
+                                                   self.zero_point,
+                                                   self.clamp_method)
+        ori_shape = x.shape
+        x = x.reshape(-1, self.group_size)
+        x_int = self._quantize(x, scale, round_zero_point)
+        x_dequant = self._dequantize(x_int, scale, round_zero_point)
+        return x_dequant.reshape(ori_shape)
+    
+    
+        
+
+class UniformAffineQuantizer(BaseQuantizer):
     def __init__(
         self,
         n_bits: int = 8,
@@ -83,13 +150,18 @@ class UniformAffineQuantizer(nn.Module):
         weight=None,
         args=None,
     ):
-        super().__init__()
-        assert 2 <= n_bits <= 16, "bitwidth not supported"
-        self.n_bits = n_bits
-        self.qmin = 0
-        self.qmax = 2 ** (n_bits) - 1
+        super().__init__(
+            n_bits=n_bits,
+            group_size=group_size,
+        )
         self.group_size = group_size if group_size != -1 else weight.shape[-1]
         assert weight.shape[-1] % group_size == 0
+
+        scale, zero_points = BaseQuantizer.init_with_weight(
+            weight, n_bits, group_size)
+        self.scale = nn.Parameter(scale)
+        self.zero_point = nn.Parameter(zero_points)
+
         self.enable = True
         self.clamp_method = args.get("clamp_method", "STE")
         self.is_tracking = args.get("iterative_freezing", False)
@@ -98,53 +170,20 @@ class UniformAffineQuantizer(nn.Module):
             freeze_threshold=args.get("freeze_threshold",0.0),
             use_ema_x_int=True
             )
-        # init scale and zero point through Max-Min quantization
-        with torch.no_grad():
-            if weight is not None:
-                x = weight.reshape(-1,self.group_size)
-                xmin = x.amin([-1], keepdim=True)
-                xmax =  x.amax([-1], keepdim=True)
-                range = xmax - xmin
-                scale = range / (2**self.n_bits-1)
-                if self.clamp_method == "STE":
-                    scale = scale.clamp(min=1e-4, max=1e4)
-                elif self.clamp_method == "MAD":
-                    scale = clamp_mad(scale, 1e-4, 1e4)
-                zero_point = -(xmin/scale).clamp(min=-1e4, max=1e4) 
-                self.scale = nn.Parameter(scale)
-                self.zero_point = nn.Parameter(zero_point.round())
-            
 
-    def change_n_bits(self, n_bits):
-        self.n_bits = n_bits
-        self.qmin = 0
-        self.qmax = int(2 ** (n_bits) - 1)
-        
     def fake_quant(self, x):
         
-        if self.clamp_method == "STE":
-            scale = clamp_ste(self.scale,1e-4, 1e4).half().float()
-            round_zero_point = clamp_ste(round_ste(self.zero_point), self.qmin, self.qmax)
-        elif self.clamp_method == "MAD":
-            scale = clamp_mad(self.scale, 1e-4, 1e4)
-            round_zero_point = clamp_mad(round_ste(self.zero_point), self.qmin, self.qmax)
-
-        dim1, dim2 = x.shape
+        scale, round_zero_point = self.cal_qparams(self.scale,
+                                                   self.zero_point,
+                                                   self.clamp_method)
+        ori_shape = x.shape
         x = x.reshape(-1, self.group_size)
-        x_int = round_ste(x / scale)
-        if round_zero_point is not None:
-            x_int = x_int.add(round_zero_point)
-        x_int = x_int.clamp(self.qmin, self.qmax)
         # freezing weights
+        x_int = self._quantize(x, scale, round_zero_point)
         if self.is_tracking:
-            x_int = self.weight_freeze_tracker(x_int,skip_tracking=False)
-        x_dequant = x_int
-        if round_zero_point is not None:
-            x_dequant = x_dequant.sub(round_zero_point)
-        x_dequant = x_dequant.mul(scale)
-        if self.group_size:
-            x_dequant = x_dequant.reshape(dim1, dim2)
-        return x_dequant
+            x_int = self.weight_freeze_tracker(x_int)
+        x_dequant = self._dequantize(x_int, scale, round_zero_point)
+        return x_dequant.reshape(ori_shape)
     
 
     def forward(self, x: torch.Tensor):

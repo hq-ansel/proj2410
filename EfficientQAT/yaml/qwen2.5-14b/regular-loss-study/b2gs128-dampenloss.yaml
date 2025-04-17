@@ -8,7 +8,7 @@ world_size: 4
 epochs: 4
 min_lr_factor: 1
 net: Qwen2.5-14B
-batch_size: 8
+batch_size: 4
 quant_lr: 0.0001
 weight_lr: 0.0001
 off_load_to_disk: False

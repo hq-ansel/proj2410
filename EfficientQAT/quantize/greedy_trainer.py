@@ -298,6 +298,21 @@ def train_units_layers(model: PreTrainedModel,
         position_ids = position_ids.unsqueeze(0).expand(args.batch_size, -1).contiguous()
         # print(f" data size {len(train_dataset)}")
 
+        # before training, need to prepare model?
+        if args.get("swa",False):
+            """
+                swa
+                swa_start: 开始使用swa的epoch数
+                swa_factor: 平均权重系数 默认建议为0.9
+            """
+            swa_model = torch.optim.swa_utils.AveragedModel(model,
+                            torch.optim.swa_utils.get_ema_avg_fn(args.swa_factor))
+            swa_start = args.swa_start # 需要手动指定
+            # 需要scheduler吗，暂时存疑
+            swa_scheduler = torch.optim.swa_utils.SWALR(optimizer, 
+                                                        anneal_strategy="cos", # “cos” or “linear”
+                                                        anneal_epochs=10, # default 
+                                                        swa_lr=args.swa_lr)
         # try torch.compile
         # qlayers = torch.nn.ModuleList(
         #     [torch.compile(qlayer,mode="reduce-overhead") for qlayer in qlayers]
@@ -311,10 +326,10 @@ def train_units_layers(model: PreTrainedModel,
             # torch.autograd.set_detect_anomaly(True)
             dataloader = DataLoader(train_dataset,
                                     batch_size=args.batch_size,
-                                    num_workers=1,
+                                    # num_workers=1,
                                     pin_memory=True,
-                                    prefetch_factor=32,  
-                                    shuffle=True
+                                    # prefetch_factor=32,  
+                                    shuffle=False,
                                     )
             # step 6.4: training                   
             for index, input_data in enumerate(dataloader):
@@ -397,7 +412,7 @@ def train_units_layers(model: PreTrainedModel,
                 else:
                     optimizer.step()
                 
-                # adjust lr
+                # adjust lr 这个是需要的吗？
                 if args.quant_lr > 0:
                     quant_scheduler.step()
                     optimizer.param_groups[quant_index]['lr'] = quant_scheduler.get_lr()[0]
@@ -411,10 +426,10 @@ def train_units_layers(model: PreTrainedModel,
                 val_loss_list = []
                 dataloader = DataLoader(val_dataset,
                                         batch_size=args.batch_size,
-                                        num_workers=0,
+                                        # num_workers=0,
                                         # pin_memory=True,
                                         # prefetch_factor=32,  
-                                        shuffle=True
+                                        shuffle=False,
                                         )
                 for index, input_data in enumerate(dataloader):  
                     # obtain output of quantization model

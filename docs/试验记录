@@ -32,3 +32,28 @@ scale的大部分max的值是小于1的，微调以后也是这样的吗？
 现在先试试其他的思路
 
 
+2025年4月18日 完成了训练
+
+先试一试dsq，看看这类改进ste的方法是不是可以直接用上
+直接寄，结果绷了，不知道是alpha的问题还是哪里的问题，可能需要先看看
+dsq到底是不是正常的
+
+2025年4月21日
+
+lr的衰减是怎么设置的？
+Efficient QAT似乎是在每个step之间设置衰减？
+但是很多论文的衰减似乎是按照epoch的方式设置的？
+
+新的疑问产生了？在做swa之前，先考虑一个问题，
+注意到EfficientQAT单独拿了一个lr schedule出来
+但是omniquant和efficientqat的论文里面都没有找到scheduler的说明？
+为什么需要使用scheduler?
+
+Scheduling Weight Transitions for Quantization-Aware Training 也提到了这一点
+关于量化过程中会出现的需要越过临界点(这个地方称为 transition points) 
+才能够 改变具体的量化值(这里称为discrete status)
+To be more specific, different from fullprecision weights, 
+quantized weights change their discrete levels, 
+only when corresponding latent weights pass transition points,
+ where the quantizer alters discrete states (we
+call this as transitions).

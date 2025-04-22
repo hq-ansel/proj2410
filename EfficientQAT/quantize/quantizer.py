@@ -737,3 +737,46 @@ class TrackOscillation(torch.nn.Module):
             self.frozen_x_int = torch.zeros_like(x_int)
             if self.use_ema_x_int:
                 self.ema_x_int = x_int.detach().clone()
+
+# TODO: DSQ还没有写完
+import math
+class DSQuantizer(UniformAffineQuantizer):
+
+    def __init__(self,
+        n_bits: int = 8,
+        group_size=None,
+        weight=None,
+        args=None,):
+        super().__init__(
+            n_bits=n_bits,
+            group_size=group_size,
+            weight=weight,
+            args=args,
+        )
+        alpha = args.get("alpha",0.4)
+        tanh_scale = 1 / (1 - alpha)
+        tanh_k = math.log((tanh_scale + 1) / (tanh_scale - 1))
+        self.tanh_scale = tanh_scale
+        self.tanh_k = tanh_k
+
+    def fake_quant(self, x):
+        tanh_scale = self.tanh_scale
+        tanh_k = self.tanh_k
+        scale = self.scale
+        zero_point = self.zero_point
+        quant_min = self.qmin
+        quant_max = self.qmax
+
+        ori_shape = x.shape
+        x = x.reshape(-1, self.group_size)
+
+
+        x = x / scale + zero_point
+        x = clamp_ste(x,quant_min,quant_max)
+        x = x.floor() + (tanh_scale 
+                          * torch.tanh(tanh_k * (x - x.floor() - 0.5))
+                        ) * 0.5 + 0.5
+        x = (x.round() - x).detach() + x
+        x = (x - zero_point) * scale
+
+        return x.reshape(ori_shape)

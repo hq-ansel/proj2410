@@ -43,6 +43,7 @@ class QuantLinear(nn.Module):
             quantizer_pkg = quantizerv3
         else:
             raise ValueError("Invalid quantizer version: {}".format(quantizer_version))
+        # 确定 quantizer的具体版本
         if args.get("gradual_quant", False):
             self.weight_quantizer = quantizer_pkg.GradualUniformAffineQuantizer(wbits,
                                                             group_size,
@@ -53,6 +54,11 @@ class QuantLinear(nn.Module):
                                                                      group_size,
                                                                      weight=org_module.weight,
                                                                      args=args)
+        elif args.get("dsq", False):
+            self.weight_quantizer = quantizer_pkg.DSQuantizer(wbits,
+                                                               group_size,
+                                                               weight=org_module.weight,
+                                                               args=args)
         else:
             self.weight_quantizer = quantizer_pkg.UniformAffineQuantizer(wbits, group_size, weight=org_module.weight,args=args)
             # self.weight_quantizer = UniformAffineQuantizerV2(wbits, group_size, weight=org_module.weight,args=args)

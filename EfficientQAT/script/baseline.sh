@@ -9,8 +9,10 @@ config_files=(
     # /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/qwen2.5-3b/b3gs128.yaml
     # /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/qwen2.5-3b/gradual-study/b3gs128-gradual-quant.yaml
 
-    /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/Llama3-8b/b2gs128.yaml
-    /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/Llama3-8b/gradual-study/b2gs128-gradual-quant.yaml
+    # /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/Llama3-8b/b2gs128.yaml
+    /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/Llama3-8b/b2gs128-fixlr.yaml
+    # /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/Llama3-8b/gradual-study/b2gs128-gradual-quant.yaml
+    # /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/Llama3-8b/b2gs128-dsq.yaml
     # /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/Llama2-7b/b2gs128.yaml
     # /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/Llama2-7b/gradual-study/b2gs128-gradual-quant.yaml
     # /home/ubuntu/data/exp/proj2410/EfficientQAT/yaml/qwen2.5-0.5b/b2gs128.yaml

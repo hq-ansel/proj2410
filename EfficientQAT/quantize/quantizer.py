@@ -94,6 +94,10 @@ class BaseQuantizer(nn.Module):
 
     @staticmethod
     def init_with_weight(weight, n_bits, group_size, clamp_method="STE"):
+        if weight.dtype == torch.float32 or weight.dtype == torch.float16:
+            scale_dtype = torch.float16
+        else:
+            scale_dtype = torch.bfloat16
         with torch.no_grad():
             x = weight.reshape(-1,group_size)
             xmin = x.amin([-1], keepdim=True)
@@ -105,11 +109,12 @@ class BaseQuantizer(nn.Module):
             elif clamp_method == "MAD":
                 scale = clamp_mad(scale, 1e-4, 1e4)
             zero_point = -xmin/scale
-            return scale, zero_point.round()
+            return scale.to(scale_dtype), zero_point.round().to(scale_dtype)
         
     def cal_qparams(self,scale,zero_point,clamp_method="STE"):
         if clamp_method == "STE":
-            scale = clamp_ste(scale,1e-4, 1e4).half().float()
+            scale_dtype = scale.dtype
+            scale = clamp_ste(scale,1e-4, 1e4).to(scale_dtype)
             round_zero_point = clamp_ste(round_ste(zero_point), self.qmin, self.qmax)
         elif clamp_method == "MAD":
             scale = clamp_mad(scale, 1e-4, 1e4)
@@ -156,7 +161,6 @@ class UniformAffineQuantizer(BaseQuantizer):
         )
         self.group_size = group_size if group_size != -1 else weight.shape[-1]
         assert weight.shape[-1] % group_size == 0
-
         scale, zero_points = BaseQuantizer.init_with_weight(
             weight, n_bits, group_size)
         self.scale = nn.Parameter(scale)

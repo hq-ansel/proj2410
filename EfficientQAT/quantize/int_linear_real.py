@@ -83,25 +83,6 @@ class QuantLinear(nn.Module, TritonModuleMixin):
         pass
 
 
-    def use_fake_quantization(self, del_quant=False,transpose=False):
-        # use fake quantization for faster training but consume more memory
-        weight = dequant_dim0(self.qweight, self.bits, self.maxq, self.infeatures, self.outfeatures)
-        dim0, dim1 = weight.shape
-        zeros = dequant_dim1(self.qzeros, self.bits, self.maxq, self.zeros_dim0, self.zeros_dim1)
-        weight = ((weight.view(-1, self.group_size, dim1) - zeros.view(-1, 1, dim1)) * self.scales.view(-1, 1, dim1)).reshape(dim0, dim1)
-        if transpose:
-            self.fake_transpose = True
-            weight = weight.transpose(0,1).contiguous()
-        self.register_buffer(
-            'weight',
-            weight
-        )
-        self.use_fake = True
-        if del_quant:
-            del self.qweight
-            del self.scales
-            del self.qzeros
-            del self.g_idx
         
     def pack(self, linear, scales, zeros, g_idx=None):
         """
@@ -119,9 +100,14 @@ class QuantLinear(nn.Module, TritonModuleMixin):
         g_idx = torch.tensor([i // self.group_size for i in range(self.infeatures)], dtype=torch.int32)
 
         scale_zeros = zeros * scales
-        self.scales = nn.Parameter(scales)
+
+        # 考虑有可能是bfloat16或者float16不要把参数限制的太死
+        # import pdb; pdb.set_trace()
+        scale_dtype = scales.dtype
+
+        self.scales = nn.Parameter(scales.to(scale_dtype))
         if linear.bias is not None:
-            self.bias = linear.bias.clone()
+            self.bias = linear.bias.clone().to(scale_dtype)
 
         intweight = []
         for idx in range(self.infeatures):
@@ -139,7 +125,8 @@ class QuantLinear(nn.Module, TritonModuleMixin):
         row = 0
         # qweight (infeatures//(32//bits), outfeatures)
         # intweight (infeatures, outfeatures)
-        qweight = np.zeros((math.ceil(intweight.shape[0]/(32//self.bits)), intweight.shape[1]), dtype=np.uint32)
+        qweight = np.zeros((math.ceil(intweight.shape[0]/(32//self.bits)),
+                             intweight.shape[1]), dtype=np.uint32)
         while row < qweight.shape[0]:
             if self.bits in [2, 3, 4, 8]:
                 for j in range(i, min(i + (32 // self.bits), intweight.shape[0])):
@@ -151,8 +138,7 @@ class QuantLinear(nn.Module, TritonModuleMixin):
 
         qweight = qweight.astype(np.int32)
         self.qweight = torch.from_numpy(qweight)
-
-        zeros = zeros.numpy().astype(np.uint32)
+        zeros = zeros.float().numpy().astype(np.uint32)
         self.zeros_dim0, self.zeros_dim1 = zeros.shape
         # qzeros (infeatures//group_size, outfeatures//(32//bits))
         qzeros = np.zeros((zeros.shape[0], math.ceil(zeros.shape[1] / (32 // self.bits))), dtype=np.uint32)
@@ -170,9 +156,45 @@ class QuantLinear(nn.Module, TritonModuleMixin):
         qzeros = qzeros.astype(np.int32)
         self.qzeros = torch.from_numpy(qzeros)
 
-        self.scales.data = self.scales.data.half()
-        if self.bias is not None:
-            self.bias.data = self.bias.data.half()
+        # self.scales.data = self.scales.data.half()
+        # if self.bias is not None:
+        #     self.bias.data = self.bias.data.half()
+
+    def get_weight(self, transpose=False, dtype = torch.float16):
+        weight = dequant_dim0(self.qweight, self.bits, self.maxq,
+                               self.infeatures, self.outfeatures,dtype=dtype)
+        dim0, dim1 = weight.shape
+        zeros = dequant_dim1(self.qzeros, self.bits, self.maxq,
+                              self.zeros_dim0, self.zeros_dim1, dtype=dtype)
+        weight = ((weight.view(-1, self.group_size, dim1) - zeros.view(-1, 1, dim1)) 
+            * self.scales.view(-1, 1, dim1)).reshape(dim0, dim1)
+        if transpose:
+            self.fake_transpose = True
+            weight = weight.transpose(0,1).contiguous()
+        return weight
+    
+    def use_fake_quantization(self, del_quant=False,transpose=False):
+        # use fake quantization for faster training but consume more memory
+        weight = dequant_dim0(self.qweight, self.bits,
+                 self.maxq, self.infeatures, self.outfeatures)
+        dim0, dim1 = weight.shape
+        zeros = dequant_dim1(self.qzeros, self.bits, self.maxq,
+                 self.zeros_dim0, self.zeros_dim1)
+        weight = ((weight.view(-1, self.group_size, dim1) - zeros.view(-1, 1, dim1))
+             * self.scales.view(-1, 1, dim1)).reshape(dim0, dim1)
+        if transpose:
+            self.fake_transpose = True
+            weight = weight.transpose(0,1).contiguous()
+        self.register_buffer(
+            'weight',
+            weight
+        )
+        self.use_fake = True
+        if del_quant:
+            del self.qweight
+            del self.scales
+            del self.qzeros
+            del self.g_idx
 
     def _dequant_dim0(self):
         return dequant_dim0(self.qweight, self.bits, self.maxq, self.infeatures, self.outfeatures)
@@ -181,23 +203,45 @@ class QuantLinear(nn.Module, TritonModuleMixin):
         return dequant_dim1(self.qzeros, self.bits, self.maxq, self.zeros_dim0, self.zeros_dim1)
 
     def forward(self, x):
+        dtype = x.dtype
         if self.use_fake:
             weight = self.weight
             if self.fake_transpose:
                 weight = weight.transpose(0,1)
         else:
-            weight = dequant_dim0(self.qweight, self.bits, self.maxq, self.infeatures, self.outfeatures)
+            weight = dequant_dim0(self.qweight, self.bits, self.maxq,
+                                   self.infeatures, self.outfeatures,
+                                   dtype)
             dim0, dim1 = weight.shape
             # dim2 = (dim1*dim0)//self.group_size
-            zeros = dequant_dim1(self.qzeros, self.bits, self.maxq, self.zeros_dim0, self.zeros_dim1)
-            weight = ((weight.view(-1, self.group_size, dim1) - zeros.view(-1, 1, dim1)) * self.scales.view(-1, 1, dim1)).reshape(dim0, dim1)
+            zeros = dequant_dim1(self.qzeros, self.bits, self.maxq, 
+                                 self.zeros_dim0, self.zeros_dim1,
+                                 dtype)
+            # assert torch.allclose(weight, weight.round(),1e-5)
+            # assert torch.allclose(zeros, zeros.round(),1e-5)
+            weight = ((weight.view(-1, self.group_size, dim1)
+                        - zeros.view(-1, 1, dim1))
+                       * self.scales.view(-1, 1, dim1)
+                       ).reshape(dim0, dim1)
+        # assert torch.allclose(self.weight,weight, atol=1e-5)
+        # assert weight.dtype == dtype
         # out = torch.matmul(x, weight)
         # torch.cuda.synchronize()
         # if self.clamp_input:
         #     x = torch.clamp(x, -128, 127)
         # import pdb; pdb.set_trace()
-        out = torch.matmul(x, weight.to(x.dtype))
-        # torch.cuda.synchronize()
+        # out = torch.matmul(x, weight.to(x.dtype))
+
+
+        out = torch.matmul(x, weight)
+        # assert torch.allclose(out,torch.nn.functional.linear(x, weight.T),1e-8)
+        # get_weight = self.get_weight(dtype=x.dtype)
+        # import pdb; pdb.set_trace()
+        # assert torch.allclose(out,torch.nn.functional.linear(x, 
+        #     get_weight.T),1e-7),f"{torch.amax(torch.abs(weight- 
+        #                                 get_weight))}"
+        # # torch.cuda.synchronize()
+        # assert out.dtype == dtype== weight.dtype == x.dtype ,f"{out.dtype} {dtype} {weight.dtype} {x.dtype}"
 
         # out = out + self.bias.to(x.dtype) if self.bias is not None else out
         if self.bias is not None:
@@ -317,8 +361,11 @@ class QuantLinearV2(nn.Module, TritonModuleMixin):
     
         g_idx = torch.tensor([i // self.group_size for i in range(self.infeatures)], dtype=torch.int32)
 
-        self.scales = nn.Parameter(scales.half())
-        self.qzeros = nn.Parameter(zeros.half())
+        # 考虑有可能是bfloat16或者float16不要把参数限制的太死
+        import pdb; pdb.set_trace()
+        scale_dtype = scales.dtype
+        self.scales = nn.Parameter(scales.to(scale_dtype))
+        self.qzeros = nn.Parameter(zeros.to(scale_dtype))
 
         if linear.bias is not None:
             self.bias = linear.bias.clone().half()

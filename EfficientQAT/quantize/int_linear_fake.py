@@ -81,13 +81,11 @@ class QuantLinear(nn.Module):
         else:
             weight = self.weight
             bias = self.bias
-        # weight = self.weight
-        # bias = self.bias
-
         out = self.fwd_func(input, weight, bias, **self.fwd_kwargs)
-
+        # out = torch.matmul(input, weight.T)
 
         return out
+
     def get_dampen_loss(self):
         # def clamp_ste(x: torch.Tensor, _min, _max):
         #     return (x.clamp(_min,_max) - x).detach() + x

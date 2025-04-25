@@ -250,6 +250,7 @@ def train_units_layers(model: PreTrainedModel,
         #                             weight_decay=args.wd,
         # )
         qlayers = model.model.layers
+        
         loss_scaler= torch.amp.GradScaler(device=args.dev)
         trainable_number = trainable_parameters_num(selected_layers)
         print(f"trainable parameter number: {trainable_number/1e6}M")
@@ -304,20 +305,19 @@ def train_units_layers(model: PreTrainedModel,
                 swa
                 swa_start: 开始使用swa的epoch数
                 swa_factor: 平均权重系数 默认建议为0.9
+                swa_lr: 学习率 我需要用到这个吗？要不还是让其自动管理吧
             """
-            swa_model = torch.optim.swa_utils.AveragedModel(model,
-                            torch.optim.swa_utils.get_ema_avg_fn(args.swa_factor))
-            swa_start = args.swa_start # 需要手动指定
+            swa_model = torch.optim.swa_utils.AveragedModel(selected_layers,
+                                                                device=args.dev,
+                        avg_fn=torch.optim.swa_utils.get_ema_avg_fn(args.get("swa_factor",0.9)))
+            swa_start = args.get("swa_start") # 需要手动指定
             # 需要scheduler吗，暂时存疑
-            swa_scheduler = torch.optim.swa_utils.SWALR(optimizer, 
-                                                        anneal_strategy="cos", # “cos” or “linear”
-                                                        anneal_epochs=10, # default 
-                                                        swa_lr=args.swa_lr)
+            # swa_scheduler = torch.optim.swa_utils.SWALR(optimizer, 
+            #                                             anneal_strategy="cos", # “cos” or “linear”
+            #                                             anneal_epochs=10, # default 
+            #                                             swa_lr=args.swa_lr)
         # try torch.compile
-        # qlayers = torch.nn.ModuleList(
-        #     [torch.compile(qlayer,mode="reduce-overhead") for qlayer in qlayers]
-        # )
-
+        selected_layers = torch.compile(selected_layers,mode="reduce-overhead")
         for epoch in range(args.epochs):
             loss_list = []
             norm_list = []
@@ -406,11 +406,23 @@ def train_units_layers(model: PreTrainedModel,
                 # 使用子空间优化
                 if args.get("sub_space_grad_clean",False):
                     sub_space_clean(selected_layers)
+                
+                
+                # optmizer step zone
                 if amp_enabled:
                     loss_scaler.step(optimizer)
                     loss_scaler.update()
                 else:
                     optimizer.step()
+                
+                # inject swa model
+                if args.get("swa",False):
+                    if step> swa_start and step % args.get("swa_freq",200)==0:
+                        # When update_parameters() is called for the first time 
+                        # (i.e. n_averaged is 0) the parameters of model are copied to the parameters of AveragedModel.
+                        #  For every subsequent call of update_parameters() the function avg_fn is used to update the parameters.
+                        swa_model.update_parameters(selected_layers)
+                        print("merge model")
                 
                 # adjust lr 这个是需要的吗？
                 if args.quant_lr > 0:

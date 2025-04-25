@@ -1,120 +1,72 @@
+
+[32mINFO[0m  ENV: Auto setting PYTORCH_CUDA_ALLOC_CONF='expandable_segments:True' for memory saving.
+[32mINFO[0m  ENV: Auto setting CUDA_DEVICE_ORDER=PCI_BUS_ID for correctness.          
 AMP enabled: False
-device_map: OrderedDict([('', 0)])
 Loading Wikitext-2 dataset...
-wikitext2: 8.030269622802734
+wikitext2: 6.13566780090332
 get_c4
-c4: 11.67180061340332
-wikitext2 perplexity: 8.03
-c4 perplexity: 11.67
+c4: 8.922924041748047
+wikitext2 perplexity: 6.14
+c4 perplexity: 8.92
 Evaluating on tasks: ['piqa', 'arc_easy', 'arc_challenge', 'hellaswag', 'winogrande']
 |    Tasks    |Version|Filter|n-shot| Metric |   |Value |   |Stderr|
 |-------------|------:|------|-----:|--------|---|-----:|---|-----:|
-|arc_challenge|      1|none  |     0|acc     |↑  |0.4497|±  |0.0145|
-|             |       |none  |     0|acc_norm|↑  |0.4744|±  |0.0146|
-|arc_easy     |      1|none  |     0|acc     |↑  |0.7744|±  |0.0086|
-|             |       |none  |     0|acc_norm|↑  |0.7315|±  |0.0091|
-|hellaswag    |      1|none  |     0|acc     |↑  |0.5492|±  |0.0050|
-|             |       |none  |     0|acc_norm|↑  |0.7352|±  |0.0044|
-|piqa         |      1|none  |     0|acc     |↑  |0.7862|±  |0.0096|
-|             |       |none  |     0|acc_norm|↑  |0.7884|±  |0.0095|
-|winogrande   |      1|none  |     0|acc     |↑  |0.6851|±  |0.0131|
+|arc_challenge|      1|none  |     0|acc     |↑  |0.5043|±  |0.0146|
+|             |       |none  |     0|acc_norm|↑  |0.5333|±  |0.0146|
+|arc_easy     |      1|none  |     0|acc     |↑  |0.8009|±  |0.0082|
+|             |       |none  |     0|acc_norm|↑  |0.7769|±  |0.0085|
+|hellaswag    |      1|none  |     0|acc     |↑  |0.6018|±  |0.0049|
+|             |       |none  |     0|acc_norm|↑  |0.7916|±  |0.0041|
+|piqa         |      1|none  |     0|acc     |↑  |0.7971|±  |0.0094|
+|             |       |none  |     0|acc_norm|↑  |0.8079|±  |0.0092|
+|winogrande   |      1|none  |     0|acc     |↑  |0.7285|±  |0.0125|
 
-Average Acc: 64.89%
+Average Acc: 68.65%
 
+[32mINFO[0m  ENV: Auto setting PYTORCH_CUDA_ALLOC_CONF='expandable_segments:True' for memory saving.
+[32mINFO[0m  ENV: Auto setting CUDA_DEVICE_ORDER=PCI_BUS_ID for correctness.          
 AMP enabled: False
-Loading quantized model from /home/ubuntu/data/exp/proj2410/quant_model/Qwen2.5-3B/EfficientQAT/w2gs128
-Loading pre-computed quantized weights...
+Loading quantized model from /home/ubuntu/data/exp/proj2410/quant_model/Llama3-8B/EfficientQAT/w2gs128
+OrderedDict({'': 0})
 Loading pre-computed quantized weights Successfully
-device_map: OrderedDict([('', 0)])
 Loading Wikitext-2 dataset...
-wikitext2: 13.794421195983887
+wikitext2: 14.686344146728516
 get_c4
-c4: 17.19541358947754
-wikitext2 perplexity: 13.79
-c4 perplexity: 17.20
+c4: 18.120141983032227
+wikitext2 perplexity: 14.69
+c4 perplexity: 18.12
 Evaluating on tasks: ['piqa', 'arc_easy', 'arc_challenge', 'hellaswag', 'winogrande']
-|    Tasks    |Version|Filter|n-shot| Metric |   |Value |   |Stderr|
-|-------------|------:|------|-----:|--------|---|-----:|---|-----:|
-|arc_challenge|      1|none  |     0|acc     |↑  |0.3422|±  |0.0139|
-|             |       |none  |     0|acc_norm|↑  |0.3592|±  |0.0140|
-|arc_easy     |      1|none  |     0|acc     |↑  |0.6801|±  |0.0096|
-|             |       |none  |     0|acc_norm|↑  |0.6368|±  |0.0099|
-|hellaswag    |      1|none  |     0|acc     |↑  |0.4306|±  |0.0049|
-|             |       |none  |     0|acc_norm|↑  |0.5647|±  |0.0049|
-|piqa         |      1|none  |     0|acc     |↑  |0.7198|±  |0.0105|
-|             |       |none  |     0|acc_norm|↑  |0.7182|±  |0.0105|
-|winogrande   |      1|none  |     0|acc     |↑  |0.6172|±  |0.0137|
 
-Average Acc: 55.80%
-Loading quantized model from /home/ubuntu/data/exp/proj2410/quant_model/Qwen2.5-3B/EfficientQAT/w2gs128-gradual-quant
-Loading pre-computed quantized weights...
+[32mINFO[0m  ENV: Auto setting PYTORCH_CUDA_ALLOC_CONF='expandable_segments:True' for memory saving.
+[32mINFO[0m  ENV: Auto setting CUDA_DEVICE_ORDER=PCI_BUS_ID for correctness.          
+AMP enabled: False
+Loading quantized model from /home/ubuntu/data/exp/proj2410/quant_model/Llama3-8B/EfficientQAT/w2gs128
+OrderedDict({'': 0})
 Loading pre-computed quantized weights Successfully
-device_map: OrderedDict([('', 0)])
 Loading Wikitext-2 dataset...
-wikitext2: 13.582012176513672
+wikitext2: 14.686344146728516
 get_c4
-c4: 17.005651473999023
-wikitext2 perplexity: 13.58
-c4 perplexity: 17.01
-Evaluating on tasks: ['piqa', 'arc_easy', 'arc_challenge', 'hellaswag', 'winogrande']
-|    Tasks    |Version|Filter|n-shot| Metric |   |Value |   |Stderr|
-|-------------|------:|------|-----:|--------|---|-----:|---|-----:|
-|arc_challenge|      1|none  |     0|acc     |↑  |0.3515|±  |0.0140|
-|             |       |none  |     0|acc_norm|↑  |0.3575|±  |0.0140|
-|arc_easy     |      1|none  |     0|acc     |↑  |0.6848|±  |0.0095|
-|             |       |none  |     0|acc_norm|↑  |0.6410|±  |0.0098|
-|hellaswag    |      1|none  |     0|acc     |↑  |0.4389|±  |0.0050|
-|             |       |none  |     0|acc_norm|↑  |0.5717|±  |0.0049|
-|piqa         |      1|none  |     0|acc     |↑  |0.7225|±  |0.0104|
-|             |       |none  |     0|acc_norm|↑  |0.7220|±  |0.0105|
-|winogrande   |      1|none  |     0|acc     |↑  |0.6188|±  |0.0137|
 
-Average Acc: 56.33%
-Loading quantized model from /home/ubuntu/data/exp/proj2410/quant_model/Qwen2.5-3B/EfficientQAT/w3gs128
-Loading pre-computed quantized weights...
+[32mINFO[0m  ENV: Auto setting PYTORCH_CUDA_ALLOC_CONF='expandable_segments:True' for memory saving.
+[32mINFO[0m  ENV: Auto setting CUDA_DEVICE_ORDER=PCI_BUS_ID for correctness.          
+AMP enabled: False
+Loading quantized model from /home/ubuntu/data/exp/proj2410/quant_model/Llama3-8B/EfficientQAT/w2gs128
+OrderedDict({'': 0})
 Loading pre-computed quantized weights Successfully
-device_map: OrderedDict([('', 0)])
 Loading Wikitext-2 dataset...
-wikitext2: 9.154098510742188
+wikitext2: 14.686344146728516
 get_c4
-c4: 12.811882972717285
-wikitext2 perplexity: 9.15
-c4 perplexity: 12.81
-Evaluating on tasks: ['piqa', 'arc_easy', 'arc_challenge', 'hellaswag', 'winogrande']
-|    Tasks    |Version|Filter|n-shot| Metric |   |Value |   |Stderr|
-|-------------|------:|------|-----:|--------|---|-----:|---|-----:|
-|arc_challenge|      1|none  |     0|acc     |↑  |0.4258|±  |0.0144|
-|             |       |none  |     0|acc_norm|↑  |0.4377|±  |0.0145|
-|arc_easy     |      1|none  |     0|acc     |↑  |0.7597|±  |0.0088|
-|             |       |none  |     0|acc_norm|↑  |0.7323|±  |0.0091|
-|hellaswag    |      1|none  |     0|acc     |↑  |0.5164|±  |0.0050|
-|             |       |none  |     0|acc_norm|↑  |0.6953|±  |0.0046|
-|piqa         |      1|none  |     0|acc     |↑  |0.7650|±  |0.0099|
-|             |       |none  |     0|acc_norm|↑  |0.7715|±  |0.0098|
-|winogrande   |      1|none  |     0|acc     |↑  |0.6811|±  |0.0131|
 
-Average Acc: 62.96%
-Loading quantized model from /home/ubuntu/data/exp/proj2410/quant_model/Qwen2.5-3B/EfficientQAT/w3gs128-gradual-quant
-Loading pre-computed quantized weights...
+[32mINFO[0m  ENV: Auto setting PYTORCH_CUDA_ALLOC_CONF='expandable_segments:True' for memory saving.
+[32mINFO[0m  ENV: Auto setting CUDA_DEVICE_ORDER=PCI_BUS_ID for correctness.          
+AMP enabled: False
+Loading quantized model from /home/ubuntu/data/exp/proj2410/quant_model/Llama3-8B/EfficientQAT/w2gs128
+OrderedDict({'': 0})
 Loading pre-computed quantized weights Successfully
-device_map: OrderedDict([('', 0)])
 Loading Wikitext-2 dataset...
-wikitext2: 9.165616035461426
+wikitext2: 14.686344146728516
 get_c4
-c4: 12.761350631713867
-wikitext2 perplexity: 9.17
-c4 perplexity: 12.76
+c4: 18.120141983032227
+wikitext2 perplexity: 14.69
+c4 perplexity: 18.12
 Evaluating on tasks: ['piqa', 'arc_easy', 'arc_challenge', 'hellaswag', 'winogrande']
-|    Tasks    |Version|Filter|n-shot| Metric |   |Value |   |Stderr|
-|-------------|------:|------|-----:|--------|---|-----:|---|-----:|
-|arc_challenge|      1|none  |     0|acc     |↑  |0.4352|±  |0.0145|
-|             |       |none  |     0|acc_norm|↑  |0.4676|±  |0.0146|
-|arc_easy     |      1|none  |     0|acc     |↑  |0.7715|±  |0.0086|
-|             |       |none  |     0|acc_norm|↑  |0.7521|±  |0.0089|
-|hellaswag    |      1|none  |     0|acc     |↑  |0.5184|±  |0.0050|
-|             |       |none  |     0|acc_norm|↑  |0.6946|±  |0.0046|
-|piqa         |      1|none  |     0|acc     |↑  |0.7780|±  |0.0097|
-|             |       |none  |     0|acc_norm|↑  |0.7753|±  |0.0097|
-|winogrande   |      1|none  |     0|acc     |↑  |0.6756|±  |0.0132|
-
-Average Acc: 63.57%

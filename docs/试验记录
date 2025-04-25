@@ -57,3 +57,8 @@ quantized weights change their discrete levels,
 only when corresponding latent weights pass transition points,
  where the quantizer alters discrete states (we
 call this as transitions).
+
+
+2025年4月22日
+
+swa处理？

@@ -102,7 +102,7 @@ def plot_loss(block_loss_data, blk_id, downsample_step=25, smoothing_window=25):
 # loss_dir="/home/ubuntu/data/exp/proj2410/logs"
 # file = os.path.join(loss_dir,"Llama2-7b-efficientqat-w2gs128.csv")
 # quant_model_path = "/home/ubuntu/data/exp/proj2410/quant_model/Llama3-8B/EfficientQAT/w2gs128-gradual-quant"
-quant_model_path = "/home/ubuntu/data/exp/proj2410/quant_model/Llama3-8B/EfficientQAT/w2gs128"
+quant_model_path = "/home/ubuntu/data/exp/proj2410/quant_model/Llama3-8B/EfficientQAT/w2gs128-swa60"
 loss_path = f"{quant_model_path}/loss.csv"
 recorder = BlockLossRecorder(loss_path)
 # pdf_name = 

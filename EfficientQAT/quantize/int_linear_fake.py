@@ -62,7 +62,7 @@ class QuantLinear(nn.Module):
                                                                args=args)
         else:
             self.weight_quantizer = quantizer_pkg.UniformAffineQuantizer(wbits, group_size, weight=org_module.weight,args=args)
-            # self.weight_quantizer = UniformAffineQuantizerV2(wbits, group_size, weight=org_module.weight,args=args)
+
         self.use_temporary_parameter = False
         self.clamp_input = args.get('clamp_input',False)
         self.post_init(args)

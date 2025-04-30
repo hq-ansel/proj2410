@@ -56,8 +56,12 @@ def init_fake_real_linear( linear:Linear):
     
     assert f_w.dtype == q_f_w.dtype == r_w.dtype == dtype , f"{f_w.dtype} {q_f_w.dtype} {r_w.dtype} {dtype}"
     
-    print(f"real and fake diff {torch.sum(torch.abs(f_w - r_w)>1e-9)}")
-    print(f"fake and q_fake diff {torch.sum(torch.abs(q_f_w - f_w)>1e-9)}")
+    assert torch.allclose(f_w, q_f_w, atol=1e-7)
+    assert torch.allclose(q_f_w, r_w, atol=1e-7)
+    assert torch.allclose(f_w, r_w, atol=1e-7)
+    
+    # print(f"real and fake diff {torch.sum(torch.abs(f_w - r_w)>1e-9)}")
+    # print(f"fake and q_fake diff {torch.sum(torch.abs(q_f_w - f_w)>1e-9)}")
 
     return linear_q_fake, linear_q_real
 
@@ -77,7 +81,7 @@ def test_linear(SIZE, BATCH, SEQLEN,  DTYPE):
         rtol, atol = (1e-3, 3e-3)
 
     rawlinear = Linear(SIZE[0], SIZE[1], False,dtype=DTYPE).cuda()
-
+    # 原始的linear.weight 的形状为(out_features, in_features)
     init.kaiming_uniform_(rawlinear.weight, a=math.sqrt(5))
     # input_tensor = torch.randn([BATCH, SEQLEN, SIZE[0]], dtype=DTYPE, device="cuda")
     # 全0测试 pass
@@ -98,25 +102,29 @@ def test_linear(SIZE, BATCH, SEQLEN,  DTYPE):
     tensor_fake = linear_q_fake.forward(input_tensor)
     tensor_real = linear_q_real.forward(input_tensor)
 
-    linear_q_real.use_fake_quantization()
-    tensor_us_fake = linear_q_fake.forward(input_tensor)
+    # linear_q_real.use_fake_quantization()
+    # tensor_us_fake = linear_q_real.forward(input_tensor)
     
     assert linear_q_fake.bias is None
     assert linear_q_real.bias is None
 
-    assert DTYPE == tensor_fake.dtype == tensor_real.dtype == tensor_us_fake.dtype,f"{DTYPE} {tensor_fake.dtype} {tensor_real.dtype} {tensor_us_fake.dtype}"
+    assert (DTYPE == tensor_fake.dtype 
+        == tensor_real.dtype 
+        ),f"{DTYPE} {tensor_fake.dtype} {tensor_real.dtype} "
     atol = 1e-5
     print(f"amax = {torch.amax(tensor_real - tensor_fake)} norm = {torch.norm(tensor_real - tensor_fake)}")
     # 统计相差大于atol的个数
     print("real == fake?",torch.sum(torch.abs(tensor_real - tensor_fake) > atol))
-    print("us fake == fake?",torch.sum(torch.abs(tensor_us_fake - tensor_fake) > atol))
+    # print("us fake == fake?",torch.sum(torch.abs(tensor_us_fake - tensor_fake) > atol))
+
 
     assert torch.allclose(tensor_fake, tensor_real,atol=atol)
 
-
+# export PYTHONPATH=$PYTHONPATH:/home/ubuntu/data/exp/proj2410
 if __name__ == "__main__":
     # test_linear((4096, 14336), 4, 2,  torch.bfloat16)
     # test_linear((896, 896), 4, 2048,  torch.bfloat16)
     # test_linear((4096, 14336), 2, 1024,  torch.float32)
     # test_linear((4096, 4096), 4, 2048,  torch.bfloat16)
-    test_linear((4096, 4096), 4, 2048,  torch.float16)
+    test_linear((4096, 14336), 4, 2048,  torch.float16)
+    test_linear((4096, 4096), 2, 1024,  torch.float16)

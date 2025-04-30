@@ -23,6 +23,7 @@ class QuantLinear(nn.Module):
         super().__init__()
         self.fwd_kwargs = dict()
         self.fwd_func = F.linear
+        # get (out_features, in_features)
         self.register_parameter('weight',org_module.weight) # trainable
         if org_module.bias is not None:
             self.register_buffer('bias',org_module.bias)

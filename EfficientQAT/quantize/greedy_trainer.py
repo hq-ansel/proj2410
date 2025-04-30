@@ -195,62 +195,6 @@ def train_units_layers(model: PreTrainedModel,
                                     weight_decay=args.wd,
                                     foreach=True)
         
-        # 导致训练崩溃
-        # logger.info("using AdaW 8bit optimizer")
-        # optimizer =bnb.optim.AdamW8bit(
-        #     param_groups,
-        #     weight_decay=args.wd,
-        #     # foreach=True
-        # )
-        # logger.info(f"using Muon optimizer")
-        # class UnionOptimizer(torch.optim.Optimizer):
-        #     def __init__(self, params, weight_decay=0.0):
-        #         super(UnionOptimizer, self).__init__(params=params,defaults={ "weight_decay": weight_decay})
-        #         # 将参数分为 muon_params 和 adamw_params
-        #         muon_params = []
-        #         adamw_params = []
-        #         lr = None
-        #         for p in params:  # 仅遍历一次参数列表
-        #             param_tensors = p["params"]
-        #             if lr is None:
-        #                 lr = p["lr"]
-        #             for param_tensor in param_tensors:
-        #                 if param_tensor.ndim >= 2:
-        #                     muon_params.append(param_tensor)
-        #                 else:
-        #                     adamw_params.append({"params": param_tensor, "lr": p["lr"]})
-        #         # muon_params = [p for p in params if p["params"].ndim >= 2]
-        #         # adamw_params = [p for p in params if p["params"].ndim < 2]
-
-        #         # 创建 Muon 和 AdamW 优化器
-        #         self.muon_optimizer = Muon(muon_params,lr=lr,weight_decay=weight_decay)
-        #         self.adamw_optimizer = torch.optim.AdamW(adamw_params,weight_decay=weight_decay)
-
-        #         # 将两个优化器的 param_groups 合并
-        #         param_groups = self.muon_optimizer.param_groups + self.adamw_optimizer.param_groups
-        #         self.param_groups = param_groups
-
-        #     def zero_grad(self, set_to_none=False):
-        #         self.muon_optimizer.zero_grad(set_to_none)
-        #         self.adamw_optimizer.zero_grad(set_to_none)
-
-        #     def step(self, closure=None):
-        #         self.muon_optimizer.step()
-        #         self.adamw_optimizer.step()
-        # optimizer = UnionOptimizer(param_groups,args.wd)
-        
-        # optimizer = torch.optim.Adam(
-        #     param_groups,
-        #     weight_decay=args.wd,
-        #     fused=True,
-        # )
-        # 很神奇，用sgd就没有不可复现性,为什么?
-        # 已解决，是由于Adam和torch的Attention实现相互作用导致的
-        # optimizer = torch.optim.SGD(param_groups,
-        #                             weight_decay=args.wd,
-        # )
-        qlayers = model.model.layers
-        
         loss_scaler= torch.amp.GradScaler(device=args.dev)
         trainable_number = trainable_parameters_num(selected_layers)
         print(f"trainable parameter number: {trainable_number/1e6}M")

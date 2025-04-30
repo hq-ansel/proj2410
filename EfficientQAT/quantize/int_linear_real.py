@@ -127,6 +127,7 @@ class QuantLinear(nn.Module, TritonModuleMixin):
         # intweight (infeatures, outfeatures)
         qweight = np.zeros((math.ceil(intweight.shape[0]/(32//self.bits)),
                              intweight.shape[1]), dtype=np.uint32)
+        
         while row < qweight.shape[0]:
             if self.bits in [2, 3, 4, 8]:
                 for j in range(i, min(i + (32 // self.bits), intweight.shape[0])):
@@ -171,7 +172,7 @@ class QuantLinear(nn.Module, TritonModuleMixin):
         if transpose:
             self.fake_transpose = True
             weight = weight.transpose(0,1).contiguous()
-        return weight
+        return weight.contiguous()
     
     def use_fake_quantization(self, del_quant=False,transpose=False):
         # use fake quantization for faster training but consume more memory
@@ -209,31 +210,14 @@ class QuantLinear(nn.Module, TritonModuleMixin):
             if self.fake_transpose:
                 weight = weight.transpose(0,1)
         else:
-            weight = dequant_dim0(self.qweight, self.bits, self.maxq,
-                                   self.infeatures, self.outfeatures,
-                                   dtype)
-            dim0, dim1 = weight.shape
-            # dim2 = (dim1*dim0)//self.group_size
-            zeros = dequant_dim1(self.qzeros, self.bits, self.maxq, 
-                                 self.zeros_dim0, self.zeros_dim1,
-                                 dtype)
-            # assert torch.allclose(weight, weight.round(),1e-5)
-            # assert torch.allclose(zeros, zeros.round(),1e-5)
-            weight = ((weight.view(-1, self.group_size, dim1)
-                        - zeros.view(-1, 1, dim1))
-                       * self.scales.view(-1, 1, dim1)
-                       ).reshape(dim0, dim1)
-        # assert torch.allclose(self.weight,weight, atol=1e-5)
-        # assert weight.dtype == dtype
-        # out = torch.matmul(x, weight)
-        # torch.cuda.synchronize()
-        # if self.clamp_input:
-        #     x = torch.clamp(x, -128, 127)
+            weight = self.get_weight(dtype=x.dtype)
+        # out = x@weight
         # import pdb; pdb.set_trace()
-        # out = torch.matmul(x, weight.to(x.dtype))
-
-
-        out = torch.matmul(x, weight)
+        weightT = weight.T.contiguous()
+        # print("x shape",x.shape,"weightT", weightT.shape)
+        out = torch.nn.functional.linear(x, weightT)
+        # out = torch.matmul(x, weight)
+        # out = x@weight.contiguous()
         # assert torch.allclose(out,torch.nn.functional.linear(x, weight.T),1e-8)
         # get_weight = self.get_weight(dtype=x.dtype)
         # import pdb; pdb.set_trace()
@@ -243,9 +227,10 @@ class QuantLinear(nn.Module, TritonModuleMixin):
         # # torch.cuda.synchronize()
         # assert out.dtype == dtype== weight.dtype == x.dtype ,f"{out.dtype} {dtype} {weight.dtype} {x.dtype}"
 
-        # out = out + self.bias.to(x.dtype) if self.bias is not None else out
-        if self.bias is not None:
-            out = out + self.bias.to(out.device, dtype=out.dtype)
+        out = out + self.bias.to(x.dtype) if self.bias is not None else out
+        # if self.bias is not None:
+        #     out = out + self.bias.to(out.device, dtype=out.dtype)
+
         return out
     
     @classmethod

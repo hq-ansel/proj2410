@@ -3,13 +3,18 @@ from transformers import AutoTokenizer, AutoModelForCausalLM
 from pathlib import Path
 import huggingface_hub
 
-huggingface_hub.login("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")
+# huggingface_hub.login("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")
 
 
 model_hub_list = [
     # "mistralai/Mixtral-8x7B-Instruct-v0.1",
-    "deepseek-ai/deepseek-moe-16b-chat",
-    "microsoft/phi-4",
+    # "deepseek-ai/deepseek-moe-16b-chat",
+    # "microsoft/phi-4",
+    "Qwen/Qwen3-8B",
+    "Qwen/Qwen3-4B",
+    "Qwen/Qwen3-1.7B",
+    "Qwen/Qwen3-0.6B",
+
 ]
 
 for model_hub in model_hub_list:

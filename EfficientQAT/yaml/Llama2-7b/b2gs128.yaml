@@ -2,7 +2,7 @@
 wbits: 2
 group_size: 128
 # training settings
-cuda_ids: "5,1"
+cuda_ids: "3,1"
 epochs: 2
 net: Llama2-7B
 batch_size: 2

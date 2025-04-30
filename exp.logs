@@ -70,3 +70,62 @@ c4: 18.120141983032227
 wikitext2 perplexity: 14.69
 c4 perplexity: 18.12
 Evaluating on tasks: ['piqa', 'arc_easy', 'arc_challenge', 'hellaswag', 'winogrande']
+|    Tasks    |Version|Filter|n-shot| Metric |   |Value |   |Stderr|
+|-------------|------:|------|-----:|--------|---|-----:|---|-----:|
+|arc_challenge|      1|none  |     0|acc     |↑  |0.3336|±  |0.0138|
+|             |       |none  |     0|acc_norm|↑  |0.3515|±  |0.0140|
+|arc_easy     |      1|none  |     0|acc     |↑  |0.6477|±  |0.0098|
+|             |       |none  |     0|acc_norm|↑  |0.5909|±  |0.0101|
+|hellaswag    |      1|none  |     0|acc     |↑  |0.4760|±  |0.0050|
+|             |       |none  |     0|acc_norm|↑  |0.6169|±  |0.0049|
+|piqa         |      1|none  |     0|acc     |↑  |0.7285|±  |0.0104|
+|             |       |none  |     0|acc_norm|↑  |0.7307|±  |0.0104|
+|winogrande   |      1|none  |     0|acc     |↑  |0.6148|±  |0.0137|
+
+Average Acc: 56.01%
+Loading quantized model from /home/ubuntu/data/exp/proj2410/quant_model/Llama3-8B/EfficientQAT/w2gs128-swa60
+OrderedDict({'': 0})
+Loading pre-computed quantized weights Successfully
+Loading Wikitext-2 dataset...
+wikitext2: 13.80486011505127
+get_c4
+c4: 17.46180534362793
+wikitext2 perplexity: 13.80
+c4 perplexity: 17.46
+Evaluating on tasks: ['piqa', 'arc_easy', 'arc_challenge', 'hellaswag', 'winogrande']
+|    Tasks    |Version|Filter|n-shot| Metric |   |Value |   |Stderr|
+|-------------|------:|------|-----:|--------|---|-----:|---|-----:|
+|arc_challenge|      1|none  |     0|acc     |↑  |0.3439|±  |0.0139|
+|             |       |none  |     0|acc_norm|↑  |0.3746|±  |0.0141|
+|arc_easy     |      1|none  |     0|acc     |↑  |0.6671|±  |0.0097|
+|             |       |none  |     0|acc_norm|↑  |0.6040|±  |0.0100|
+|hellaswag    |      1|none  |     0|acc     |↑  |0.4816|±  |0.0050|
+|             |       |none  |     0|acc_norm|↑  |0.6272|±  |0.0048|
+|piqa         |      1|none  |     0|acc     |↑  |0.7378|±  |0.0103|
+|             |       |none  |     0|acc_norm|↑  |0.7421|±  |0.0102|
+|winogrande   |      1|none  |     0|acc     |↑  |0.6306|±  |0.0136|
+
+Average Acc: 57.22%
+Loading quantized model from /home/ubuntu/data/exp/proj2410/baseline/EfficientQAT/output/e2e-qp-output/Llama-3-8b-w2g128-alpaca-4096/checkpoint-10000
+OrderedDict({'': 0})
+Loading pre-computed quantized weights Successfully
+Loading Wikitext-2 dataset...
+wikitext2: 15.019841194152832
+get_c4
+c4: 20.586458206176758
+wikitext2 perplexity: 15.02
+c4 perplexity: 20.59
+Evaluating on tasks: ['piqa', 'arc_easy', 'arc_challenge', 'hellaswag', 'winogrande']
+|    Tasks    |Version|Filter|n-shot| Metric |   |Value |   |Stderr|
+|-------------|------:|------|-----:|--------|---|-----:|---|-----:|
+|arc_challenge|      1|none  |     0|acc     |↑  |0.4027|±  |0.0143|
+|             |       |none  |     0|acc_norm|↑  |0.4096|±  |0.0144|
+|arc_easy     |      1|none  |     0|acc     |↑  |0.6864|±  |0.0095|
+|             |       |none  |     0|acc_norm|↑  |0.6301|±  |0.0099|
+|hellaswag    |      1|none  |     0|acc     |↑  |0.5390|±  |0.0050|
+|             |       |none  |     0|acc_norm|↑  |0.6962|±  |0.0046|
+|piqa         |      1|none  |     0|acc     |↑  |0.7378|±  |0.0103|
+|             |       |none  |     0|acc_norm|↑  |0.7318|±  |0.0103|
+|winogrande   |      1|none  |     0|acc     |↑  |0.6377|±  |0.0135|
+
+Average Acc: 60.07%

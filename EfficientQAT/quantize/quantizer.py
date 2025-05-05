@@ -173,7 +173,7 @@ class UniformAffineQuantizer(BaseQuantizer):
             freeze_threshold=args.get("freeze_threshold",0.0),
             use_ema_x_int=True
             )
-
+    @torch.compile
     def fake_quant(self, x):
         
         scale, round_zero_point = self.cal_qparams(self.scale,
@@ -361,6 +361,12 @@ class GradualUniformAffineQuantizer(BaseQuantizer):
         self.enable = True
         self.group_size = group_size if group_size != -1 else weight.shape[-1]
         assert weight.shape[-1] % group_size == 0
+        scale, zero_points = BaseQuantizer.init_with_weight(
+            weight, n_bits, group_size)
+        self.scale = nn.Parameter(scale)
+        self.zero_point = nn.Parameter(zero_points)
+
+
         self.clamp_method = args.get("clamp_method", "STE")
         self.quantization_position_ratio = 1.0  # 量化比例
         self.interpolate = 1.0 if args.get("interpolate", False) else 0  # 插值比例 0 代表没有前权重 1代表全是前权重
@@ -379,7 +385,7 @@ class GradualUniformAffineQuantizer(BaseQuantizer):
         else:
             raise ValueError("interpolate should be between 0 and 1.")
 
-    
+    @torch.compile
     def fake_quant(self, x):
 
         scale, round_zero_point = self.cal_qparams(self.scale,
@@ -395,10 +401,7 @@ class GradualUniformAffineQuantizer(BaseQuantizer):
 
         # 直接构造量化后的新张量
         x_quantized = x.clone()
-        x_int = self.quant_int(x[:quantized_groups], 
-                               scale[:quantized_groups],
-                                 round_zero_point[:quantized_groups])
-        x_int = self._quantize(x_int[:quantized_groups],
+        x_int = self._quantize(x[:quantized_groups],
                                scale[:quantized_groups],
                                 round_zero_point[:quantized_groups])
 

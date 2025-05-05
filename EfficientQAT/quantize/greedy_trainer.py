@@ -261,7 +261,7 @@ def train_units_layers(model: PreTrainedModel,
             #                                             anneal_epochs=10, # default 
             #                                             swa_lr=args.swa_lr)
         # try torch.compile
-        selected_layers = torch.compile(selected_layers,mode="reduce-overhead")
+        # selected_layers = torch.compile(selected_layers,mode="reduce-overhead")
         for epoch in range(args.epochs):
             loss_list = []
             norm_list = []

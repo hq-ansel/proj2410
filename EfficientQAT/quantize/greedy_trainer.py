@@ -202,19 +202,23 @@ def train_units_layers(model: PreTrainedModel,
         early_stop_flag = 0
 
         if args.get("gradual_quant",False) or args.get("interpolate",False):
+            gradual_factor = args.get("gradual_factor",2.0)
             class GradualWarmupScheduler:
                 def __init__(self,
                               linear_list:List[int_linear_fake.QuantLinear],
-                              total_iteration:int,):
+                              total_iteration:int,
+                              gradual_factor:float=2.0
+                              ):
                     self.linear_list = linear_list
                     self.total_iteration = total_iteration
                     self.iteration = 0
+                    self.gradual_factor = gradual_factor
                     self.update()
                 def update(self):
                     self.iteration += 1
                     for linear in self.linear_list:
-                        if self.iteration < (self.total_iteration/2.0):
-                            ratio = self.iteration/(self.total_iteration/2.0)
+                        if self.iteration < (self.total_iteration/self.gradual_factor):
+                            ratio = self.iteration/(self.total_iteration/self.gradual_factor)
                             if args.get("gradual_quant",False):
                                 linear.update_position_ratio(ratio)
                             if args.get("interpolate", False):
@@ -231,6 +235,7 @@ def train_units_layers(model: PreTrainedModel,
             graualWarmupScheduler = GradualWarmupScheduler(
                 q_linear_list,
                 total_training_iteration,
+                gradual_factor
             )
         if hasattr(args,"dampen_loss"):
             dampen_loss_weight = args.get("dampen_loss_weight",0.01)

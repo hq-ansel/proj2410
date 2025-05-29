@@ -14,6 +14,7 @@ crossblock_window_size: 1
 train_size:  4096
 slide_step: 1
 clip_grad: 999
+gradual_factor: 4.0
 
 
 model: /home/ubuntu/data/exp/proj2410/model/Llama3-8B

@@ -287,9 +287,10 @@ def train_units_layers(model: PreTrainedModel,
                                     enabled=amp_enabled,
                                     dtype=args.dtype if amp_enabled else torch.float32):
                     inp,target = input_data
+                    # 强制要求激活值是float32
                     inp = inp.to(args.dev,dtype=args.dtype)
-                    hidden_state = inp
                     trg = target.to(args.dev,dtype=torch.float32)
+                    hidden_state = inp
                     # estimate memory usage unit GB
                     # inp_memory = inp.numel() * inp.element_size() / 1024**3
                     # hidden_state_memory = hidden_state.numel() * hidden_state.element_size() / 1024**3
@@ -306,6 +307,7 @@ def train_units_layers(model: PreTrainedModel,
                         assert isinstance(layer_outputs, tuple)
                         hidden_state = layer_outputs[0]
                     loss = loss_func(hidden_state, trg)
+                    # insert part
                     if index == 32:
                         tmp = {
                             "hidden_state":inp,
@@ -314,6 +316,8 @@ def train_units_layers(model: PreTrainedModel,
                         }
                         print(f"layers {trainable_layer_idx_list} input_data {tmp} output {hidden_state} target {target} ")
                     # print(f"index {index} loss {loss}")
+
+                    # insert dampen loss
                     if args.get("dampen_loss",False):
                         dampen_loss = torch.zeros_like(loss).to(loss.device)
                         for layer_idx in trainable_layer_idx_list:
@@ -399,6 +403,7 @@ def train_units_layers(model: PreTrainedModel,
                                     dtype=args.dtype if amp_enabled else torch.float32):
                         inp,target = input_data
                         hidden_state = inp.to(args.dev,dtype=args.dtype)
+                        trg = target.to(args.dev,dtype=torch.float32)
                         for layer_idx in trainable_layer_idx_list:
                             layer_outputs = qlayers[layer_idx](
                                 hidden_states=hidden_state,
@@ -406,7 +411,7 @@ def train_units_layers(model: PreTrainedModel,
                                 position_embeddings=(position_embeddings[0].float(),position_embeddings[1].float())
                             )
                             hidden_state = layer_outputs[0]
-                        loss = loss_func(hidden_state, target.to(args.dev,dtype=torch.float32))
+                        loss = loss_func(hidden_state, trg)
                     val_loss_list.append(loss.cpu())
 
                 train_mean_num = min(len(loss_list),64) 

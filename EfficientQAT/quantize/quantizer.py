@@ -442,6 +442,80 @@ class GradualUniformAffineQuantizer(BaseQuantizer):
         return x_int.reshape(dim1, dim2), scale, round_zero_point
 
 
+
+# 复现 QVGen: Pushing the Limit of Quantized Video Generative Models
+class RankDecayQuantizer(BaseQuantizer):
+    def __init__(
+        self,
+        n_bits: int = 8,
+        group_size=None,
+        weight=None,
+        args=None,
+    ):
+        super().__init__(
+            n_bits=n_bits,
+            group_size=group_size,
+        )
+        self.enable = True
+        self.group_size = group_size if group_size != -1 else weight.shape[-1]
+        assert weight.shape[-1] % group_size == 0
+        scale, zero_points = BaseQuantizer.init_with_weight(
+            weight, n_bits, group_size)
+        self.scale = nn.Parameter(scale)
+        self.zero_point = nn.Parameter(zero_points)
+
+        self.clamp_method = args.get("clamp_method", "STE")
+        self.rank = args.get("lora_rank", 32)
+
+
+        self.decay_ratio = 1.0
+        self.shrinking_ratio = 1/2
+
+    @torch.compile
+    def fake_quant(self, x):
+        
+        scale, round_zero_point = self.cal_qparams(self.scale,
+                                                   self.zero_point,
+                                                   self.clamp_method)
+        ori_shape = x.shape
+        x = x.reshape(-1, self.group_size)
+        # freezing weights
+        x_int = self._quantize(x, scale, round_zero_point)
+        if self.is_tracking:
+            x_int = self.weight_freeze_tracker(x_int)
+        x_dequant = self._dequantize(x_int, scale, round_zero_point)
+        return x_dequant.reshape(ori_shape)
+    
+    def update_decay_factor(self):
+        """Update decay factor using cosine annealing"""
+        self.phase_step += 1
+        
+        if self.phase_step >= self.decay_steps:
+            # Rank reduction phase
+            self.reduce_rank()
+            self.phase_step = 0
+            self.current_u = torch.tensor(1.0)
+        else:
+            # Cosine annealing decay
+            progress = float(self.phase_step) / self.decay_steps
+            self.current_u = 0.5 * (1 + math.cos(math.pi * progress))
+    def forward(self, x: torch.Tensor):
+        if self.n_bits >= 16 or not self.enable:
+            return x
+
+        x_dequant = self.fake_quant(x)
+        weight_res = x- x_dequant
+        with torch.no_grad():
+        # 对权重做SVD分解
+            u,s,vh = torch.svd(weight_res)
+            s = torch.sqrt(s)
+            self.lora_L = s[:self.rank]*u[:,:self.rank]
+            self.lora_R = s[:self.rank]*vh[:self.rank,:]
+            pivot_dim = ((1-self.shrinking_ratio)*self.rank).round()
+            self.lora_L[:,pivot_dim:]*=self.decay_raio
+        self.update_decay_factor()
+        return x_dequant+self.lora_L@self.lora_R
+
 class GradualUniformAffineQuantizerV2(nn.Module):
     def __init__(
         self,

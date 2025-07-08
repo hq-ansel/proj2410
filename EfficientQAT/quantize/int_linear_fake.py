@@ -23,6 +23,7 @@ class QuantLinear(nn.Module):
         super().__init__()
         self.fwd_kwargs = dict()
         self.fwd_func = F.linear
+        # get (out_features, in_features)
         self.register_parameter('weight',org_module.weight) # trainable
         if org_module.bias is not None:
             self.register_buffer('bias',org_module.bias)
@@ -43,6 +44,7 @@ class QuantLinear(nn.Module):
             quantizer_pkg = quantizerv3
         else:
             raise ValueError("Invalid quantizer version: {}".format(quantizer_version))
+        # 确定 quantizer的具体版本
         if args.get("gradual_quant", False):
             self.weight_quantizer = quantizer_pkg.GradualUniformAffineQuantizer(wbits,
                                                             group_size,
@@ -53,9 +55,14 @@ class QuantLinear(nn.Module):
                                                                      group_size,
                                                                      weight=org_module.weight,
                                                                      args=args)
+        elif args.get("dsq", False):
+            self.weight_quantizer = quantizer_pkg.DSQuantizer(wbits,
+                                                               group_size,
+                                                               weight=org_module.weight,
+                                                               args=args)
         else:
             self.weight_quantizer = quantizer_pkg.UniformAffineQuantizer(wbits, group_size, weight=org_module.weight,args=args)
-            # self.weight_quantizer = UniformAffineQuantizerV2(wbits, group_size, weight=org_module.weight,args=args)
+
         self.use_temporary_parameter = False
         self.clamp_input = args.get('clamp_input',False)
         self.post_init(args)
@@ -75,27 +82,13 @@ class QuantLinear(nn.Module):
         else:
             weight = self.weight
             bias = self.bias
-        # weight = self.weight
-        # bias = self.bias
-
         out = self.fwd_func(input, weight, bias, **self.fwd_kwargs)
-
+        # out = torch.matmul(input, weight.T)
 
         return out
-    def get_dampen_loss(self):
-        # def clamp_ste(x: torch.Tensor, _min, _max):
-        #     return (x.clamp(_min,_max) - x).detach() + x
-        # group_size = self.weight_quantizer.group_size
-        # zero_point = self.weight_quantizer.zero_point
-        # scale = self.weight_quantizer.scale
-        # a_min = zero_point*scale
-        # a_max = (2**self.weight_quantizer.n_bits-1)*scale+a_min
 
-        # return torch.norm(
-        #     self.weight_quantizer.fake_quant(self.weight).reshape(-1,group_size) -
-        #         clamp_ste(self.weight.reshape(-1,group_size),a_min, a_max),
-        #     p=2
-        # )
+    def get_dampen_loss(self):
+
         return torch.norm(
             self.weight_quantizer.fake_quant(self.weight).detach() - self.weight,
             p=2

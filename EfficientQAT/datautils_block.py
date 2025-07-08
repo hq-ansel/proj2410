@@ -161,7 +161,7 @@ class LazyLoadDatasetV2(Dataset):
     def update_dataset(self, module: Callable,
                        next_module: Callable,
                     layer_idx: int,
-                    batch_size: int = 8,
+                    batch_size: int = 16,
                     attention_mask: torch.Tensor = None,
                     position_embeddings: Tuple[torch.Tensor, torch.Tensor] = None):
         """
@@ -194,27 +194,41 @@ class LazyLoadDatasetV2(Dataset):
         #     del input_sample, output_sample, output, next_output
         #     gc.collect()
         # batch_size = 32
-        for start_idx in range(0,len(self.data_list),batch_size):
-            end_idx = min(start_idx+batch_size,len(self.data_list))
-            input_samples,output_samples = [],[]
-            for idx in range(start_idx,end_idx):
-                  input_sample,output_sample = self.data_list[idx]
-                  input_samples.append(input_sample.unsqueeze(0))
-                  output_samples.append(output_sample.unsqueeze(0))
-            inp_tensor = torch.cat(input_samples,dim=0).to(device)
-            out_tensor = torch.cat(output_samples,dim=0).to(device)
-            outputs = module(inp_tensor, attention_mask=attention_mask,
-                            position_embeddings=position_embeddings)[0]
-            next_outputs = next_module(out_tensor, attention_mask=attention_mask,
-                                    position_embeddings=position_embeddings)[0]
-            # 更新数据
-            for idx in range(start_idx,end_idx):
-                self.data_list[idx] = (outputs[idx-start_idx].half().cpu(),next_outputs[idx-start_idx].half().cpu())
-            # 释放内存
-            torch.cuda.synchronize()
-            del input_samples, output_samples, outputs, next_outputs,inp_tensor,out_tensor
-            gc.collect()
-            torch.cuda.empty_cache()
+        # module = torch.compile(module)
+
+        for idx, sample in enumerate(self.data_list):
+            input_sample, output_sample = sample
+            input_sample = input_sample.to(device).unsqueeze(0)
+            output_sample = output_sample.to(device).unsqueeze(0)
+            input_tensor = module(input_sample, attention_mask=attention_mask,
+                            position_embeddings=position_embeddings)[0].squeeze(0)
+            output_tensor = next_module(output_sample, attention_mask=attention_mask,
+                                    position_embeddings=position_embeddings)[0].squeeze(0)
+            self.data_list[idx] = (input_tensor.half().cpu(), output_tensor.half().cpu())
+        torch.cuda.synchronize()
+        torch.cuda.empty_cache()
+        # for start_idx in range(0,len(self.data_list),batch_size):
+        #     end_idx = min(start_idx+batch_size,len(self.data_list))
+        #     torch.cuda.synchronize()
+        #     input_samples,output_samples = [],[]
+        #     for idx in range(start_idx,end_idx):
+        #           input_sample,output_sample = self.data_list[idx]
+        #           input_samples.append(input_sample.unsqueeze(0))
+        #           output_samples.append(output_sample.unsqueeze(0))
+        #     inp_tensor = torch.cat(input_samples,dim=0).to(device)
+        #     out_tensor = torch.cat(output_samples,dim=0).to(device)
+        #     outputs = module(inp_tensor, attention_mask=attention_mask,
+        #                     position_embeddings=position_embeddings)[0]
+        #     next_outputs = next_module(out_tensor, attention_mask=attention_mask,
+        #                             position_embeddings=position_embeddings)[0]
+        #     # 更新数据
+        #     for idx in range(start_idx,end_idx):
+        #         self.data_list[idx] = (outputs[idx-start_idx].half().cpu(),next_outputs[idx-start_idx].half().cpu())
+        #     # 释放内存
+        #     torch.cuda.synchronize()
+            # del input_samples, output_samples, outputs, next_outputs,inp_tensor,out_tensor
+            # gc.collect()
+            # torch.cuda.empty_cache()
         # # for idx in range(0, (len(self.data_list)+batch_size-1 )//batch_size):
         # for idx in tqdm(range(0, len(self.data_list)//batch_size),
         #                  total=len(self.data_list)//batch_size, desc="update_dataset"):
@@ -636,41 +650,60 @@ def get_c4(
     print("get_c4")
     
     # Attempt to load dataset from local path for faster loading
-    try:
-        traindata = load_dataset(
-            "arrow",
-            data_files={
-                "train": "/path/to/local/train.arrow",
-                "validation": "/path/to/local/validation.arrow",
-            },
-            split='train'
-        )
-        valdata = load_dataset(
-            "arrow",
-            data_files={"validation": "/path/to/local/validation.arrow"},
-            split='validation'
-        )
-    except:
-        # Fallback to remote dataset
-        traindata = load_dataset('allenai/c4', data_files={'train': 'en/c4-train.00000-of-01024.json.gz'}, split='train')
-        valdata = load_dataset('allenai/c4', data_files={'validation': 'en/c4-validation.00000-of-00008.json.gz'}, split='validation')
+    # try:
+    #     traindata = load_dataset(
+    #         "arrow",
+    #         data_files={
+    #             "train": "/path/to/local/train.arrow",
+    #             "validation": "/path/to/local/validation.arrow",
+    #         },
+    #         split='train'
+    #     )
+    #     valdata = load_dataset(
+    #         "arrow",
+    #         data_files={"validation": "/path/to/local/validation.arrow"},
+    #         split='validation'
+    #     )
+    # except:
+    # Fallback to remote dataset
+    traindata = load_dataset(
+        "allenai/c4",
+        "default",
+        data_files={"train": "en/c4-train.00000-of-01024.json.gz"},
+        split="train",
+        revision="607bd4c8450a42878aa9ddc051a65a055450ef87",
+    )
+    valdata = load_dataset(
+        "allenai/c4",
+        "default",
+        data_files={"validation": "en/c4-validation.00000-of-00008.json.gz"},
+        split="validation",
+        revision="607bd4c8450a42878aa9ddc051a65a055450ef87",
+    )
+    # traindata = load_dataset('allenai/c4', data_files={'train': 'en/c4-train.00000-of-01024.json.gz'},download_mode="force_redownload", split='train')
+    # valdata = load_dataset('allenai/c4', data_files={'validation': 'en/c4-validation.00000-of-00008.json.gz'},download_mode="force_redownload", split='validation')
 
     random.seed(0)
     valenc = []
 
-    # Generate validation data
-    for _ in range(256):
-        while True:
-            i = random.randint(0, len(valdata) - 1)
-            tmp = tokenizer(valdata[i]['text'], return_tensors='pt')
-            if tmp.input_ids.shape[1] >= seqlen:
-                break
-        i = random.randint(0, tmp.input_ids.shape[1] - seqlen - 1)
-        j = i + seqlen
-        valenc.append(tmp.input_ids[:, i:j])
+    try:
+        # Generate validation data
+        for _ in range(256):
+            while True:
+                i = random.randint(0, len(valdata) - 1)
+                tmp = tokenizer(valdata[i]['text'], return_tensors='pt')
+                if tmp.input_ids.shape[1] >= seqlen:
+                    break
+            if tmp.input_ids.shape[1] - seqlen - 1>=0:
+                i = random.randint(0, tmp.input_ids.shape[1] - seqlen - 1)
+            else:
+                i = 0
+            j = i + seqlen
+            valenc.append(tmp.input_ids[:, i:j])
 
-    valenc = torch.hstack(valenc)
-
+        valenc = torch.hstack(valenc)
+    except:
+        import pdb;pdb.set_trace()
     if test_only:
         return valenc  # Return validation data if test_only is True
 
@@ -876,7 +909,7 @@ def test_ppl(
         # Evaluate on the test set
         for i in tqdm(range(nsamples)):
             batch = testenc[:, (i * seqlen): ((i + 1) * seqlen)].to(model.device)
-            outputs = model.model(batch)
+            outputs = model.model(batch,use_cache=False)
             
             # Apply the classifier if available
             if classifier is not None:

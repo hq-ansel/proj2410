@@ -24,6 +24,7 @@ from torch.optim.lr_scheduler import CosineAnnealingLR
 from torch.utils.data import DataLoader
 from transformers import PreTrainedModel
 import logging
+import bitsandbytes as bnb
 
 from .. import utils
 from . import int_linear_fake, int_linear_real
@@ -192,17 +193,7 @@ def train_units_layers(model: PreTrainedModel,
         optimizer =torch.optim.AdamW(param_groups,
                                     weight_decay=args.wd,
                                     foreach=True)
-        # optimizer = torch.optim.Adam(
-        #     param_groups,
-        #     weight_decay=args.wd,
-        #     fused=True,
-        # )
-        # 很神奇，用sgd就没有不可复现性,为什么?
-        # 已解决，是由于Adam和torch的Attention实现相互作用导致的
-        # optimizer = torch.optim.SGD(param_groups,
-        #                             weight_decay=args.wd,
-        # )
-        qlayers = model.model.layers
+        
         loss_scaler= torch.amp.GradScaler(device=args.dev)
         trainable_number = trainable_parameters_num(selected_layers)
         print(f"trainable parameter number: {trainable_number/1e6}M")
@@ -210,19 +201,23 @@ def train_units_layers(model: PreTrainedModel,
         early_stop_flag = 0
 
         if args.get("gradual_quant",False) or args.get("interpolate",False):
+            gradual_factor = args.get("gradual_factor",2.0)
             class GradualWarmupScheduler:
                 def __init__(self,
                               linear_list:List[int_linear_fake.QuantLinear],
-                              total_iteration:int,):
+                              total_iteration:int,
+                              gradual_factor:float=2.0
+                              ):
                     self.linear_list = linear_list
                     self.total_iteration = total_iteration
                     self.iteration = 0
+                    self.gradual_factor = gradual_factor
                     self.update()
                 def update(self):
                     self.iteration += 1
                     for linear in self.linear_list:
-                        if self.iteration < (self.total_iteration/2.0):
-                            ratio = self.iteration/(self.total_iteration/2.0)
+                        if self.iteration < (self.total_iteration/self.gradual_factor):
+                            ratio = self.iteration/(self.total_iteration/self.gradual_factor)
                             if args.get("gradual_quant",False):
                                 linear.update_position_ratio(ratio)
                             if args.get("interpolate", False):
@@ -239,6 +234,7 @@ def train_units_layers(model: PreTrainedModel,
             graualWarmupScheduler = GradualWarmupScheduler(
                 q_linear_list,
                 total_training_iteration,
+                gradual_factor
             )
         if hasattr(args,"dampen_loss"):
             dampen_loss_weight = args.get("dampen_loss_weight",0.01)
@@ -251,6 +247,25 @@ def train_units_layers(model: PreTrainedModel,
         position_ids = position_ids.unsqueeze(0).expand(args.batch_size, -1).contiguous()
         # print(f" data size {len(train_dataset)}")
 
+        # before training, need to prepare model?
+        if args.get("swa",False):
+            """
+                swa
+                swa_start: 开始使用swa的epoch数
+                swa_factor: 平均权重系数 默认建议为0.9
+                swa_lr: 学习率 我需要用到这个吗？要不还是让其自动管理吧
+            """
+            swa_model = torch.optim.swa_utils.AveragedModel(selected_layers,
+                                                                device=args.dev,
+                        avg_fn=torch.optim.swa_utils.get_ema_avg_fn(args.get("swa_factor",0.9)))
+            swa_start = args.get("swa_start") # 需要手动指定
+            # 需要scheduler吗，暂时存疑
+            # swa_scheduler = torch.optim.swa_utils.SWALR(optimizer, 
+            #                                             anneal_strategy="cos", # “cos” or “linear”
+            #                                             anneal_epochs=10, # default 
+            #                                             swa_lr=args.swa_lr)
+        # try torch.compile
+        # selected_layers = torch.compile(selected_layers,mode="reduce-overhead")
         for epoch in range(args.epochs):
             loss_list = []
             norm_list = []
@@ -260,9 +275,9 @@ def train_units_layers(model: PreTrainedModel,
             dataloader = DataLoader(train_dataset,
                                     batch_size=args.batch_size,
                                     # num_workers=1,
-                                    # pin_memory=True,
+                                    pin_memory=True,
                                     # prefetch_factor=32,  
-                                    shuffle=False
+                                    shuffle=False,
                                     )
             # step 6.4: training                   
             for index, input_data in enumerate(dataloader):
@@ -271,9 +286,16 @@ def train_units_layers(model: PreTrainedModel,
                                     enabled=amp_enabled,
                                     dtype=args.dtype if amp_enabled else torch.float32):
                     inp,target = input_data
+                    # 强制要求激活值是float32
                     inp = inp.to(args.dev,dtype=args.dtype)
-                    hidden_state = inp
                     trg = target.to(args.dev,dtype=torch.float32)
+                    hidden_state = inp
+                    # estimate memory usage unit GB
+                    # inp_memory = inp.numel() * inp.element_size() / 1024**3
+                    # hidden_state_memory = hidden_state.numel() * hidden_state.element_size() / 1024**3
+                    # target_memory = trg.numel() * trg.element_size() / 1024**3
+                    # logger.info(f"index {index} input_memory {inp_memory:.4f} hidden_state_memory {hidden_state_memory:.4f} target_memory {target_memory:.4f} ")
+                    # import pdb;pdb.set_trace()
                     for layer_idx in trainable_layer_idx_list:
                         layer_outputs = qlayers[layer_idx](
                             hidden_states=hidden_state,
@@ -284,6 +306,7 @@ def train_units_layers(model: PreTrainedModel,
                         assert isinstance(layer_outputs, tuple)
                         hidden_state = layer_outputs[0]
                     loss = loss_func(hidden_state, trg)
+                    # insert part
                     if index == 32:
                         tmp = {
                             "hidden_state":inp,
@@ -292,6 +315,8 @@ def train_units_layers(model: PreTrainedModel,
                         }
                         print(f"layers {trainable_layer_idx_list} input_data {tmp} output {hidden_state} target {target} ")
                     # print(f"index {index} loss {loss}")
+
+                    # insert dampen loss
                     if args.get("dampen_loss",False):
                         dampen_loss = torch.zeros_like(loss).to(loss.device)
                         for layer_idx in trainable_layer_idx_list:
@@ -305,16 +330,17 @@ def train_units_layers(model: PreTrainedModel,
                 if not math.isfinite(loss.item()) or loss.item()==0:
                     logger.info("Loss is NAN, stopping training")
                     pdb.set_trace()
+                loss_cpu = loss.data.cpu()
                 if args.log_loss:
                     loss_recorder.record(f"blk{trainable_layer_idx_list}",
                                         step,
-                                        loss.data.cpu().item())
+                                        loss_cpu.item())
                     
                 if args.get("gradual_quant",False):
                     graualWarmupScheduler.update() 
                 else: 
                     None
-                loss_list.append(loss.data.cpu())
+                loss_list.append(loss_cpu)
                 if amp_enabled:
                     loss_scaler.scale(loss).backward()
                 else:
@@ -332,13 +358,25 @@ def train_units_layers(model: PreTrainedModel,
                 # 使用子空间优化
                 if args.get("sub_space_grad_clean",False):
                     sub_space_clean(selected_layers)
+                
+                
+                # optmizer step zone
                 if amp_enabled:
                     loss_scaler.step(optimizer)
                     loss_scaler.update()
                 else:
                     optimizer.step()
                 
-                # adjust lr
+                # inject swa model
+                if args.get("swa",False):
+                    if step> swa_start and step % args.get("swa_freq",200)==0:
+                        # When update_parameters() is called for the first time 
+                        # (i.e. n_averaged is 0) the parameters of model are copied to the parameters of AveragedModel.
+                        #  For every subsequent call of update_parameters() the function avg_fn is used to update the parameters.
+                        swa_model.update_parameters(selected_layers)
+                        print("merge model")
+                
+                # adjust lr 这个是需要的吗？
                 if args.quant_lr > 0:
                     quant_scheduler.step()
                     optimizer.param_groups[quant_index]['lr'] = quant_scheduler.get_lr()[0]
@@ -352,10 +390,10 @@ def train_units_layers(model: PreTrainedModel,
                 val_loss_list = []
                 dataloader = DataLoader(val_dataset,
                                         batch_size=args.batch_size,
-                                        num_workers=0,
-                                        pin_memory=True,
+                                        # num_workers=0,
+                                        # pin_memory=True,
                                         # prefetch_factor=32,  
-                                        shuffle=False
+                                        shuffle=False,
                                         )
                 for index, input_data in enumerate(dataloader):  
                     # obtain output of quantization model
@@ -364,6 +402,7 @@ def train_units_layers(model: PreTrainedModel,
                                     dtype=args.dtype if amp_enabled else torch.float32):
                         inp,target = input_data
                         hidden_state = inp.to(args.dev,dtype=args.dtype)
+                        trg = target.to(args.dev,dtype=torch.float32)
                         for layer_idx in trainable_layer_idx_list:
                             layer_outputs = qlayers[layer_idx](
                                 hidden_states=hidden_state,
@@ -371,7 +410,7 @@ def train_units_layers(model: PreTrainedModel,
                                 position_embeddings=(position_embeddings[0].float(),position_embeddings[1].float())
                             )
                             hidden_state = layer_outputs[0]
-                        loss = loss_func(hidden_state, target.to(args.dev,dtype=torch.float32))
+                        loss = loss_func(hidden_state, trg)
                     val_loss_list.append(loss.cpu())
 
                 train_mean_num = min(len(loss_list),64) 
@@ -547,9 +586,9 @@ def train_units_layers_with_catcher(model: PreTrainedModel,
             dataloader = DataLoader(train_dataset,
                                     batch_size=args.batch_size,
                                     num_workers=0,
-                                    pin_memory=True,
+                                    # pin_memory=True,
                                     # prefetch_factor=32,  
-                                    shuffle=False
+                                    shuffle=True
                                     )
             # step 6.4: training                   
             for index, input_data in enumerate(dataloader):
@@ -633,9 +672,9 @@ def train_units_layers_with_catcher(model: PreTrainedModel,
             dataloader = DataLoader(val_dataset,
                                     batch_size=args.batch_size,
                                     num_workers=0,
-                                    pin_memory=True,
+                                    # pin_memory=True,
                                     # prefetch_factor=32,  
-                                    shuffle=False
+                                    shuffle=True
                                     )
             # if not args.loss_func == "KL-Divergence":
             #     qlayers[align_index].set_forward_state(stop_forward=False)
@@ -923,7 +962,7 @@ def greedy_local_train(
     
     # dev =args.cuda[0] if torch.cuda.is_available() else "cpu"
     dev = args.cuda[0]
-    dtype = torch.float16 if amp_enabled else torch.float32
+    dtype = torch.bfloat16 if amp_enabled else torch.float32
     args.dev = dev
     args.dtype = dtype
     use_cache = model.config.use_cache

@@ -101,7 +101,8 @@ def plot_loss(block_loss_data, blk_id, downsample_step=25, smoothing_window=25):
 # if __name__ == "__main__":
 # loss_dir="/home/ubuntu/data/exp/proj2410/logs"
 # file = os.path.join(loss_dir,"Llama2-7b-efficientqat-w2gs128.csv")
-quant_model_path = "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128"
+# quant_model_path = "/home/ubuntu/data/exp/proj2410/quant_model/Llama3-8B/EfficientQAT/w2gs128-gradual-quant"
+quant_model_path = "/home/ubuntu/data/exp/proj2410/quant_model/Llama3-8B/EfficientQAT/w2gs128-swa60"
 loss_path = f"{quant_model_path}/loss.csv"
 recorder = BlockLossRecorder(loss_path)
 # pdf_name = 
@@ -119,6 +120,25 @@ import matplotlib.pyplot as plt
 import numpy as np
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 
+def plot_outlier(block_loss,threshold,ax,blk):
+    outlier_indices = np.where(block_loss > threshold)[0]
+    non_outlier_loss = np.clip(block_loss, None, threshold)
+    
+    # Assign color to the current block
+    color = colors[blk%4]
+    
+    # Plot non-outliers in the main plot
+    ax.plot(range(steps), non_outlier_loss, label=f'Block {blk+1}', color=color)
+    
+    # Add an inset to show outliers for this block only
+    if len(outlier_indices) > 0:
+        inset = inset_axes(ax, width="30%", height="30%", loc="upper right")
+        inset.scatter(outlier_indices, block_loss[outlier_indices], color=color, s=10, label=f'Block {blk+1}')
+        inset.set_title(f"Outliers (Block {blk+1})", fontsize=8)
+        inset.set_xlim(0, steps)
+        inset.set_ylim(threshold, np.max(block_loss) * 1.1)  # Show outlier range
+        inset.tick_params(axis='both', which='major', labelsize=6)
+        inset.legend(fontsize=6)
 out_dir = "/home/ubuntu/data/exp/proj2410/test/"
 loss = np.array(data)
 # Number of blocks to group in each plot
@@ -133,7 +153,7 @@ mean_loss = np.mean(loss)
 threshold = 4 * mean_loss
 
 # Create a color map for different blocks
-colors = plt.cm.tab10(np.linspace(0, 1, total_blocks))
+colors = plt.cm.tab10(np.linspace(0, 1, 4))
 
 # Plot the loss for each block group in 8 plots
 fig, axs = plt.subplots(2, cols, figsize=(16, 8))  # Main plots
@@ -144,24 +164,10 @@ for i in range(total_blocks // blocks_per_plot):
     for blk in range(i * blocks_per_plot, (i + 1) * blocks_per_plot):
         # Identify outliers
         block_loss = loss[blk]
-        outlier_indices = np.where(block_loss > threshold)[0]
-        non_outlier_loss = np.clip(block_loss, None, threshold)
-        
-        # Assign color to the current block
-        color = colors[blk]
-        
-        # Plot non-outliers in the main plot
-        ax.plot(range(steps), non_outlier_loss, label=f'Block {blk+1}', color=color)
-        
-        # Add an inset to show outliers for this block only
-        if len(outlier_indices) > 0:
-            inset = inset_axes(ax, width="30%", height="30%", loc="upper right")
-            inset.scatter(outlier_indices, block_loss[outlier_indices], color=color, s=10, label=f'Block {blk+1}')
-            inset.set_title(f"Outliers (Block {blk+1})", fontsize=8)
-            inset.set_xlim(0, steps)
-            inset.set_ylim(threshold, np.max(block_loss) * 1.1)  # Show outlier range
-            inset.tick_params(axis='both', which='major', labelsize=6)
-            inset.legend(fontsize=6)
+
+        color = colors[blk%4]
+        ax.plot(range(steps), block_loss, label=f'Block {blk+1}', color=color)
+
 
     ax.set_title(f'Loss for Blocks {i*blocks_per_plot + 1} to {(i+1)*blocks_per_plot}')
     ax.set_xlabel('Steps')

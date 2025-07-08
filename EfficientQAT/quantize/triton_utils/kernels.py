@@ -227,9 +227,9 @@ def silu(x):
     return x * tl.sigmoid(x)
 
 
-def dequant_dim0(qweight, bits, maxq, infeatures, outfeatures):
+def dequant_dim0(qweight, bits, maxq, infeatures, outfeatures, dtype=torch.float16):
     with torch.cuda.device(qweight.device):
-        output = torch.empty((infeatures, outfeatures), device=qweight.device, dtype=torch.float16)
+        output = torch.empty((infeatures, outfeatures), device=qweight.device, dtype=dtype)
         grid = lambda META: (
             triton.cdiv(output.shape[0], META['BLOCK_SIZE_M']) * triton.cdiv(output.shape[1], META['BLOCK_SIZE_N']),
         )
@@ -242,9 +242,9 @@ def dequant_dim0(qweight, bits, maxq, infeatures, outfeatures):
         )
         return output
 
-def dequant_dim1(qweight, bits, maxq, infeatures, outfeatures):
+def dequant_dim1(qweight, bits, maxq, infeatures, outfeatures, dtype=torch.float16):
     with torch.cuda.device(qweight.device):
-        output = torch.empty((infeatures, outfeatures), device=qweight.device, dtype=torch.float16)
+        output = torch.empty((infeatures, outfeatures), device=qweight.device, dtype=dtype)
         grid = lambda META: (
             triton.cdiv(output.shape[0], META['BLOCK_SIZE_M']) * triton.cdiv(output.shape[1], META['BLOCK_SIZE_N']),
         )

@@ -1,0 +1,76 @@
+
+2025年4月17日 
+
+计划是探索超参数对实验的影响，结果发现现有配置下调w的lr 巨烂，稍微加一个数量级，就训崩了
+
+Llama3-8B with grad clip 0.3
+wlr 2e-5 lr 1e-4
+g2 w2 13.54 c4 17.38 
+g2-graual w2 14.77 18.21
+wlr 1e-4 lr 1e-4
+g2 w2  14.23 18.16
+g2-graual  36.19 32.99 # ?见鬼了模型差异性怎么这么大? Llama3-8B和Llama2-7B的不同性有点离谱了
+
+那么调参就不太可行了，不知道为什么bit net的作者声称参数搜索很重要的？搜索的是啥参数？
+
+可解释性也差的一批，Llama3-8B的结果看起来只有block2和block10不太稳定，其他层训练效果都相对平缓
+之前设计的gradual/soft模式基本上没有起到应该有的合适的效果。
+会是学习率的问题吗？采用的是全流程[lr,lr/10]的余弦退火学习率（CosineAnnealingLR），理论上收敛形状是什么样的？
+train loss号线看不太出来？唯一看出来的效果是loss的最大值确实减少了
+
+怀疑是scale和学习率不太匹配，看看scale的值分布
+
+scale的大部分max的值是小于1的，微调以后也是这样的吗？
+
+是不是scale的实际上应该用更大的学习率？
+
+略作改动EfficientQAT deita的部分都不是完整的实验啊 还是用w2g128的思路
+
+先暂时保存，等实验抛出来结果
+这里需要比较一下直接用全量调出来的结果和用全量调完，继续用scale调的结果进行比较
+
+现在先试试其他的思路
+
+
+2025年4月18日 完成了训练
+
+先试一试dsq，看看这类改进ste的方法是不是可以直接用上
+直接寄，结果绷了，不知道是alpha的问题还是哪里的问题，可能需要先看看
+dsq到底是不是正常的
+
+2025年4月21日
+
+lr的衰减是怎么设置的？
+Efficient QAT似乎是在每个step之间设置衰减？
+但是很多论文的衰减似乎是按照epoch的方式设置的？
+
+新的疑问产生了？在做swa之前，先考虑一个问题，
+注意到EfficientQAT单独拿了一个lr schedule出来
+但是omniquant和efficientqat的论文里面都没有找到scheduler的说明？
+为什么需要使用scheduler?
+
+Scheduling Weight Transitions for Quantization-Aware Training 也提到了这一点
+关于量化过程中会出现的需要越过临界点(这个地方称为 transition points) 
+才能够 改变具体的量化值(这里称为discrete status)
+To be more specific, different from fullprecision weights, 
+quantized weights change their discrete levels, 
+only when corresponding latent weights pass transition points,
+ where the quantizer alters discrete states (we
+call this as transitions).
+
+
+2025年4月22日
+
+swa处理？
+
+
+swa 好像没有效果啊？
+为什么呢？
+
+同时考虑一个问题
+发现输入tensor 的max 可以达到2632 这个是比较危险的值了，
+对于float16来说 最大表示范围是65504，如果有两个tensor都是2632，6,927,424
+直接超过表示范围造成Nan
+乐，没有统一超参数
+
+还是得充分利用gpu才行，怎么实现并行呢？

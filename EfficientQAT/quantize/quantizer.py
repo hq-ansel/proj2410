@@ -1,4 +1,3 @@
-from unittest import skip
 import torch
 import torch.nn as nn
 import random
@@ -75,7 +74,79 @@ def clamp_mad(x: torch.Tensor, min_val, max_val):
     return ClampMAD.apply(x, torch.tensor(min_val, device=x.device), torch.tensor(max_val, device=x.device))
 
 
-class UniformAffineQuantizer(nn.Module):
+class BaseQuantizer(nn.Module):
+    def __init__(self, 
+        n_bits: int = 8,
+        group_size=None,
+    ):
+        super().__init__()
+        assert 2 <= n_bits <= 16, "bitwidth not supported"
+        self.n_bits = n_bits
+        self.qmin = 0
+        self.qmax = 2 ** (n_bits) - 1
+        self.group_size = group_size 
+
+    def change_n_bits(self, n_bits):
+        self.n_bits = n_bits
+        self.qmin = 0
+        self.qmax = int(2 ** (n_bits) - 1)
+
+    @staticmethod
+    def init_with_weight(weight, n_bits, group_size, clamp_method="STE"):
+        if weight.dtype == torch.float32 or weight.dtype == torch.float16:
+            scale_dtype = torch.float16
+        else:
+            scale_dtype = torch.bfloat16
+        with torch.no_grad():
+            x = weight.reshape(-1,group_size)
+            xmin = x.amin([-1], keepdim=True)
+            xmax =  x.amax([-1], keepdim=True)
+            x_range = xmax - xmin
+            scale = x_range / (2**n_bits-1)
+            if clamp_method == "STE":
+                scale = scale.clamp(min=1e-4, max=1e4)
+            elif clamp_method == "MAD":
+                scale = clamp_mad(scale, 1e-4, 1e4)
+            zero_point = -xmin/scale
+            return scale.to(scale_dtype), zero_point.round().to(scale_dtype)
+        
+    def cal_qparams(self,scale,zero_point,clamp_method="STE"):
+        if clamp_method == "STE":
+            scale_dtype = scale.dtype
+            scale = clamp_ste(scale,1e-4, 1e4).to(scale_dtype)
+            round_zero_point = clamp_ste(round_ste(zero_point), self.qmin, self.qmax)
+        elif clamp_method == "MAD":
+            scale = clamp_mad(scale, 1e-4, 1e4)
+            round_zero_point = clamp_mad(round_ste(zero_point), self.qmin, self.qmax)
+        return scale, round_zero_point
+
+    def _quantize(self, x, scale, round_zero_point):
+        x_int = round_ste(x / scale)
+        if round_zero_point is not None:
+            x_int = x_int.add(round_zero_point)
+        x_int = x_int.clamp(self.qmin, self.qmax)
+        return x_int
+    
+    def _dequantize(self, x_int, scale, round_zero_point):
+        if round_zero_point is not None:
+            x_int = x_int.sub(round_zero_point)
+        x_float = x_int * scale
+        return x_float
+    
+    def fake_quant(self, x):
+        scale, round_zero_point = self.cal_qparams(self.scale,
+                                                   self.zero_point,
+                                                   self.clamp_method)
+        ori_shape = x.shape
+        x = x.reshape(-1, self.group_size)
+        x_int = self._quantize(x, scale, round_zero_point)
+        x_dequant = self._dequantize(x_int, scale, round_zero_point)
+        return x_dequant.reshape(ori_shape)
+    
+    
+        
+
+class UniformAffineQuantizer(BaseQuantizer):
     def __init__(
         self,
         n_bits: int = 8,
@@ -83,13 +154,17 @@ class UniformAffineQuantizer(nn.Module):
         weight=None,
         args=None,
     ):
-        super().__init__()
-        assert 2 <= n_bits <= 16, "bitwidth not supported"
-        self.n_bits = n_bits
-        self.qmin = 0
-        self.qmax = 2 ** (n_bits) - 1
+        super().__init__(
+            n_bits=n_bits,
+            group_size=group_size,
+        )
         self.group_size = group_size if group_size != -1 else weight.shape[-1]
         assert weight.shape[-1] % group_size == 0
+        scale, zero_points = BaseQuantizer.init_with_weight(
+            weight, n_bits, group_size)
+        self.scale = nn.Parameter(scale)
+        self.zero_point = nn.Parameter(zero_points)
+
         self.enable = True
         self.clamp_method = args.get("clamp_method", "STE")
         self.is_tracking = args.get("iterative_freezing", False)
@@ -98,53 +173,20 @@ class UniformAffineQuantizer(nn.Module):
             freeze_threshold=args.get("freeze_threshold",0.0),
             use_ema_x_int=True
             )
-        # init scale and zero point through Max-Min quantization
-        with torch.no_grad():
-            if weight is not None:
-                x = weight.reshape(-1,self.group_size)
-                xmin = x.amin([-1], keepdim=True)
-                xmax =  x.amax([-1], keepdim=True)
-                range = xmax - xmin
-                scale = range / (2**self.n_bits-1)
-                if self.clamp_method == "STE":
-                    scale = scale.clamp(min=1e-4, max=1e4)
-                elif self.clamp_method == "MAD":
-                    scale = clamp_mad(scale, 1e-4, 1e4)
-                zero_point = -(xmin/scale).clamp(min=-1e4, max=1e4) 
-                self.scale = nn.Parameter(scale)
-                self.zero_point = nn.Parameter(zero_point.round())
-            
-
-    def change_n_bits(self, n_bits):
-        self.n_bits = n_bits
-        self.qmin = 0
-        self.qmax = int(2 ** (n_bits) - 1)
-        
+    @torch.compile
     def fake_quant(self, x):
         
-        if self.clamp_method == "STE":
-            scale = clamp_ste(self.scale,1e-4, 1e4).half().float()
-            round_zero_point = clamp_ste(round_ste(self.zero_point), self.qmin, self.qmax)
-        elif self.clamp_method == "MAD":
-            scale = clamp_mad(self.scale, 1e-4, 1e4)
-            round_zero_point = clamp_mad(round_ste(self.zero_point), self.qmin, self.qmax)
-
-        dim1, dim2 = x.shape
+        scale, round_zero_point = self.cal_qparams(self.scale,
+                                                   self.zero_point,
+                                                   self.clamp_method)
+        ori_shape = x.shape
         x = x.reshape(-1, self.group_size)
-        x_int = round_ste(x / scale)
-        if round_zero_point is not None:
-            x_int = x_int.add(round_zero_point)
-        x_int = x_int.clamp(self.qmin, self.qmax)
         # freezing weights
+        x_int = self._quantize(x, scale, round_zero_point)
         if self.is_tracking:
-            x_int = self.weight_freeze_tracker(x_int,skip_tracking=False)
-        x_dequant = x_int
-        if round_zero_point is not None:
-            x_dequant = x_dequant.sub(round_zero_point)
-        x_dequant = x_dequant.mul(scale)
-        if self.group_size:
-            x_dequant = x_dequant.reshape(dim1, dim2)
-        return x_dequant
+            x_int = self.weight_freeze_tracker(x_int)
+        x_dequant = self._dequantize(x_int, scale, round_zero_point)
+        return x_dequant.reshape(ori_shape)
     
 
     def forward(self, x: torch.Tensor):
@@ -304,52 +346,30 @@ class UniformAffineQuantizerV3(nn.Module):
         return x_dequant
 
 
-class GradualUniformAffineQuantizer(nn.Module):
+class GradualUniformAffineQuantizer(BaseQuantizer):
     def __init__(
         self,
         n_bits: int = 8,
         group_size=None,
         weight=None,
         args=None,
-        quantization_position_ratio=1.0,  # 新增量化比例参数，默认全量化
     ):
-        super().__init__()
-        assert 2 <= n_bits <= 16, "bitwidth not supported"
-        self.n_bits = n_bits
-        self.qmin = 0
-        self.qmax = 2 ** (n_bits) - 1
+        super().__init__(
+            n_bits=n_bits,
+            group_size=group_size,
+        )
+        self.enable = True
         self.group_size = group_size if group_size != -1 else weight.shape[-1]
         assert weight.shape[-1] % group_size == 0
-        self.enable = True
+        scale, zero_points = BaseQuantizer.init_with_weight(
+            weight, n_bits, group_size)
+        self.scale = nn.Parameter(scale)
+        self.zero_point = nn.Parameter(zero_points)
+
+
         self.clamp_method = args.get("clamp_method", "STE")
-        self.quantization_position_ratio = quantization_position_ratio  # 量化比例
+        self.quantization_position_ratio = 1.0  # 量化比例
         self.interpolate = 1.0 if args.get("interpolate", False) else 0  # 插值比例 0 代表没有前权重 1代表全是前权重
-
-        if self.clamp_method == "STE":
-            self.clamp_method =clamp_ste
-        elif self.clamp_method == "MAD":
-            self.clamp_method = clamp_mad
-
-        # init scale and zero point through Max-Min quantization
-        with torch.no_grad():
-            if weight is not None:
-                x = weight.reshape(-1, self.group_size)
-                xmin = x.amin([-1], keepdim=True)
-                xmax = x.amax([-1], keepdim=True)
-                range = xmax - xmin
-                scale = range / (2**self.n_bits - 1)
-                if self.clamp_method == "STE":
-                    scale = scale.clamp(min=1e-4, max=1e4)
-                elif self.clamp_method == "MAD":
-                    scale = clamp_mad(scale, 1e-4, 1e4)
-                zero_point = -(xmin / scale).clamp(min=-1e4, max=1e4)
-                self.scale = nn.Parameter(scale)
-                self.zero_point = nn.Parameter(zero_point.round())
-
-    def change_n_bits(self, n_bits):
-        self.n_bits = n_bits
-        self.qmin = 0
-        self.qmax = int(2 ** (n_bits) - 1)
 
     def update_position_ratio(self, new_position_ratio):
         """Update the quantization position_ratio dynamically."""
@@ -365,29 +385,13 @@ class GradualUniformAffineQuantizer(nn.Module):
         else:
             raise ValueError("interpolate should be between 0 and 1.")
 
-    def quant_int(self, x, scale, zero_point):
-        """
-        隐式要求x.shape[-1] % self.group_size == 0
-        """
-        x_int = round_ste(x / scale)
-        if zero_point is not None:
-            x_int = x_int.add(zero_point)
-        x_int = x_int.clamp(self.qmin, self.qmax)
-        return x_int
-    
-    def dequant_int(self, x_int, scale, zero_point):
-        x_dequant = x_int
-        if zero_point is not None:
-            x_dequant = x_dequant.sub(zero_point)
-        x_dequant = x_dequant.mul(scale)
-        return x_dequant
-    
+    @torch.compile
     def fake_quant(self, x):
 
-        scale = self.clamp_method(self.scale, 1e-4, 1e4).half().float()
-        round_zero_point = self.clamp_method( round_ste(self.zero_point), self.qmin, self.qmax)
-
-        dim1, dim2 = x.shape
+        scale, round_zero_point = self.cal_qparams(self.scale,
+                                                   self.zero_point,
+                                                   self.clamp_method)
+        ori_shape = x.shape
         x = x.reshape(-1, self.group_size)
 
         # 计算需要量化的组数
@@ -397,24 +401,20 @@ class GradualUniformAffineQuantizer(nn.Module):
 
         # 直接构造量化后的新张量
         x_quantized = x.clone()
-        # x_int = round_ste(x[:quantized_groups] / scale[:quantized_groups])
-        # if round_zero_point is not None:
-        #     x_int = x_int.add(round_zero_point[:quantized_groups])
-        # x_int = x_int.clamp(self.qmin, self.qmax)
-        x_int = self.quant_int(x[:quantized_groups], scale[:quantized_groups], round_zero_point[:quantized_groups])
+        x_int = self._quantize(x[:quantized_groups],
+                               scale[:quantized_groups],
+                                round_zero_point[:quantized_groups])
 
-        x_dequant = x_int
-        # if round_zero_point is not None:
-        #     x_dequant = x_dequant.sub(round_zero_point[:quantized_groups])
-        # x_dequant = x_dequant.mul(scale[:quantized_groups])
-        x_dequant = self.dequant_int(x_int, scale[:quantized_groups], round_zero_point[:quantized_groups])
+        x_dequant = self._dequantize(x_int,
+                scale[:quantized_groups],
+                round_zero_point[:quantized_groups])
 
         # 返回量化后的新张量
         x_quantized[:quantized_groups] = x_dequant
         if self.interpolate>1e-6:
             x_quantized = (1-self.interpolate)*x_quantized+x*self.interpolate
 
-        return x_quantized.reshape(dim1, dim2)
+        return x_quantized.reshape(ori_shape)
 
     def forward(self, x: torch.Tensor):
         if self.n_bits >= 16 or not self.enable:
@@ -441,6 +441,80 @@ class GradualUniformAffineQuantizer(nn.Module):
 
         return x_int.reshape(dim1, dim2), scale, round_zero_point
 
+
+
+# 复现 QVGen: Pushing the Limit of Quantized Video Generative Models
+class RankDecayQuantizer(BaseQuantizer):
+    def __init__(
+        self,
+        n_bits: int = 8,
+        group_size=None,
+        weight=None,
+        args=None,
+    ):
+        super().__init__(
+            n_bits=n_bits,
+            group_size=group_size,
+        )
+        self.enable = True
+        self.group_size = group_size if group_size != -1 else weight.shape[-1]
+        assert weight.shape[-1] % group_size == 0
+        scale, zero_points = BaseQuantizer.init_with_weight(
+            weight, n_bits, group_size)
+        self.scale = nn.Parameter(scale)
+        self.zero_point = nn.Parameter(zero_points)
+
+        self.clamp_method = args.get("clamp_method", "STE")
+        self.rank = args.get("lora_rank", 32)
+
+
+        self.decay_ratio = 1.0
+        self.shrinking_ratio = 1/2
+
+    @torch.compile
+    def fake_quant(self, x):
+        
+        scale, round_zero_point = self.cal_qparams(self.scale,
+                                                   self.zero_point,
+                                                   self.clamp_method)
+        ori_shape = x.shape
+        x = x.reshape(-1, self.group_size)
+        # freezing weights
+        x_int = self._quantize(x, scale, round_zero_point)
+        if self.is_tracking:
+            x_int = self.weight_freeze_tracker(x_int)
+        x_dequant = self._dequantize(x_int, scale, round_zero_point)
+        return x_dequant.reshape(ori_shape)
+    
+    def update_decay_factor(self):
+        """Update decay factor using cosine annealing"""
+        self.phase_step += 1
+        
+        if self.phase_step >= self.decay_steps:
+            # Rank reduction phase
+            self.reduce_rank()
+            self.phase_step = 0
+            self.current_u = torch.tensor(1.0)
+        else:
+            # Cosine annealing decay
+            progress = float(self.phase_step) / self.decay_steps
+            self.current_u = 0.5 * (1 + math.cos(math.pi * progress))
+    def forward(self, x: torch.Tensor):
+        if self.n_bits >= 16 or not self.enable:
+            return x
+
+        x_dequant = self.fake_quant(x)
+        weight_res = x- x_dequant
+        with torch.no_grad():
+        # 对权重做SVD分解
+            u,s,vh = torch.svd(weight_res)
+            s = torch.sqrt(s)
+            self.lora_L = s[:self.rank]*u[:,:self.rank]
+            self.lora_R = s[:self.rank]*vh[:self.rank,:]
+            pivot_dim = ((1-self.shrinking_ratio)*self.rank).round()
+            self.lora_L[:,pivot_dim:]*=self.decay_raio
+        self.update_decay_factor()
+        return x_dequant+self.lora_L@self.lora_R
 
 class GradualUniformAffineQuantizerV2(nn.Module):
     def __init__(
@@ -698,3 +772,46 @@ class TrackOscillation(torch.nn.Module):
             self.frozen_x_int = torch.zeros_like(x_int)
             if self.use_ema_x_int:
                 self.ema_x_int = x_int.detach().clone()
+
+# TODO: DSQ还没有写完
+import math
+class DSQuantizer(UniformAffineQuantizer):
+
+    def __init__(self,
+        n_bits: int = 8,
+        group_size=None,
+        weight=None,
+        args=None,):
+        super().__init__(
+            n_bits=n_bits,
+            group_size=group_size,
+            weight=weight,
+            args=args,
+        )
+        alpha = args.get("alpha",0.4)
+        tanh_scale = 1 / (1 - alpha)
+        tanh_k = math.log((tanh_scale + 1) / (tanh_scale - 1))
+        self.tanh_scale = tanh_scale
+        self.tanh_k = tanh_k
+
+    def fake_quant(self, x):
+        tanh_scale = self.tanh_scale
+        tanh_k = self.tanh_k
+        scale = self.scale
+        zero_point = self.zero_point
+        quant_min = self.qmin
+        quant_max = self.qmax
+
+        ori_shape = x.shape
+        x = x.reshape(-1, self.group_size)
+
+
+        x = x / scale + zero_point
+        x = clamp_ste(x,quant_min,quant_max)
+        x = x.floor() + (tanh_scale 
+                          * torch.tanh(tanh_k * (x - x.floor() - 0.5))
+                        ) * 0.5 + 0.5
+        x = (x.round() - x).detach() + x
+        x = (x - zero_point) * scale
+
+        return x.reshape(ori_shape)

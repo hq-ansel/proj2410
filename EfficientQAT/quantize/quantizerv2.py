@@ -360,6 +360,10 @@ class GradualUniformAffineQuantizer(nn.Module):
         return x_int.reshape(dim1, dim2), scale, round_zero_point
 
 
+
+# 复现 QVGen: Pushing the Limit of Quantized Video Generative Models
+
+
 class GradualUniformAffineQuantizerV2(nn.Module):
     def __init__(
         self,

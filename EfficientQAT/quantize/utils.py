@@ -249,28 +249,28 @@ def set_weight_parameters(model, requires_grad):
     for n, m in model.named_parameters():
         if n.find('weight') > -1 and not (n.find('scale') > -1 or n.find('zero_point') > -1):
             m.requires_grad = requires_grad
-    return iter(params)
+    return params
 
 def weight_parameters(model):
     params = []
     for n, m in model.named_parameters():
         if n.find('weight') > -1 and not (n.find('scale') > -1 or n.find('zero_point') > -1):
             params.append(m)
-    return iter(params)
+    return params
 
 def set_quant_parameters(model, requires_grad):
     params = []
     for n, m in model.named_parameters():
         if n.find('scale') > -1 or n.find('zero_point') > -1:
             m.requires_grad = requires_grad
-    return iter(params)  
+    return params
 
 def quant_parameters(model):
     params = []
     for n, m in model.named_parameters():
         if n.find('scale') > -1 or n.find('zero_point') > -1:
             params.append(m)
-    return iter(params)  
+    return params 
 
 @torch.no_grad()
 def sub_space_clean(model):
@@ -389,9 +389,10 @@ class BlockLossRecorder:
         self.file_path = file_path
         self.loss_data = {}
 
-        # 如果文件存在，则从文件中加载已有的数据
-        if os.path.exists(self.file_path):
-            self._load_from_file()
+        # 放弃这个功能
+        # # 如果文件存在，则从文件中加载已有的数据
+        # if os.path.exists(self.file_path):
+        #     self._load_from_file()
 
     def record(self, blk_id:str, step:int, loss:float):
         """

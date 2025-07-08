@@ -5,7 +5,7 @@ lm_eval==0.4.4
 numpy
 torch
 tqdm
-transformers==4.45.1
+transformers==4.51.1
 triton
 termcolor
 sentencepiece

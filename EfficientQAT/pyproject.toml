@@ -1,0 +1,23 @@
+[project]
+name = "proj 2410"
+version = "0.1.0"
+description = "A short description"
+authors = [
+    { name="Your Name", email="your@email.com" }
+]
+requires-python = ">=3.8"
+
+dependencies = [
+    "accelerate",
+    "bitsandbytes",
+    "datasets==2.18.0",
+    "lm_eval==0.4.4",
+    "numpy",
+    "torch",
+    "tqdm",
+    "transformers==4.51.1",
+    "triton",
+    "termcolor",
+    "sentencepiece",
+    "protobuf"
+]

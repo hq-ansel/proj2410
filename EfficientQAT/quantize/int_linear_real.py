@@ -41,11 +41,7 @@ class QuantLinear(nn.Module, TritonModuleMixin):
         **kwargs
     ):
         super().__init__()
-<<<<<<< HEAD
-        if bits not in [2, 4, 8]:
-=======
         if bits not in [2, 3, 4, 8]:
->>>>>>> f9ee1fd6ab0ce324ab88428529ed9bd1122b1fbf
             raise NotImplementedError("Only 2,4,8 bits are supported.")
         if infeatures % 32 != 0 or outfeatures % 32 != 0:
             raise NotImplementedError("in_feature and out_feature must be divisible by 32.")
@@ -87,7 +83,6 @@ class QuantLinear(nn.Module, TritonModuleMixin):
         pass
 
 
-<<<<<<< HEAD
     def use_fake_quantization(self, del_quant=False,transpose=False):
         # use fake quantization for faster training but consume more memory
         weight = dequant_dim0(self.qweight, self.bits, self.maxq, self.infeatures, self.outfeatures)
@@ -107,8 +102,6 @@ class QuantLinear(nn.Module, TritonModuleMixin):
             del self.scales
             del self.qzeros
             del self.g_idx
-=======
->>>>>>> f9ee1fd6ab0ce324ab88428529ed9bd1122b1fbf
         
     def pack(self, linear, scales, zeros, g_idx=None):
         """
@@ -126,11 +119,6 @@ class QuantLinear(nn.Module, TritonModuleMixin):
         g_idx = torch.tensor([i // self.group_size for i in range(self.infeatures)], dtype=torch.int32)
 
         scale_zeros = zeros * scales
-<<<<<<< HEAD
-        self.scales = nn.Parameter(scales)
-        if linear.bias is not None:
-            self.bias = linear.bias.clone()
-=======
 
         # 考虑有可能是bfloat16或者float16不要把参数限制的太死
         # import pdb; pdb.set_trace()
@@ -139,7 +127,6 @@ class QuantLinear(nn.Module, TritonModuleMixin):
         self.scales = nn.Parameter(scales.to(scale_dtype))
         if linear.bias is not None:
             self.bias = linear.bias.clone().to(scale_dtype)
->>>>>>> f9ee1fd6ab0ce324ab88428529ed9bd1122b1fbf
 
         intweight = []
         for idx in range(self.infeatures):
@@ -157,13 +144,9 @@ class QuantLinear(nn.Module, TritonModuleMixin):
         row = 0
         # qweight (infeatures//(32//bits), outfeatures)
         # intweight (infeatures, outfeatures)
-<<<<<<< HEAD
-        qweight = np.zeros((math.ceil(intweight.shape[0]/(32//self.bits)), intweight.shape[1]), dtype=np.uint32)
-=======
         qweight = np.zeros((math.ceil(intweight.shape[0]/(32//self.bits)),
                              intweight.shape[1]), dtype=np.uint32)
         
->>>>>>> f9ee1fd6ab0ce324ab88428529ed9bd1122b1fbf
         while row < qweight.shape[0]:
             if self.bits in [2, 3, 4, 8]:
                 for j in range(i, min(i + (32 // self.bits), intweight.shape[0])):
@@ -175,12 +158,7 @@ class QuantLinear(nn.Module, TritonModuleMixin):
 
         qweight = qweight.astype(np.int32)
         self.qweight = torch.from_numpy(qweight)
-<<<<<<< HEAD
-
-        zeros = zeros.numpy().astype(np.uint32)
-=======
         zeros = zeros.float().numpy().astype(np.uint32)
->>>>>>> f9ee1fd6ab0ce324ab88428529ed9bd1122b1fbf
         self.zeros_dim0, self.zeros_dim1 = zeros.shape
         # qzeros (infeatures//group_size, outfeatures//(32//bits))
         qzeros = np.zeros((zeros.shape[0], math.ceil(zeros.shape[1] / (32 // self.bits))), dtype=np.uint32)
@@ -198,11 +176,6 @@ class QuantLinear(nn.Module, TritonModuleMixin):
         qzeros = qzeros.astype(np.int32)
         self.qzeros = torch.from_numpy(qzeros)
 
-<<<<<<< HEAD
-        self.scales.data = self.scales.data.half()
-        if self.bias is not None:
-            self.bias.data = self.bias.data.half()
-=======
         # self.scales.data = self.scales.data.half()
         # if self.bias is not None:
         #     self.bias.data = self.bias.data.half()
@@ -242,7 +215,6 @@ class QuantLinear(nn.Module, TritonModuleMixin):
             del self.scales
             del self.qzeros
             del self.g_idx
->>>>>>> f9ee1fd6ab0ce324ab88428529ed9bd1122b1fbf
 
     def _dequant_dim0(self):
         return dequant_dim0(self.qweight, self.bits, self.maxq, self.infeatures, self.outfeatures)
@@ -251,33 +223,12 @@ class QuantLinear(nn.Module, TritonModuleMixin):
         return dequant_dim1(self.qzeros, self.bits, self.maxq, self.zeros_dim0, self.zeros_dim1)
 
     def forward(self, x):
-<<<<<<< HEAD
-=======
         dtype = x.dtype
->>>>>>> f9ee1fd6ab0ce324ab88428529ed9bd1122b1fbf
         if self.use_fake:
             weight = self.weight
             if self.fake_transpose:
                 weight = weight.transpose(0,1)
         else:
-<<<<<<< HEAD
-            weight = dequant_dim0(self.qweight, self.bits, self.maxq, self.infeatures, self.outfeatures)
-            dim0, dim1 = weight.shape
-            # dim2 = (dim1*dim0)//self.group_size
-            zeros = dequant_dim1(self.qzeros, self.bits, self.maxq, self.zeros_dim0, self.zeros_dim1)
-            weight = ((weight.view(-1, self.group_size, dim1) - zeros.view(-1, 1, dim1)) * self.scales.view(-1, 1, dim1)).reshape(dim0, dim1)
-        # out = torch.matmul(x, weight)
-        # torch.cuda.synchronize()
-        # if self.clamp_input:
-        #     x = torch.clamp(x, -128, 127)
-        # import pdb; pdb.set_trace()
-        out = torch.matmul(x, weight.to(x.dtype))
-        # torch.cuda.synchronize()
-
-        # out = out + self.bias.to(x.dtype) if self.bias is not None else out
-        if self.bias is not None:
-            out = out + self.bias.to(out.device, dtype=out.dtype)
-=======
             weight = self.get_weight(dtype=x.dtype)
         # out = x@weight
         # import pdb; pdb.set_trace()
@@ -299,7 +250,6 @@ class QuantLinear(nn.Module, TritonModuleMixin):
         # if self.bias is not None:
         #     out = out + self.bias.to(out.device, dtype=out.dtype)
 
->>>>>>> f9ee1fd6ab0ce324ab88428529ed9bd1122b1fbf
         return out
     
     @classmethod
@@ -336,11 +286,7 @@ class QuantLinearV2(nn.Module, TritonModuleMixin):
         **kwargs
     ):
         super().__init__()
-<<<<<<< HEAD
-        if bits not in [2, 4, 8]:
-=======
         if bits not in [2, 3,4, 8]:
->>>>>>> f9ee1fd6ab0ce324ab88428529ed9bd1122b1fbf
             raise NotImplementedError("Only 2,4,8 bits are supported.")
         if infeatures % 32 != 0 or outfeatures % 32 != 0:
             raise NotImplementedError("in_feature and out_feature must be divisible by 32.")
@@ -419,16 +365,11 @@ class QuantLinearV2(nn.Module, TritonModuleMixin):
     
         g_idx = torch.tensor([i // self.group_size for i in range(self.infeatures)], dtype=torch.int32)
 
-<<<<<<< HEAD
-        self.scales = nn.Parameter(scales.half())
-        self.qzeros = nn.Parameter(zeros.half())
-=======
         # 考虑有可能是bfloat16或者float16不要把参数限制的太死
         import pdb; pdb.set_trace()
         scale_dtype = scales.dtype
         self.scales = nn.Parameter(scales.to(scale_dtype))
         self.qzeros = nn.Parameter(zeros.to(scale_dtype))
->>>>>>> f9ee1fd6ab0ce324ab88428529ed9bd1122b1fbf
 
         if linear.bias is not None:
             self.bias = linear.bias.clone().half()
@@ -631,11 +572,7 @@ def load_quantized_model(model_path, wbits, group_size):
     print(f"Loading quantized model from {model_path}")
 
     # import pdb;pdb.set_trace()
-<<<<<<< HEAD
     tokenizer = AutoTokenizer.from_pretrained(model_path, use_fast=False)
-=======
-    tokenizer = AutoTokenizer.from_pretrained(model_path)
->>>>>>> f9ee1fd6ab0ce324ab88428529ed9bd1122b1fbf
     config = AutoConfig.from_pretrained(model_path)
     with init_empty_weights():
         model = AutoModelForCausalLM.from_config(config=config,torch_dtype=torch.float16, trust_remote_code=True)
@@ -655,15 +592,11 @@ def load_quantized_model(model_path, wbits, group_size):
     # print("Loading pre-computed quantized weights...",model)
     model.tie_weights()
     # kwargs = {"max_memory": "16GB"} 
-<<<<<<< HEAD
-    device_map = infer_auto_device_map(model,
-=======
     total_gpu = torch.cuda.device_count()
     max_memory = {k:"20GiB" for k in range(total_gpu)}
     # import pdb;pdb.set_trace()
     device_map = infer_auto_device_map(model,
         max_memory=max_memory,
->>>>>>> f9ee1fd6ab0ce324ab88428529ed9bd1122b1fbf
         no_split_module_classes=[
             "OPTDecoderLayer",
             "LlamaDecoderLayer",
@@ -674,20 +607,11 @@ def load_quantized_model(model_path, wbits, group_size):
         ],                               
         # **kwargs
         )
-<<<<<<< HEAD
     print("Loading pre-computed quantized weights...")
     load_checkpoint_in_model(model,
         checkpoint=model_path,
         device_map=device_map,
         offload_state_dict=True)
-=======
-    # import pdb;pdb.set_trace()
-    # print("Loading pre-computed quantized weights...")
-    print(device_map)
-    load_checkpoint_in_model(model,
-        checkpoint=model_path,
-        device_map=device_map)
->>>>>>> f9ee1fd6ab0ce324ab88428529ed9bd1122b1fbf
     print("Loading pre-computed quantized weights Successfully")
 
     return model, tokenizer

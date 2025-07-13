@@ -51,6 +51,5 @@ dist/
 # 系统cache
 hf_home/
 logs/
-model/
 quant_model/
 cache/

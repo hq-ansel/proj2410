@@ -1,0 +1,67 @@
+# str, direction of cached dataset, leading to faster debug
+cache_dir: /home/ubuntu/data/exp/proj2410/cache
+# str, direction of logging file
+output_dir: ./log/
+# str, direction for saving quantization model
+save_quant_dir: None
+# bool, use real quantization instead of fake quantization, 
+# can reduce memory footprint
+real_quant: True
+# str, model path of resumed quantized model
+resume_quant: None
+# str, Where to extract calibration data from.
+calib_dataset: redpajama
+# int, Number of training data samples.
+train_size: 4096
+# int, Number of validation data samples.
+val_size: 64
+# int, lenth of the training sequence.
+training_seqlen: 2048
+# int, batch size.
+batch_size: 2
+# int, number of epochs
+epochs: 2
+# int, input sequence length for evaluating perplexity
+ppl_seqlen: 2048
+# int, Seed for sampling the calibration data.
+seed: 42
+# bool, evaluate perplexity on wikitext2 and c4
+eval_ppl: False
+# str, exampe:piqa,arc_easy,arc_challenge,hellaswag,winogrande
+eval_tasks: "piqa"
+# int, evaluation batch size
+eval_batch_size: 16
+# int, weights quantization bits
+wbits: 4
+# int, weights quantization group size
+group_size: 128
+# float, lr of quantization parameters (s and z)
+quant_lr: 1e-4
+# float, lr of full-precision weights
+weight_lr: 1e-5
+# float, clip gradient
+clip_grad: 1
+# float, weight decay
+wd: 0
+# str, model (family) name, for the easier saving of data cache
+net: None
+# str, The maximum memory of each GPU
+max_memory: 70GiB
+# int, early stoping after validation loss do not decrease
+early_stop: 0
+# bool, save training dataset to disk, saving CPU memory but may reduce training speed
+off_load_to_disk: False
+# str, log loss path
+log_loss: None
+# str, loss function for training
+loss_func: MSE
+# str, clamp method for training
+clamp_method: STE
+# str, quantization shedule type
+quant_shedule_type: partial
+# str, train shedule type
+train_shedule_type: start2end
+# bool, use catcher for training saving memory
+with_catcher: False
+# str, quantization method
+quant_method: block_ap

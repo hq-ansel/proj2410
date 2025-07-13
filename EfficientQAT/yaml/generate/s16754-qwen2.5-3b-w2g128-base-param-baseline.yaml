@@ -28,13 +28,10 @@ train_param_settings:
   eval_ppl: false
   eval_tasks: piqa
   eval_batch_size: 16
-  wbits: 4
-  group_size: 128
   quant_lr: 1e-4
   weight_lr: 1e-5
   clip_grad: 1
   wd: 0
-  net: None
   max_memory: 70GiB
   early_stop: 0
   off_load_to_disk: false

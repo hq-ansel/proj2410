@@ -31,10 +31,6 @@ eval_ppl: False
 eval_tasks: "piqa"
 # int, evaluation batch size
 eval_batch_size: 16
-# int, weights quantization bits
-wbits: 4
-# int, weights quantization group size
-group_size: 128
 # float, lr of quantization parameters (s and z)
 quant_lr: 1e-4
 # float, lr of full-precision weights
@@ -43,8 +39,6 @@ weight_lr: 1e-5
 clip_grad: 1
 # float, weight decay
 wd: 0
-# str, model (family) name, for the easier saving of data cache
-net: None
 # str, The maximum memory of each GPU
 max_memory: 70GiB
 # int, early stoping after validation loss do not decrease

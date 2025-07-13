@@ -19,6 +19,7 @@ from .quantize.int_linear_real import load_quantized_model  # 假设修复了模
 from .quantize.block_ap import block_ap
 from .quantize.crossblockquant import cross_block_quantization
 from .quantize.greedy_trainer import greedy_local_train, timer
+from .liger_kernel_utils import apply_liger_kernel
 
 amp_enabled = os.environ.get("AMP_ENABLED", "False").lower() == "true"
 torch.set_float32_matmul_precision('high')
@@ -102,6 +103,8 @@ def main() -> None:
     if config.get('save_quant_dir'):
         Path(config['train_param_settings']['save_quant_dir']).mkdir(parents=True, exist_ok=True)
     output_dir = Path(config.get('output_dir', './log/'))
+    if not output_dir.exists():
+        output_dir.mkdir(parents=True, exist_ok=True)
     logger = utils.create_logger(output_dir)
     config['logger'] = logger
     logger.info(config)
@@ -114,6 +117,9 @@ def main() -> None:
     else:
         model_config = AutoConfig.from_pretrained(config['model_settings']['model'])
         tokenizer = AutoTokenizer.from_pretrained(config['model_settings']['model'], use_fast=False, legacy=False)
+        apply_liger_kernel(
+            config=model_config, 
+            require_logits=True)
         model = AutoModelForCausalLM.from_pretrained(
             config['model_settings']['model'],
             attn_implementation="eager",
@@ -167,7 +173,7 @@ def main() -> None:
             model.save_pretrained(config['train_param_settings']['save_quant_dir'])
         tokenizer.save_pretrained(config['train_param_settings']['save_quant_dir'])
         logger.info("save model success")
-    model.to(config['cuda_ids'][0])
+    model.to(config["cluster_settings"]['cuda_ids'][0])
     evaluate(model, tokenizer, config, logger)
 
 if __name__ == "__main__":

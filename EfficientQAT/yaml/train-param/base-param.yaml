@@ -32,9 +32,9 @@ eval_tasks: "piqa"
 # int, evaluation batch size
 eval_batch_size: 16
 # float, lr of quantization parameters (s and z)
-quant_lr: 1e-4
+quant_lr: 0.0001
 # float, lr of full-precision weights
-weight_lr: 1e-5
+weight_lr: 0.00001
 # float, clip gradient
 clip_grad: 1
 # float, weight decay

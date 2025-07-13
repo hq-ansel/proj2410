@@ -120,7 +120,7 @@ def update_config_with_args(config, args):
             config[key] = value
     if "cuda_ids" in config:
         os.environ["CUDA_VISIBLE_DEVICES"]=config.cuda_ids
-        config.cuda = [int(i) for i in config.cuda_ids.split(',')]
+        config.cuda = config.cuda_ids
     return config
 
 # 初始化分布式训练环境

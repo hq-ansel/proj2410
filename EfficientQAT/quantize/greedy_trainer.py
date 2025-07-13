@@ -174,7 +174,7 @@ def train_units_layers(model: PreTrainedModel,
                                                 lr=train_params['quant_lr'])
             quant_scheduler = CosineAnnealingLR(empty_optimizer_1,
                                         T_max=total_training_iteration,
-                                        eta_min=train_params['quant_lr']/train_params['min_lr_factor'])
+                                        eta_min=train_params['quant_lr']/hyper_params['min_lr_factor'])
             quant_index = param_group_index
             param_group_index += 1
         else:
@@ -188,7 +188,7 @@ def train_units_layers(model: PreTrainedModel,
                                                 lr=train_params['weight_lr'])
             weight_scheduler = CosineAnnealingLR(empty_optimizer_2,
                                             T_max=total_training_iteration,
-                                            eta_min=train_params['weight_lr']/train_params['min_lr_factor'])
+                                            eta_min=train_params['weight_lr']/hyper_params['min_lr_factor'])
             weight_index = param_group_index
             param_group_index += 1
         else:
@@ -286,7 +286,7 @@ def train_units_layers(model: PreTrainedModel,
             # step 6.4: training                   
             for index, input_data in enumerate(dataloader):
                 optimizer.zero_grad()
-                with torch.autocast(device_type=train_params['dev'],
+                with torch.autocast(device_type="cuda",
                                     enabled=amp_enabled,
                                     dtype=train_params['dtype'] if amp_enabled else torch.float32):
                     inp,target = input_data
@@ -401,7 +401,7 @@ def train_units_layers(model: PreTrainedModel,
                                         )
                 for index, input_data in enumerate(dataloader):  
                     # obtain output of quantization model
-                    with torch.autocast(device_type=train_params['dev'],
+                    with torch.autocast(device_type="cuda",
                                     enabled=amp_enabled,
                                     dtype=train_params['dtype'] if amp_enabled else torch.float32):
                         inp,target = input_data
@@ -599,7 +599,7 @@ def train_units_layers_with_catcher(model: PreTrainedModel,
                                     )
             # step 6.4: training                   
             for index, input_data in enumerate(dataloader):
-                with torch.autocast(device_type=train_params['dev'],
+                with torch.autocast(device_type="cuda",
                                     enabled=amp_enabled,
                                     dtype=train_params['dtype'] if amp_enabled else torch.float32):
                     inp = input_data
@@ -688,7 +688,7 @@ def train_units_layers_with_catcher(model: PreTrainedModel,
             for index, input_data in enumerate(dataloader):  
                 # obtain output of quantization model
                 with torch.no_grad():
-                    with torch.autocast(device_type=train_params['dev'],
+                    with torch.autocast(device_type="cuda",
                                     enabled=amp_enabled,
                                     dtype=train_params['dtype'] if amp_enabled else torch.float32):
                         inp = input_data
@@ -734,13 +734,13 @@ def train_units_layers_with_catcher(model: PreTrainedModel,
 
 
 
-def trans_quant_block(qlayer:nn.Module,args):
+def trans_quant_block(qlayer:nn.Module,hyper_params):
     for name, module in qlayer.named_modules():
         if isinstance(module,torch.nn.Linear):
             quantlinear = int_linear_fake.QuantLinear(module,
-                                args['wbits'],
-                                args['group_size'],
-                                args)
+                                hyper_params['wbits'],
+                                hyper_params['group_size'],
+                                hyper_params)
             quantlinear.set_quant_state(True)
             set_op_by_name(qlayer, name, quantlinear)  
             del module  
@@ -753,7 +753,6 @@ def custom_shedule_train(model:PreTrainedModel,
                     position_embeddings : Tuple[torch.Tensor, torch.Tensor],
                     logger: logging.Logger,
                     config: Dict[str, Any]):
-    # model.to(args.dev)
 
     train_params = config.get('train_param_settings', {})
     hyper_params = config.get('hyperparam_settings', {})
@@ -768,22 +767,22 @@ def custom_shedule_train(model:PreTrainedModel,
     if train_params.get("quant_shedule_type") == "full":
         for i in range(len(model.model.layers)):
             model.model.layers[i] = trans_quant_block(qlayer=model.model.layers[i],
-                                                      args=train_params)
+                                                      hyper_params=hyper_params)
     else: is_quant_layer = [False]*len(model.model.layers)
     if train_params.get("train_shedule_type") == "start2end":
         num_layers = len(model.model.layers)
-        for start in range(0,num_layers,train_params['slide_step']):
-            end = min(start + train_params['crossblock_window_size'], num_layers)
+        for start in range(0,num_layers,hyper_params['slide_step']):
+            end = min(start + hyper_params['crossblock_window_size'], num_layers)
             shedule_list.append(list(range(start, end)))
     elif train_params.get("train_shedule_type") == "end2start":
         num_layers = len(model.model.layers)
-        for end in range(num_layers, 0, -1*train_params['slide_step']):
-            start = max(end - train_params['crossblock_window_size'], 0)
+        for end in range(num_layers, 0, -1*hyper_params['slide_step']):
+            start = max(end - hyper_params['crossblock_window_size'], 0)
             shedule_list.append(list(range(start, end)))
     
-    logger.info(f"use loss func {config.get('loss_func')} ")
+    logger.info(f"use loss func {train_params['loss_func']}")
 
-    loss_func = get_loss_func(config.get('loss_func'))
+    loss_func = get_loss_func(train_params['loss_func'])
     loss_recorder = utils.BlockLossRecorder(file_path=train_params['log_loss'],)
     
     for train_layer_window in shedule_list:
@@ -791,11 +790,11 @@ def custom_shedule_train(model:PreTrainedModel,
             for layer_idx in train_layer_window:
                 if not is_quant_layer[layer_idx]:
                     is_quant_layer[layer_idx] = True
-                    if train_params.get("keep_fp_weight"):
-                        fp_layer = copy.deepcopy(model.model.layers[layer_idx])
+                    # if train_params.get("keep_fp_weight"):
+                    #     fp_layer = copy.deepcopy(model.model.layers[layer_idx])
                     model.model.layers[layer_idx] = trans_quant_block(
                                             qlayer=model.model.layers[layer_idx],
-                                                                      args=train_params)
+                                            hyper_params=hyper_params)
         if train_params['epochs'] > 0 :
             logger.info(f"train blocks {train_layer_window}")
             # assert attention_mask is not None , "attention_mask is None"
@@ -894,52 +893,52 @@ def custom_shedule_train(model:PreTrainedModel,
         if not train_params.get("with_catcher"):
             if train_layer_window != shedule_list[-1]:
                 with torch.no_grad():
-                    with torch.autocast(device_type=train_params['dev'],
+                    with torch.autocast(device_type="cuda",
                                         enabled=amp_enabled,
                                         dtype=train_params['dtype'] if amp_enabled else torch.float32):
                         for slide_base in train_layer_window:
                             # 更新后的input 需要经过[windows_start,windows_start+slide_step)层的输出
-                            if slide_base == train_layer_window[0]+train_params['slide_step']:
+                            if slide_base == train_layer_window[0]+hyper_params['slide_step']:
                                 break
                             layer_idx = slide_base 
                             # print(f"slide_base {slide_base} layer_idx {layer_idx}")
                             layer = model.model.layers[layer_idx].to(train_params['dev'],dtype=train_params['dtype'])
-                            next_layer = model.model.layers[layer_idx+train_params['slide_step']].to(train_params['dev'],dtype=train_params['dtype'])
+                            next_layer = model.model.layers[layer_idx+hyper_params['slide_step']].to(train_params['dev'],dtype=train_params['dtype'])
                             print(f" layer {layer_idx}  update input")
-                            print(f" layer {layer_idx+train_params['slide_step']}  update output")
+                            print(f" layer {layer_idx+hyper_params['slide_step']}  update output")
                             # keep_fp_weight 代表用使用原权重更新作为训练输入而不是使用量化后权重进行更新
-                            if train_params.get("keep_fp_weight"):
-                                fp_layer = fp_layer.to(train_params['dev'],dtype=train_params['dtype'])
-                                train_dataset.update_dataset(module=fp_layer, 
+                            # if train_params.get("keep_fp_weight"):
+                            #     fp_layer = fp_layer.to(train_params['dev'],dtype=train_params['dtype'])
+                            #     train_dataset.update_dataset(module=fp_layer, 
+                            #                         next_module=next_layer,
+                            #                         layer_idx=layer_idx+hyper_params['slide_step'],
+                            #                         # batch_size=args.batch_size,
+                            #                         attention_mask=attention_mask,
+                            #                         position_embeddings=position_embeddings,
+                            #                             )
+                            #     val_dataset.update_dataset(module=fp_layer, 
+                            #                             next_module=next_layer,
+                            #                             layer_idx=layer_idx+hyper_params['slide_step'],
+                            #                             # batch_size=args.batch_size,
+                            #                             attention_mask=attention_mask,
+                            #                             position_embeddings=position_embeddings,
+                            #                                 )
+                            #     del fp_layer
+                            # else:
+                            train_dataset.update_dataset(module=layer, 
                                                     next_module=next_layer,
-                                                    layer_idx=layer_idx+train_params['slide_step'],
+                                                    layer_idx=layer_idx+hyper_params['slide_step'],
                                                     # batch_size=args.batch_size,
                                                     attention_mask=attention_mask,
                                                     position_embeddings=position_embeddings,
                                                         )
-                                val_dataset.update_dataset(module=fp_layer, 
-                                                        next_module=next_layer,
-                                                        layer_idx=layer_idx+train_params['slide_step'],
-                                                        # batch_size=args.batch_size,
-                                                        attention_mask=attention_mask,
-                                                        position_embeddings=position_embeddings,
-                                                            )
-                                del fp_layer
-                            else:
-                                train_dataset.update_dataset(module=layer, 
-                                                        next_module=next_layer,
-                                                        layer_idx=layer_idx+train_params['slide_step'],
-                                                        # batch_size=args.batch_size,
-                                                        attention_mask=attention_mask,
-                                                        position_embeddings=position_embeddings,
-                                                            )
-                                val_dataset.update_dataset(module=layer, 
-                                                        next_module=next_layer,
-                                                        layer_idx=layer_idx+train_params['slide_step'],
-                                                        # batch_size=args.batch_size,
-                                                        attention_mask=attention_mask,
-                                                        position_embeddings=position_embeddings,
-                                                            )
+                            val_dataset.update_dataset(module=layer, 
+                                                    next_module=next_layer,
+                                                    layer_idx=layer_idx+hyper_params['slide_step'],
+                                                    # batch_size=args.batch_size,
+                                                    attention_mask=attention_mask,
+                                                    position_embeddings=position_embeddings,
+                                                        )
                             layer.cpu()
                             next_layer.cpu()
             # attention_mask = attention_mask.to(dtype=_dtype)
@@ -967,7 +966,7 @@ def greedy_local_train(
     if off_load_to_disk:
         logger.info("offload the training dataset to disk, saving CPU memory, but may slowdown the training due to additional I/O...")
     
-    dev = config.get('cuda_ids', ['cuda:0'])[0] if torch.cuda.is_available() else 'cpu'
+    dev = config["cluster_settings"]['cuda_ids'][0] if torch.cuda.is_available() else 'cpu'
     dtype = torch.bfloat16 if amp_enabled else torch.float32
     train_params['dev'] = dev
     train_params['dtype'] = dtype
@@ -984,22 +983,22 @@ def greedy_local_train(
         train_dataset = LazyLoadDatasetV2(
             model=model,
             dataloader=trainloader,
-            crossblock_window_size=train_params['crossblock_window_size'],
-            device=config['cuda_ids'][0],
+            crossblock_window_size=hyper_params['crossblock_window_size'],
+            device=config["cluster_settings"]['cuda_ids'][0],
         )
         # 准备验证集
         val_dataset = LazyLoadDatasetV2(
             model=model,
             dataloader=valloader,
-            crossblock_window_size=train_params['crossblock_window_size'],
-            device=config['cuda_ids'][0],
+            crossblock_window_size=hyper_params['crossblock_window_size'],
+            device=config["cluster_settings"]['cuda_ids'][0],
         )
         if train_dataset.attention_mask is None:
             attention_mask = train_dataset.attention_mask
         else:
-            attention_mask = train_dataset.attention_mask.to(config['cuda_ids'][0])
-        position_embeddings = (train_dataset.position_embeddings[0].to(config['cuda_ids'][0]),
-                            train_dataset.position_embeddings[1].to(config['cuda_ids'][0]))
+            attention_mask = train_dataset.attention_mask.to(config["cluster_settings"]['cuda_ids'][0])
+        position_embeddings = (train_dataset.position_embeddings[0].to(config["cluster_settings"]['cuda_ids'][0]),
+                            train_dataset.position_embeddings[1].to(config["cluster_settings"]['cuda_ids'][0]))
 
         del trainloader, valloader
         gc.collect()

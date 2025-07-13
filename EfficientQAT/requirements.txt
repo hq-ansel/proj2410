@@ -5,6 +5,7 @@ lm_eval==0.4.4
 numpy
 torch
 tqdm
+liger-kernel 
 transformers==4.51.1
 triton
 termcolor
@@ -12,6 +13,11 @@ sentencepiece
 protobuf
 easydict
 matplotlib
+logbar
+tokenicer
 ninja
 gptqmodel
+# uv pip install -r requirements.txt --no-build-isolation
+# export NINJA_JOBS=192
+# uv pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128 && \
 # uv pip install -r requirements.txt --no-build-isolation

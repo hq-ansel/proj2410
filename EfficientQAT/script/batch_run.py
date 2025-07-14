@@ -26,6 +26,9 @@ def main() -> None:
         env: Dict[str, str] = os.environ.copy()
         env['HF_HOME'] = HF_HOME
         env['PYTHONPATH'] = env.get('PYTHONPATH', '') + ':' + PYTHONPATH
+        # env["http_proxy"] = "172.18.166.139:7890"
+        # env['https_proxy'] = "172.18.166.139:7890"
+        # env['HF_ENDPOINT'] = "https://hf-mirror.com"
         cmd: List[str] = [
             'python', '-m', 'EfficientQAT.main_block_ap',
             '--config_path', "EfficientQAT/"+config_path,

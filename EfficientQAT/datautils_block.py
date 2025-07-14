@@ -752,34 +752,40 @@ def get_redpajama(
     seed: int, 
     seqlen: int
 ) -> Tuple[List[Tuple[torch.Tensor, torch.Tensor]], List[Tuple[torch.Tensor, torch.Tensor]]]:
-    """
-    Load and preprocess the RedPajama dataset, returning train and validation data.
-
-    Args:
-        tokenizer (PreTrainedTokenizer): Tokenizer for encoding the text data.
-        train_size (int): Number of training samples to generate.
-        val_size (int): Number of validation samples to generate.
-        seed (int): Seed for random number generator to ensure reproducibility.
-        seqlen (int): Length of the input sequences.
-
-    Returns:
-        Tuple[List[Tuple[torch.Tensor, torch.Tensor]], List[Tuple[torch.Tensor, torch.Tensor]]]:
-            A tuple of two lists, each containing tuples of input and target tensors for 
-            the training and validation datasets.
-    """
-    print("get_redpajama")
+    print("Loading RedPajama dataset...")
+    
+    # 设置缓存目录
+    cache_dir = "~/data/exp/proj2410/hf_home/arxiv/"
+    
     try:
-        loacal_dataset = "/path/to/local/redpajama-dataset"
-        traindata = load_dataset(loacal_dataset, split='train')
-    except:
-        traindata = load_dataset("togethercomputer/RedPajama-Data-1T-Sample", split='train')
+        # 尝试加载数据集
+        traindata = load_dataset(
+            "togethercomputer/RedPajama-Data-1T",
+            data_files={"train": "arxiv/arxiv-train.00000-of-00001.json.gz"},  # 选择特定的分片
+            split="train"
+        )
+    except Exception as e:
+        print(f"Error loading dataset: {str(e)}")
+        print("Trying to clean cache and reload...")
+        # 清理缓存并重试
+        import shutil
+        shutil.rmtree(cache_dir, ignore_errors=True)
+        os.makedirs(cache_dir, exist_ok=True)
+        
+        traindata = load_dataset(
+            "togethercomputer/RedPajama-Data-1T",
+            split='train',
+            cache_dir=cache_dir,
+            trust_remote_code=True,
+        )
 
+    # Rest of the function remains the same
     random.seed(seed)
     traindata = traindata.shuffle(seed=seed)
-
+    
     trainloader = []
     val_sample_ratio = 0.9  # 90% for training, 10% for validation
-
+    
     # Generate training samples
     for _ in range(train_size):
         while True:
@@ -793,9 +799,9 @@ def get_redpajama(
         tar = inp.clone()
         tar[:, :-1] = -100  # Shift target for language modeling
         trainloader.append((inp, tar))
-
+    
     valloader = []
-
+    
     # Generate validation samples
     for _ in range(val_size):
         while True:
@@ -809,7 +815,7 @@ def get_redpajama(
         tar = inp.clone()
         tar[:, :-1] = -100  # Shift target for language modeling
         valloader.append((inp, tar))
-
+    
     return trainloader, valloader
 
 

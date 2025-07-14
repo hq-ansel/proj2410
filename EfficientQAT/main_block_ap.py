@@ -102,6 +102,8 @@ def main() -> None:
         Path(config['train_param_settings']['cache_dir']).mkdir(parents=True, exist_ok=True)
     if config.get('save_quant_dir'):
         Path(config['train_param_settings']['save_quant_dir']).mkdir(parents=True, exist_ok=True)
+    if config['train_param_settings']['cache_dir']:
+        Path(config['train_param_settings']['cache_dir']).mkdir(parents=True, exist_ok=True)
     output_dir = Path(config.get('output_dir', './log/'))
     if not output_dir.exists():
         output_dir.mkdir(parents=True, exist_ok=True)

@@ -855,21 +855,21 @@ def custom_shedule_train(model:PreTrainedModel,
                         scales = scales.view(dim0,-1).transpose(0,1).contiguous()
                         zeros = zeros.view(dim0,-1).transpose(0,1).contiguous()
                         if quantizer_version == "v1":
-                            q_linear = int_linear_real.QuantLinear(train_params['wbits'],
+                            q_linear = int_linear_real.QuantLinear(hyper_params['wbits'],
                                                         group_size,
                                                         module.in_features,
                                                         module.out_features,
                                                         not module.bias is None,
                                                         clamp_input= train_params.get("clamp_input",False))
                         elif quantizer_version == "v2":
-                            q_linear = int_linear_real.QuantLinearV2(train_params['wbits'],
+                            q_linear = int_linear_real.QuantLinearV2(hyper_params['wbits'],
                                                         group_size,
                                                         module.in_features,
                                                         module.out_features,
                                                         not module.bias is None,
                                                         clamp_input= train_params.get("clamp_input",False))
                         elif quantizer_version == "v3":
-                            q_linear = int_linear_real.QuantLinearV3(train_params['wbits'],
+                            q_linear = int_linear_real.QuantLinearV3(hyper_params['wbits'],
                                                         group_size,
                                                         module.in_features,
                                                         module.out_features,

@@ -9,8 +9,8 @@ save_quant_dir: None
 real_quant: True
 # str, model path of resumed quantized model
 resume_quant: None
-# str, Where to extract calibration data from.
-calib_dataset: redpajama
+# str, Where to extract calibration data from. [redpajama, wikitext2, c4]
+calib_dataset: wikitext2
 # int, Number of training data samples.
 train_size: 4096
 # int, Number of validation data samples.

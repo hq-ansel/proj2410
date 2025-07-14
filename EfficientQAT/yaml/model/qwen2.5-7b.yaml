@@ -1,0 +1,3 @@
+net: Qwen2.5-7B
+model: /home/ubuntu/data/exp/proj2410/model/Qwen2.5-7B
+save_parent_dir: /home/ubuntu/data/exp/proj2410/quant_model/Qwen2.5-7B 

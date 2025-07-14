@@ -53,3 +53,5 @@ hf_home/
 logs/
 quant_model/
 cache/
+
+/model/

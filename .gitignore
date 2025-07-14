@@ -53,7 +53,13 @@ hf_home/
 logs/
 log/
 hess/
+# 忽略所有 model/ 目录（递归忽略其内容）
 model/
+qtip/model/
+quip_sharp/model/
+
+# 排除需要跟踪的特定目录（使用 ! 取反规则）
+!EfficientQAT/yaml/model/
 quant_model/
 cache/
 output/
@@ -109,16 +115,5 @@ dist/
 .idea/
 .vscode/
 
-# 系统cache
-hf_home/
-logs/
-log/
-hess/
-model/
-quant_model/
-cache/
-output/
-data/
-build/  
 
 baseline/

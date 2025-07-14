@@ -1,0 +1,3 @@
+net: Llama2-7b
+model: /home/ubuntu/data/exp/proj2410/model/Llama2-7b
+save_parent_dir: /home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B

@@ -175,7 +175,6 @@ class LazyLoadDatasetV2(Dataset):
         new_file_list = []
         device = next(module.parameters()).device
         _dtype = next(module.parameters()).dtype
-
         # 确保 position_embeddings 移动到正确的设备
         position_embeddings = tuple(it.to(device) for it in position_embeddings)
 
@@ -195,7 +194,7 @@ class LazyLoadDatasetV2(Dataset):
         #     gc.collect()
         # batch_size = 32
         # module = torch.compile(module)
-
+        attention_mask = attention_mask.to(device)
         for idx, sample in enumerate(self.data_list):
             input_sample, output_sample = sample
             input_sample = input_sample.to(device).unsqueeze(0)
@@ -205,7 +204,7 @@ class LazyLoadDatasetV2(Dataset):
             output_tensor = next_module(output_sample, attention_mask=attention_mask,
                                     position_embeddings=position_embeddings)[0].squeeze(0)
             self.data_list[idx] = (input_tensor.half().cpu(), output_tensor.half().cpu())
-        torch.cuda.synchronize()
+            torch.cuda.synchronize()
         torch.cuda.empty_cache()
         # for start_idx in range(0,len(self.data_list),batch_size):
         #     end_idx = min(start_idx+batch_size,len(self.data_list))

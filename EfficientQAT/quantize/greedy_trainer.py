@@ -783,7 +783,7 @@ def custom_shedule_train(model:PreTrainedModel,
     logger.info(f"use loss func {train_params['loss_func']}")
 
     loss_func = get_loss_func(train_params['loss_func'])
-    loss_recorder = utils.BlockLossRecorder(file_path=train_params['log_loss'],)
+    loss_recorder = utils.BlockLossRecorder(file_path=config['log_loss'],)
     
     for train_layer_window in shedule_list:
         if not train_params.get("quant_shedule_type") == "full" :
@@ -893,9 +893,9 @@ def custom_shedule_train(model:PreTrainedModel,
         if not train_params.get("with_catcher"):
             if train_layer_window != shedule_list[-1]:
                 with torch.no_grad():
-                    with torch.autocast(device_type="cuda",
-                                        enabled=amp_enabled,
-                                        dtype=train_params['dtype'] if amp_enabled else torch.float32):
+                    # with torch.autocast(device_type="cuda",
+                    #                     enabled=amp_enabled,
+                    #                     dtype=train_params['dtype'] if amp_enabled else torch.float32):
                         for slide_base in train_layer_window:
                             # 更新后的input 需要经过[windows_start,windows_start+slide_step)层的输出
                             if slide_base == train_layer_window[0]+hyper_params['slide_step']:

@@ -100,8 +100,8 @@ def main() -> None:
         Path(config['train_param_settings']['output_dir']).mkdir(parents=True, exist_ok=True)
     if config.get('cache_dir'):
         Path(config['train_param_settings']['cache_dir']).mkdir(parents=True, exist_ok=True)
-    if config.get('save_quant_dir'):
-        Path(config['train_param_settings']['save_quant_dir']).mkdir(parents=True, exist_ok=True)
+    if config.get('save_dir'):
+        Path(config['save_dir']).mkdir(parents=True, exist_ok=True)
     if config['train_param_settings']['cache_dir']:
         Path(config['train_param_settings']['cache_dir']).mkdir(parents=True, exist_ok=True)
     output_dir = Path(config.get('output_dir', './log/'))
@@ -119,9 +119,9 @@ def main() -> None:
     else:
         model_config = AutoConfig.from_pretrained(config['model_settings']['model'])
         tokenizer = AutoTokenizer.from_pretrained(config['model_settings']['model'], use_fast=False, legacy=False)
-        apply_liger_kernel(
-            config=model_config, 
-            require_logits=True)
+        # apply_liger_kernel(
+        #     config=model_config, 
+        #     require_logits=True)
         model = AutoModelForCausalLM.from_pretrained(
             config['model_settings']['model'],
             attn_implementation="eager",
@@ -167,13 +167,13 @@ def main() -> None:
                 raise NotImplementedError(f"quantization method {config['train_param_settings']['quant_method']} not implemented")
             logger.info(time.time() - tick)
     torch.cuda.empty_cache()
-    if config.get('save_quant_dir'):
+    if config['save_dir'] is not None:
         logger.info("start saving model")
         if config['train_param_settings']['quant_method'] == "gptq":
-            model.save(config['train_param_settings']['save_quant_dir'])
+            model.save(config['save_dir'])
         else:
-            model.save_pretrained(config['train_param_settings']['save_quant_dir'])
-        tokenizer.save_pretrained(config['train_param_settings']['save_quant_dir'])
+            model.save_pretrained(config['save_dir'])
+        tokenizer.save_pretrained(config['save_dir'])
         logger.info("save model success")
     model.to(config["cluster_settings"]['cuda_ids'][0])
     evaluate(model, tokenizer, config, logger)

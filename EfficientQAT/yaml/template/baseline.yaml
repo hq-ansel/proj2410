@@ -6,8 +6,8 @@ cluster_settings: cluster/s16754.yaml
 
 # model settings
 # content
-# model_settings: model
-model_settings: model/qwen2.5-3b.yaml
+model_settings: model
+# model_settings: model/qwen2.5-3b.yaml
 # net: Qwen2.5-3B
 # model: /home/ubuntu/data/exp/proj2410/model/Qwen2.5-3B
 # save_parent_dir: /home/ubuntu/data/exp/proj2410/quant_model/Qwen2.5-3B 
@@ -50,4 +50,4 @@ method: "{hyperparam_settings.method_name}"
 # 从 model_settings 中获取 save_parent_dir
 save_dir: "{model_settings.save_parent_dir}/EfficientQAT/{method}/"
 output_dir: "{save_dir}"
-log_loss: "{save_dir}/loss.csv"
+log_loss: "{save_dir}loss.csv"

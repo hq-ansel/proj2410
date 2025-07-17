@@ -204,8 +204,8 @@ def train_units_layers(model: PreTrainedModel,
         best_val_loss = 1e6
         early_stop_flag = 0
 
-        if config.get("gradual_quant",False) or config.get("interpolate",False):
-            gradual_factor = config.get("gradual_factor",2.0)
+        if hyper_params.get("gradual_quant",False) or config.get("interpolate",False):
+            gradual_factor = hyper_params.get("gradual_factor",2.0)
             class GradualWarmupScheduler:
                 def __init__(self,
                               linear_list:List[int_linear_fake.QuantLinear],
@@ -222,7 +222,7 @@ def train_units_layers(model: PreTrainedModel,
                     for linear in self.linear_list:
                         if self.iteration < (self.total_iteration/self.gradual_factor):
                             ratio = self.iteration/(self.total_iteration/self.gradual_factor)
-                            if config.get("gradual_quant",False):
+                            if hyper_params.get("gradual_quant",False):
                                 linear.update_position_ratio(ratio)
                             if config.get("interpolate", False):
                                 linear.update_interpolate_ratio(1-ratio)
@@ -240,8 +240,8 @@ def train_units_layers(model: PreTrainedModel,
                 total_training_iteration,
                 gradual_factor
             )
-        if config.get("dampen_loss"):
-            dampen_loss_weight = config.get("dampen_loss_weight",0.01)
+        if hyper_params.get("dampen_loss"):
+            dampen_loss_weight = hyper_params.get("dampen_loss_weight",0.01)
             dampen_loss_weight_scheduler = CosineAnnealingScheduler(max_value=dampen_loss_weight,
                                                                     min_value=0,
                                                                      total_steps=total_training_iteration,
@@ -252,7 +252,7 @@ def train_units_layers(model: PreTrainedModel,
         # print(f" data size {len(train_dataset)}")
 
         # before training, need to prepare model?
-        if config.get("swa",False):
+        if hyper_params.get("swa",False):
             """
                 swa
                 swa_start: 开始使用swa的epoch数
@@ -261,8 +261,8 @@ def train_units_layers(model: PreTrainedModel,
             """
             swa_model = torch.optim.swa_utils.AveragedModel(selected_layers,
                                                                 device=train_params['dev'],
-                        avg_fn=torch.optim.swa_utils.get_ema_avg_fn(config.get("swa_factor",0.9)))
-            swa_start = config.get("swa_start") # 需要手动指定
+                        avg_fn=torch.optim.swa_utils.get_ema_avg_fn(hyper_params.get("swa_factor",0.9)))
+            swa_start = hyper_params.get("swa_start") # 需要手动指定
             # 需要scheduler吗，暂时存疑
             # swa_scheduler = torch.optim.swa_utils.SWALR(optimizer, 
             #                                             anneal_strategy="cos", # “cos” or “linear”
@@ -321,7 +321,7 @@ def train_units_layers(model: PreTrainedModel,
                     # print(f"index {index} loss {loss}")
 
                     # insert dampen loss
-                    if config.get("dampen_loss",False):
+                    if hyper_params.get("dampen_loss",False):
                         dampen_loss = torch.zeros_like(loss).to(loss.device)
                         for layer_idx in trainable_layer_idx_list:
                             qlayer = qlayers[layer_idx]
@@ -340,7 +340,7 @@ def train_units_layers(model: PreTrainedModel,
                                         step,
                                         loss_cpu.item())
                     
-                if config.get("gradual_quant",False):
+                if hyper_params.get("gradual_quant",False):
                     graualWarmupScheduler.update() 
                 else: 
                     pass
@@ -360,7 +360,7 @@ def train_units_layers(model: PreTrainedModel,
                                                             , float(train_params['clip_grad'])).cpu()
                     norm_list.append(norm.data)
                 # 使用子空间优化
-                if config.get("sub_space_grad_clean",False):
+                if hyper_params.get("sub_space_grad_clean",False):
                     sub_space_clean(selected_layers)
                 
                 
@@ -372,8 +372,8 @@ def train_units_layers(model: PreTrainedModel,
                     optimizer.step()
                 
                 # inject swa model
-                if config.get("swa",False):
-                    if step> swa_start and step % config.get("swa_freq",200)==0:
+                if hyper_params.get("swa",False):
+                    if step> swa_start and step % hyper_params.get("swa_freq",200)==0:
                         # When update_parameters() is called for the first time 
                         # (i.e. n_averaged is 0) the parameters of model are copied to the parameters of AveragedModel.
                         #  For every subsequent call of update_parameters() the function avg_fn is used to update the parameters.
@@ -551,7 +551,7 @@ def train_units_layers_with_catcher(model: PreTrainedModel,
         print(f"estimated data usage: {train_params['batch_size']*train_params['training_seqlen']*model.config.hidden_size*4/(1024**3)}G")
         best_val_loss = 1e6
         early_stop_flag = 0
-        if config.get("gradual_quant",False) or config.get("interpolate",False):
+        if hyper_params.get("gradual_quant",False) or config.get("interpolate",False):
             class GradualWarmupScheduler:
                 def __init__(self,
                               linear_list:List[int_linear_fake.QuantLinear],
@@ -565,7 +565,7 @@ def train_units_layers_with_catcher(model: PreTrainedModel,
                     for linear in self.linear_list:
                         if self.iteration < (self.total_iteration/2.0):
                             ratio = self.iteration/(self.total_iteration/2.0)
-                            if config.get("gradual_quant",False):
+                            if hyper_params.get("gradual_quant",False):
                                 linear.update_position_ratio(ratio)
                             if config.get("interpolate", False):
                                 linear.update_interpolate_ratio(1-ratio)
@@ -620,7 +620,7 @@ def train_units_layers_with_catcher(model: PreTrainedModel,
                         print(f"input {inp} output {output} target_output {target_output}")
                     loss = loss_func(output, target_output.to(train_params['dev'],dtype=torch.float32))
 
-                    if config.get("dampen_loss",False):
+                    if hyper_params.get("dampen_loss",False):
                         for idx in trainable_layer_idx_list:
                             for n,m in qlayers[idx].named_modules():
                                 if isinstance(m, int_linear_fake.QuantLinear):
@@ -633,7 +633,7 @@ def train_units_layers_with_catcher(model: PreTrainedModel,
                     loss_recorder.record(f"blk{trainable_layer_idx_list}",
                                         step,
                                         loss.data.cpu().item())
-                graualWarmupScheduler.update() if config.get("gradual_quant",False) else None
+                graualWarmupScheduler.update() if hyper_params.get("gradual_quant",False) else None
                 loss_list.append(loss.data.cpu())
                 # 反向传播和优化
                 if not config.get("loss_func") == "KL-Divergence":

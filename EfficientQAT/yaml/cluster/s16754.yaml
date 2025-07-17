@@ -1,4 +1,4 @@
 # 可用包括 0,1,2
-cuda_ids: [2]
+cuda_ids: [1]
 # rank: 4
 # world_size: 4

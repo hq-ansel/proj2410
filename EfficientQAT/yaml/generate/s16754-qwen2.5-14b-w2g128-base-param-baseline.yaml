@@ -28,7 +28,7 @@ train_param_settings:
   epochs: 2
   ppl_seqlen: 2048
   seed: 42
-  eval_ppl: false
+  eval_ppl: true
   eval_tasks: piqa
   eval_batch_size: 16
   quant_lr: 0.0001

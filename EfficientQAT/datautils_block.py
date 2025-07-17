@@ -758,7 +758,7 @@ def get_redpajama(
     try:
         # 尝试加载数据集
         traindata = load_dataset(
-            "/home/ubuntu/data/exp/proj2410/hf_home/datasets/RedPajama-Data-1T-Sample",
+            "/home/ubuntu/data/exp/proj2410/hf_home/datasets/red_pajama-data-1_t-sample",
             split="train",
             trust_remote_code=True,
         )

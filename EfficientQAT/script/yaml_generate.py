@@ -140,6 +140,7 @@ def main():
     主函数：读取模板，解析设置，生成所有组合的完整嵌套配置文件。
     """
     base_dir = 'yaml'
+    # 除了baseline.yaml，还有 gradual_quant.yaml
     template_path = os.path.join(base_dir, 'template', 'baseline.yaml')
     output_dir = os.path.join(base_dir, 'generate')
     os.makedirs(output_dir, exist_ok=True)

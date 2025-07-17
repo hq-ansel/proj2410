@@ -9,7 +9,7 @@ path_list = [
     # "Qwen/Qwen2.5-7B",
     # "Qwen/Qwen2.5-14B", 
     # "Qwen/Qwen2.5-32B",
-    
+    'Qwen/Qwen3-8B',
 ]
 
 save_dir = "/home/ubuntu/data/exp/proj2410/model"
@@ -21,3 +21,9 @@ for path in path_list:
     print(f"Saving model to {save_path}")
     model.save_pretrained(save_path)
     tokenizer.save_pretrained(save_path)
+
+
+# 下面是用modelscope下载
+# LLaMA2-13B
+# LLaMA2-70B
+# LLaMA3-8B

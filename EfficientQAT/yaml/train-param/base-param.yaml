@@ -26,7 +26,7 @@ ppl_seqlen: 2048
 # int, Seed for sampling the calibration data.
 seed: 42
 # bool, evaluate perplexity on wikitext2 and c4
-eval_ppl: False
+eval_ppl: True
 # str, exampe:piqa,arc_easy,arc_challenge,hellaswag,winogrande
 eval_tasks: "piqa"
 # int, evaluation batch size

@@ -28,7 +28,7 @@ torch.set_float32_matmul_precision('high')
 def evaluate(model: Any, tokenizer: AutoTokenizer, config: Dict[str, Any], logger: Optional[Any] = None) -> Dict[str, Any]:
     block_class_name = model.model.layers[0].__class__.__name__
     results = {}
-    if config.get('eval_ppl', False):
+    if config["train_param_settings"]["eval_ppl"]:
         datasets = ["wikitext2", "c4"]
         ppl_results = test_ppl(model, tokenizer, datasets, config.get('ppl_seqlen', 2048))
         for dataset in ppl_results:
@@ -36,7 +36,7 @@ def evaluate(model: Any, tokenizer: AutoTokenizer, config: Dict[str, Any], logge
                 logger.info(f'{dataset} perplexity: {ppl_results[dataset]:.2f}')
             else:
                 print(f'{dataset} perplexity: {ppl_results[dataset]:.2f}')
-    if config.get('eval_tasks', "") != "":
+    if config['train_param_settings'].get('eval_tasks', "") != "":
         import lm_eval
         from lm_eval.models.huggingface import HFLM
         from lm_eval.utils import make_table

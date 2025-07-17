@@ -1,3 +1,10 @@
+import os
+import sys
+import random
+import yaml
+os.environ["HF_Home"] = "/home/ubuntu/data/exp/proj2410/hf_home"
+os.environ['HF_ENDPOINT'] = "https://hf-mirror.com"
+
 
 from EfficientQAT.quantize.int_linear_real import load_quantized_model
 from EfficientQAT.main_block_ap import evaluate
@@ -8,6 +15,8 @@ from easydict import EasyDict
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import torch
 from EfficientQAT.main_block_ap import evaluate
+
+# curl测试是否可以链接到huggingface
 
 quant_path_list = [
     # 仅block wise
@@ -57,7 +66,7 @@ quant_path_list = [
     # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-subspace-lr1/redpajama-4096/checkpoint-256",
     # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-gradual-quant-nocli/redpajama-4096/checkpoint-256",
 
-    # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128",
+    "/home/ubuntu/data/exp/proj2410/quant_model/Qwen2.5-0.5B/EfficientQAT/w2g128",
     # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-freeze-weight",
     # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-dampenloss",
     # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-gradual-quant",
@@ -67,17 +76,17 @@ quant_path_list = [
     # "/home/ubuntu/data/exp/proj2410/model/Llama3-8B",
     
     # "/home/ubuntu/data/exp/proj2410/model/Qwen2.5-3B",
-    # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen2.5-3B/EfficientQAT/w2gs128",
+    "/home/ubuntu/data/exp/proj2410/quant_model/Qwen2.5-3B/EfficientQAT/w2g128",
     # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen2.5-3B/EfficientQAT/w2gs128-gradual-quant",
     # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen2.5-3B/EfficientQAT/w3gs128",
     # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen2.5-3B/EfficientQAT/w3gs128-gradual-quant",
-    "/home/ubuntu/data/exp/proj2410/quant_model/Llama3-8B/EfficientQAT/w2gs128",
-    "/home/ubuntu/data/exp/proj2410/quant_model/Llama3-8B/EfficientQAT/w2gs128-swa60",
+    # "/home/ubuntu/data/exp/proj2410/quant_model/Llama3-8B/EfficientQAT/w2gs128",
+    # "/home/ubuntu/data/exp/proj2410/quant_model/Llama3-8B/EfficientQAT/w2gs128-swa60",
 
     # "/home/ubuntu/data/exp/proj2410/baseline/EfficientQAT/output/block_ap_models/Llama-3-8b-w2g128",
     # "/home/ubuntu/data/exp/proj2410/quant_model/Llama3-8B/EfficientQAT/w2gs128-gradual-quant"
     # "/home/ubuntu/data/exp/proj2410/quant_model/Llama3-8B/EfficientQAT/w4gs128",
-    "/home/ubuntu/data/exp/proj2410/baseline/EfficientQAT/output/e2e-qp-output/Llama-3-8b-w2g128-alpaca-4096/checkpoint-10000",
+    # "/home/ubuntu/data/exp/proj2410/baseline/EfficientQAT/output/e2e-qp-output/Llama-3-8b-w2g128-alpaca-4096/checkpoint-10000",
 ]
 # CUDA_VISIBLE_DEVICES=2 python -m test.eval_batch
 # CUDA_VISIBLE_DEVICES=2 python -m test.eval_batch > exp.logs
@@ -97,16 +106,17 @@ for quant_path in quant_path_list:
                                                            device_map="auto")
         tokenizer = AutoTokenizer.from_pretrained(quant_path)
     args = EasyDict()
-    args.eval_ppl = True
-    args.eval_tasks = ""
-    args.max_memory = "24GB"
-    args.ppl_seqlen = 2048
-    args.batch_size = 1
-    args.calib_dataset = "redpajama"
-    args.train_size = 1
-    args.val_size = 1
-    args.seed = 42
-    args.eval_tasks="piqa,arc_easy,arc_challenge,hellaswag,winogrande"
+    args["train_param_settings"]={}
+    args["train_param_settings"]["eval_ppl"] = False
+    args["train_param_settings"]["eval_tasks"] = ""
+    args["train_param_settings"]["max_memory"] = "24GB"
+    args["train_param_settings"]["ppl_seqlen"] = 2048
+    args["train_param_settings"]["batch_size"] = 1
+    args["train_param_settings"]["calib_dataset"] = "redpajama"
+    args["train_param_settings"]["train_size"] = 1
+    args["train_param_settings"]["val_size"] = 1
+    args["train_param_settings"]["seed"] = 42
+    args["train_param_settings"]["eval_tasks"]="piqa,arc_easy,arc_challenge,hellaswag,winogrande"
     # args.eval_tasks="xsum,cnn_dailymail,openbookqa,copa,mathqa,rte"
     args.eval_batch_size=4
     args.training_seqlen = 2048

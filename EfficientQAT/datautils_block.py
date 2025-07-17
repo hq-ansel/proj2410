@@ -754,7 +754,6 @@ def get_redpajama(
     print("Loading RedPajama dataset...")
     
     # 设置缓存目录
-    cache_dir = "~/data/exp/proj2410/hf_home/arxiv/"
     
     try:
         # 尝试加载数据集
@@ -766,15 +765,9 @@ def get_redpajama(
     except Exception as e:
         print(f"Error loading dataset: {str(e)}")
         print("Trying to clean cache and reload...")
-        # 清理缓存并重试
-        import shutil
-        shutil.rmtree(cache_dir, ignore_errors=True)
-        os.makedirs(cache_dir, exist_ok=True)
-        
         traindata = load_dataset(
             "togethercomputer/RedPajama-Data-1T",
             split='train',
-            cache_dir=cache_dir,
             trust_remote_code=True,
         )
 

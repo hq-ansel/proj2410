@@ -1,7 +1,7 @@
 accelerate
 bitsandbytes
-datasets==2.18.0
-lm_eval==0.4.4
+datasets
+lm_eval
 numpy
 torch
 tqdm

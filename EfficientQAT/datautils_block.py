@@ -758,15 +758,16 @@ def get_redpajama(
     try:
         # 尝试加载数据集
         traindata = load_dataset(
-            "togethercomputer/RedPajama-Data-1T",
-            data_files={"train": "arxiv/arxiv-train.00000-of-00001.json.gz"},  # 选择特定的分片
-            split="train"
+            "/home/ubuntu/data/exp/proj2410/hf_home/datasets/RedPajama-Data-1T-Sample",
+            split="train",
+            trust_remote_code=True,
         )
     except Exception as e:
         print(f"Error loading dataset: {str(e)}")
         print("Trying to clean cache and reload...")
+        os.system("huggingface-cli download togethercomputer/RedPajama-Data-1T-Sample --repo-type=dataset --local-dir /home/ubuntu/data/exp/proj2410/hf_home/datasets/RedPajama-Data-1T-Sample")
         traindata = load_dataset(
-            "togethercomputer/RedPajama-Data-1T",
+            "/home/ubuntu/data/exp/proj2410/hf_home/datasets/RedPajama-Data-1T-Sample",
             split='train',
             trust_remote_code=True,
         )

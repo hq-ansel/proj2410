@@ -20,7 +20,7 @@ train_param_settings:
   save_quant_dir: None
   real_quant: true
   resume_quant: None
-  calib_dataset: wikitext2
+  calib_dataset: redpajama
   train_size: 4096
   val_size: 64
   training_seqlen: 2048

@@ -1,3 +1,5 @@
+from typing import Dict
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -18,7 +20,7 @@ class QuantLinear(nn.Module):
         org_module: nn.Linear,
         wbits=4,
         group_size=64,
-        args=None,
+        args:Dict=None,
     ):
         super().__init__()
         self.fwd_kwargs = dict()

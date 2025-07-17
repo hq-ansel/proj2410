@@ -2,13 +2,14 @@ import torch
 import torch.nn as nn
 import random
 import pdb
+from typing import Optional, Any, Dict, Tuple
 
 CLIPMIN = 1e-4
 
 HighPassThreshold = 1e-1
 
 
-def round_ste(x: torch.Tensor):
+def round_ste(x: torch.Tensor) -> torch.Tensor:
     """
     Implement Straight-Through Estimator for rounding operation.
     """
@@ -25,7 +26,10 @@ class HighPassRoundSTE(torch.autograd.Function):
     result = round(x)
     """
     @staticmethod
-    def forward(ctx, x):
+    def forward(
+        ctx,
+        x: torch.Tensor
+    ) -> torch.Tensor:
         ctx.save_for_backward(x)
         res = x.round() - x
         # res \in (-0.5, 0.5)
@@ -33,18 +37,29 @@ class HighPassRoundSTE(torch.autograd.Function):
         return result
 
     @staticmethod
-    def backward(ctx, grad_output):
+    def backward(
+        ctx,
+        grad_output: torch.Tensor
+    ) -> Tuple[torch.Tensor, None]:
         x, = ctx.saved_tensors
         grad_input = grad_output
         return grad_input, None
 
-def clamp_ste(x: torch.Tensor, min, max):
+def clamp_ste(
+    x: torch.Tensor,
+    min: float,
+    max: float
+) -> torch.Tensor:
     return (x.clamp(min,max) - x).detach() + x
 
 
 class ClampMAD(torch.autograd.Function):
     @staticmethod
-    def forward(ctx, x, min_val, max_val):
+    def forward(ctx,
+                x: torch.Tensor,
+                min_val: torch.Tensor,
+                max_val: torch.Tensor
+                ) -> torch.Tensor:
         """
         前向传播：执行截断操作。
         """
@@ -52,7 +67,9 @@ class ClampMAD(torch.autograd.Function):
         return x.clamp(min_val, max_val)
 
     @staticmethod
-    def backward(ctx, grad_output):
+    def backward(ctx,
+                 grad_output: torch.Tensor
+                 ) -> Tuple[Optional[torch.Tensor], None, None]:
         """
         反向传播：应用 MAD 规则调整梯度。
         """
@@ -67,7 +84,10 @@ class ClampMAD(torch.autograd.Function):
         grad_input = grad_output * alpha
         return grad_input, None, None
 
-def clamp_mad(x: torch.Tensor, min_val, max_val):
+def clamp_mad(x: torch.Tensor,
+              min_val: float,
+              max_val: float
+              ) -> torch.Tensor:
     """
     使用 ClampMAD 进行截断操作。
     """
@@ -75,24 +95,36 @@ def clamp_mad(x: torch.Tensor, min_val, max_val):
 
 
 class BaseQuantizer(nn.Module):
-    def __init__(self, 
-        n_bits: int = 8,
-        group_size=None,
-    ):
+    def __init__(self,
+                 n_bits: int = 8,
+                 group_size: Optional[int] = None,
+                 ) -> None:
         super().__init__()
         assert 2 <= n_bits <= 16, "bitwidth not supported"
         self.n_bits = n_bits
         self.qmin = 0
         self.qmax = 2 ** (n_bits) - 1
+        if group_size is None:
+            raise ValueError("group_size must not be None")
         self.group_size = group_size 
 
-    def change_n_bits(self, n_bits):
+    def change_n_bits(self,
+                      n_bits: int
+                      ) -> None:
         self.n_bits = n_bits
         self.qmin = 0
         self.qmax = int(2 ** (n_bits) - 1)
 
     @staticmethod
-    def init_with_weight(weight, n_bits, group_size, clamp_method="STE"):
+    def init_with_weight(weight: torch.Tensor,
+                        n_bits: int,
+                        group_size: int,
+                        clamp_method: str = "STE"
+                        ) -> Tuple[torch.Tensor, torch.Tensor]:
+        if weight is None:
+            raise ValueError("weight must not be None")
+        if group_size is None:
+            raise ValueError("group_size must not be None")
         if weight.dtype == torch.float32 or weight.dtype == torch.float16:
             scale_dtype = torch.float16
         else:
@@ -110,7 +142,16 @@ class BaseQuantizer(nn.Module):
             zero_point = -xmin/scale
             return scale.to(scale_dtype), zero_point.round().to(scale_dtype)
         
-    def cal_qparams(self,scale,zero_point,clamp_method="STE"):
+    def cal_qparams(self,
+                    scale: torch.Tensor,
+                    zero_point: torch.Tensor,
+                    clamp_method: str = "STE"
+                    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        # 兼容nn.Parameter类型
+        if hasattr(scale, 'data'):
+            scale = scale.data
+        if hasattr(zero_point, 'data'):
+            zero_point = zero_point.data
         if clamp_method == "STE":
             scale_dtype = scale.dtype
             scale = clamp_ste(scale,1e-4, 1e4).to(scale_dtype)
@@ -120,20 +161,30 @@ class BaseQuantizer(nn.Module):
             round_zero_point = clamp_mad(round_ste(zero_point), self.qmin, self.qmax)
         return scale, round_zero_point
 
-    def _quantize(self, x, scale, round_zero_point):
+    def _quantize(self,
+                  x: torch.Tensor,
+                  scale: torch.Tensor,
+                  round_zero_point: Optional[torch.Tensor]
+                  ) -> torch.Tensor:
         x_int = round_ste(x / scale)
         if round_zero_point is not None:
             x_int = x_int.add(round_zero_point)
         x_int = x_int.clamp(self.qmin, self.qmax)
         return x_int
     
-    def _dequantize(self, x_int, scale, round_zero_point):
+    def _dequantize(self,
+                    x_int: torch.Tensor,
+                    scale: torch.Tensor,
+                    round_zero_point: Optional[torch.Tensor]
+                    ) -> torch.Tensor:
         if round_zero_point is not None:
             x_int = x_int.sub(round_zero_point)
         x_float = x_int * scale
         return x_float
     
-    def fake_quant(self, x):
+    def fake_quant(self,
+                   x: torch.Tensor
+                   ) -> torch.Tensor:
         scale, round_zero_point = self.cal_qparams(self.scale,
                                                    self.zero_point,
                                                    self.clamp_method)
@@ -150,18 +201,22 @@ class UniformAffineQuantizer(BaseQuantizer):
     def __init__(
         self,
         n_bits: int = 8,
-        group_size=None,
-        weight=None,
-        args=None,
-    ):
+        group_size: Optional[int] = None,
+        weight: Optional[torch.Tensor] = None,
+        args: Optional[dict] = None,
+    ) -> None:
+        if group_size is None:
+            raise ValueError("group_size must not be None")
+        if weight is None:
+            raise ValueError("weight must not be None")
         super().__init__(
             n_bits=n_bits,
             group_size=group_size,
         )
         self.group_size = group_size if group_size != -1 else weight.shape[-1]
-        assert weight.shape[-1] % group_size == 0
+        assert weight.shape[-1] % self.group_size == 0
         scale, zero_points = BaseQuantizer.init_with_weight(
-            weight, n_bits, group_size)
+            weight, n_bits, self.group_size)
         self.scale = nn.Parameter(scale)
         self.zero_point = nn.Parameter(zero_points)
 
@@ -174,11 +229,14 @@ class UniformAffineQuantizer(BaseQuantizer):
             use_ema_x_int=True
             )
     @torch.compile
-    def fake_quant(self, x):
+    def fake_quant(self,
+                   x: torch.Tensor
+                   ) -> torch.Tensor:
         
-        scale, round_zero_point = self.cal_qparams(self.scale,
-                                                   self.zero_point,
-                                                   self.clamp_method)
+        scale, round_zero_point = self.cal_qparams(
+            self.scale,
+            self.zero_point,
+            self.clamp_method)
         ori_shape = x.shape
         x = x.reshape(-1, self.group_size)
         # freezing weights
@@ -189,7 +247,9 @@ class UniformAffineQuantizer(BaseQuantizer):
         return x_dequant.reshape(ori_shape)
     
 
-    def forward(self, x: torch.Tensor):
+    def forward(self,
+                x: torch.Tensor
+                ) -> torch.Tensor:
         if self.n_bits >= 16 or not self.enable:
             return x
 
@@ -201,17 +261,21 @@ class UniformAffineQuantizerV2(nn.Module):
     def __init__(
         self,
         n_bits: int = 8,
-        group_size=None,
-        weight=None,
-        args=None,
-    ):
+        group_size: Optional[int] = None,
+        weight: Optional[torch.Tensor] = None,
+        args: Optional[dict] = None,
+    ) -> None:
+        if group_size is None:
+            raise ValueError("group_size must not be None")
+        if weight is None:
+            raise ValueError("weight must not be None")
         super().__init__()
         assert 2 <= n_bits <= 16, "bitwidth not supported"
         self.n_bits = n_bits
         self.qmin = 0
         self.qmax = 2 ** (n_bits) - 1
         self.group_size = group_size if group_size != -1 else weight.shape[-1]
-        assert weight.shape[-1] % group_size == 0
+        assert weight.shape[-1] % self.group_size == 0
         self.enable = True
         self.clamp_method = args.get("clamp_method", "STE")
 
@@ -232,12 +296,16 @@ class UniformAffineQuantizerV2(nn.Module):
                 self.zero_point = nn.Parameter(zero_point.round())
             
 
-    def change_n_bits(self, n_bits):
+    def change_n_bits(self,
+                      n_bits: int
+                      ) -> None:
         self.n_bits = n_bits
         self.qmin = 0
         self.qmax = int(2 ** (n_bits) - 1)
         
-    def fake_quant(self, x):
+    def fake_quant(self,
+                   x: torch.Tensor
+                   ) -> torch.Tensor:
         
         if self.clamp_method == "STE":
             scale = clamp_ste(self.scale,1e-4, 1e4)
@@ -261,7 +329,9 @@ class UniformAffineQuantizerV2(nn.Module):
         return x_dequant
     
 
-    def forward(self, x: torch.Tensor):
+    def forward(self,
+                x: torch.Tensor
+                ) -> torch.Tensor:
         if self.n_bits >= 16 or not self.enable:
             return x
 
@@ -272,17 +342,21 @@ class UniformAffineQuantizerV3(nn.Module):
     def __init__(
         self,
         n_bits: int = 8,
-        group_size=None,
-        weight=None,
-        args=None,
-    ):
+        group_size: Optional[int] = None,
+        weight: Optional[torch.Tensor] = None,
+        args: Optional[dict] = None,
+    ) -> None:
+        if group_size is None:
+            raise ValueError("group_size must not be None")
+        if weight is None:
+            raise ValueError("weight must not be None")
         super().__init__()
         assert 2 <= n_bits <= 16, "bitwidth not supported"
         self.n_bits = n_bits
         self.qmin = 0
         self.qmax = 2 ** (n_bits) - 1
         self.group_size = group_size if group_size != -1 else weight.shape[-1]
-        assert weight.shape[-1] % group_size == 0
+        assert weight.shape[-1] % self.group_size == 0
         self.enable = True
         self.clamp_method = args.get("clamp_method", "STE")
 
@@ -303,12 +377,16 @@ class UniformAffineQuantizerV3(nn.Module):
                 self.zero_point = nn.Parameter(zero_point.round())
             
 
-    def change_n_bits(self, n_bits):
+    def change_n_bits(self,
+                      n_bits: int
+                      ) -> None:
         self.n_bits = n_bits
         self.qmin = 0
         self.qmax = int(2 ** (n_bits) - 1)
         
-    def fake_quant(self, x):
+    def fake_quant(self,
+                   x: torch.Tensor
+                   ) -> torch.Tensor:
         """
         初始化的时候应该就使得W-> (W-Z) / S
         所以fake quant就转换为
@@ -338,7 +416,9 @@ class UniformAffineQuantizerV3(nn.Module):
         return x_dequant
     
 
-    def forward(self, x: torch.Tensor):
+    def forward(self,
+                x: torch.Tensor
+                ) -> torch.Tensor:
         if self.n_bits >= 16 or not self.enable:
             return x
 
@@ -350,19 +430,23 @@ class GradualUniformAffineQuantizer(BaseQuantizer):
     def __init__(
         self,
         n_bits: int = 8,
-        group_size=None,
-        weight=None,
-        args=None,
-    ):
+        group_size: Optional[int] = None,
+        weight: Optional[torch.Tensor] = None,
+        args: Optional[dict] = None,
+    ) -> None:
+        if group_size is None:
+            raise ValueError("group_size must not be None")
+        if weight is None:
+            raise ValueError("weight must not be None")
         super().__init__(
             n_bits=n_bits,
             group_size=group_size,
         )
         self.enable = True
         self.group_size = group_size if group_size != -1 else weight.shape[-1]
-        assert weight.shape[-1] % group_size == 0
+        assert weight.shape[-1] % self.group_size == 0
         scale, zero_points = BaseQuantizer.init_with_weight(
-            weight, n_bits, group_size)
+            weight, n_bits, self.group_size)
         self.scale = nn.Parameter(scale)
         self.zero_point = nn.Parameter(zero_points)
 
@@ -371,14 +455,18 @@ class GradualUniformAffineQuantizer(BaseQuantizer):
         self.quantization_position_ratio = 1.0  # 量化比例
         self.interpolate = 1.0 if args.get("interpolate", False) else 0  # 插值比例 0 代表没有前权重 1代表全是前权重
 
-    def update_position_ratio(self, new_position_ratio):
+    def update_position_ratio(self,
+                             new_position_ratio: float
+                             ) -> None:
         """Update the quantization position_ratio dynamically."""
         if 0.0 <= new_position_ratio <= 1.0:
             self.quantization_position_ratio = new_position_ratio
         else:
             raise ValueError("quantization_position_ratio should be between 0 and 1.")
 
-    def update_interpolate_ratio(self, new_interpolate):
+    def update_interpolate_ratio(self,
+                                 new_interpolate: float
+                                 ) -> None:
         """Update the interpolate ratio dynamically."""
         if 0.0 <= new_interpolate <= 1.0:
             self.interpolate = new_interpolate
@@ -386,7 +474,9 @@ class GradualUniformAffineQuantizer(BaseQuantizer):
             raise ValueError("interpolate should be between 0 and 1.")
 
     @torch.compile
-    def fake_quant(self, x):
+    def fake_quant(self,
+                   x: torch.Tensor
+                   ) -> torch.Tensor:
 
         scale, round_zero_point = self.cal_qparams(self.scale,
                                                    self.zero_point,
@@ -416,12 +506,16 @@ class GradualUniformAffineQuantizer(BaseQuantizer):
 
         return x_quantized.reshape(ori_shape)
 
-    def forward(self, x: torch.Tensor):
+    def forward(self,
+                x: torch.Tensor
+                ) -> torch.Tensor:
         if self.n_bits >= 16 or not self.enable:
             return x
         return self.fake_quant(x)
     
-    def get_inferred_params(self,x):
+    def get_inferred_params(self,
+                            x: torch.Tensor
+                            ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         scale = clamp_ste(self.scale, 1e-4, 1e4)
         round_zero_point = clamp_ste(round_ste(self.zero_point), self.qmin, self.qmax)
 
@@ -448,19 +542,23 @@ class RankDecayQuantizer(BaseQuantizer):
     def __init__(
         self,
         n_bits: int = 8,
-        group_size=None,
-        weight=None,
-        args=None,
-    ):
+        group_size: Optional[int] = None,
+        weight: Optional[torch.Tensor] = None,
+        args: Optional[dict] = None,
+    ) -> None:
+        if group_size is None:
+            raise ValueError("group_size must not be None")
+        if weight is None:
+            raise ValueError("weight must not be None")
         super().__init__(
             n_bits=n_bits,
             group_size=group_size,
         )
         self.enable = True
         self.group_size = group_size if group_size != -1 else weight.shape[-1]
-        assert weight.shape[-1] % group_size == 0
+        assert weight.shape[-1] % self.group_size == 0
         scale, zero_points = BaseQuantizer.init_with_weight(
-            weight, n_bits, group_size)
+            weight, n_bits, self.group_size)
         self.scale = nn.Parameter(scale)
         self.zero_point = nn.Parameter(zero_points)
 
@@ -472,7 +570,9 @@ class RankDecayQuantizer(BaseQuantizer):
         self.shrinking_ratio = 1/2
 
     @torch.compile
-    def fake_quant(self, x):
+    def fake_quant(self,
+                   x: torch.Tensor
+                   ) -> torch.Tensor:
         
         scale, round_zero_point = self.cal_qparams(self.scale,
                                                    self.zero_point,
@@ -486,7 +586,7 @@ class RankDecayQuantizer(BaseQuantizer):
         x_dequant = self._dequantize(x_int, scale, round_zero_point)
         return x_dequant.reshape(ori_shape)
     
-    def update_decay_factor(self):
+    def update_decay_factor(self) -> None:
         """Update decay factor using cosine annealing"""
         self.phase_step += 1
         
@@ -499,7 +599,9 @@ class RankDecayQuantizer(BaseQuantizer):
             # Cosine annealing decay
             progress = float(self.phase_step) / self.decay_steps
             self.current_u = 0.5 * (1 + math.cos(math.pi * progress))
-    def forward(self, x: torch.Tensor):
+    def forward(self,
+                x: torch.Tensor
+                ) -> torch.Tensor:
         if self.n_bits >= 16 or not self.enable:
             return x
 
@@ -520,18 +622,22 @@ class GradualUniformAffineQuantizerV2(nn.Module):
     def __init__(
         self,
         n_bits: int = 8,
-        group_size=None,
-        weight=None,
-        args=None,
-        quantization_position_ratio=1.0,  # 新增量化比例参数，默认全量化
-    ):
+        group_size: Optional[int] = None,
+        weight: Optional[torch.Tensor] = None,
+        args: Optional[dict] = None,
+        quantization_position_ratio: float = 1.0,  # 新增量化比例参数，默认全量化
+    ) -> None:
+        if group_size is None:
+            raise ValueError("group_size must not be None")
+        if weight is None:
+            raise ValueError("weight must not be None")
         super().__init__()
         assert 2 <= n_bits <= 16, "bitwidth not supported"
         self.n_bits = n_bits
         self.qmin = 0
         self.qmax = 2 ** (n_bits) - 1
         self.group_size = group_size if group_size != -1 else weight.shape[-1]
-        assert weight.shape[-1] % group_size == 0
+        assert weight.shape[-1] % self.group_size == 0
         self.enable = True
         self.clamp_method = args.get("clamp_method", "STE")
         self.quantization_position_ratio = quantization_position_ratio  # 量化比例
@@ -569,7 +675,7 @@ class GradualUniformAffineQuantizerV2(nn.Module):
                 self.scale = nn.Parameter(scale)
                 self.zero_point = nn.Parameter(zero_point.round())
 
-    def extra_repr(self):
+    def extra_repr(self) -> str:
         return (
             f"n_bits={self.n_bits}, "
             f"group_size={self.group_size}, "
@@ -578,26 +684,36 @@ class GradualUniformAffineQuantizerV2(nn.Module):
             f"weight_freeze_tracker={self.weight_freeze_tracker}"
         )
 
-    def change_n_bits(self, n_bits):
+    def change_n_bits(self,
+                      n_bits: int
+                      ) -> None:
         self.n_bits = n_bits
         self.qmin = 0
         self.qmax = int(2 ** (n_bits) - 1)
 
-    def update_position_ratio(self, new_position_ratio):
+    def update_position_ratio(self,
+                             new_position_ratio: float
+                             ) -> None:
         """Update the quantization position_ratio dynamically."""
         if 0.0 <= new_position_ratio <= 1.0:
             self.quantization_position_ratio = new_position_ratio
         else:
             raise ValueError("quantization_position_ratio should be between 0 and 1.")
 
-    def update_interpolate_ratio(self, new_interpolate):
+    def update_interpolate_ratio(self,
+                                 new_interpolate: float
+                                 ) -> None:
         """Update the interpolate ratio dynamically."""
         if 0.0 <= new_interpolate <= 1.0:
             self.interpolate = new_interpolate
         else:
             raise ValueError("interpolate should be between 0 and 1.")
 
-    def quant_int(self, x, scale, zero_point):
+    def quant_int(self,
+                  x: torch.Tensor,
+                  scale: torch.Tensor,
+                  zero_point: Optional[torch.Tensor]
+                  ) -> torch.Tensor:
         """
         隐式要求x.shape[-1] % self.group_size == 0
         """
@@ -614,7 +730,11 @@ class GradualUniformAffineQuantizerV2(nn.Module):
         # x_int = clamp_mad(x_int, self.qmin, self.qmax)
         return x_int
     
-    def dequant_int(self, x_int, scale, zero_point):
+    def dequant_int(self,
+                    x_int: torch.Tensor,
+                    scale: torch.Tensor,
+                    zero_point: Optional[torch.Tensor]
+                    ) -> torch.Tensor:
         x_dequant = x_int
         if zero_point is not None:
             x_dequant = x_dequant.sub(zero_point)
@@ -653,13 +773,17 @@ class GradualUniformAffineQuantizerV2(nn.Module):
 
         return x_quantized.reshape(dim1, dim2)
 
-    def forward(self, x: torch.Tensor):
+    def forward(self,
+                x: torch.Tensor
+                ) -> torch.Tensor:
         if self.n_bits >= 16 or not self.enable:
             return x
         return self.fake_quant(x)
     
 
-    def get_inferred_params(self,x):
+    def get_inferred_params(self,
+                            x: torch.Tensor
+                            ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         scale = clamp_ste(self.scale, 1e-4, 1e4)
         round_zero_point = clamp_ste(self.zero_point.round(), self.qmin, self.qmax)
 
@@ -688,7 +812,11 @@ class TrackOscillation(torch.nn.Module):
     It tracks the oscillations in integer domain.
     """
 
-    def __init__(self, momentum=0.01, freeze_threshold=0, use_ema_x_int=True):
+    def __init__(self,
+                 momentum: float = 0.01,
+                 freeze_threshold: float = 0,
+                 use_ema_x_int: bool = True
+                 ) -> None:
         super(TrackOscillation, self).__init__()
         self.momentum = momentum
 
@@ -708,8 +836,13 @@ class TrackOscillation(torch.nn.Module):
         self.frozen_x_int = None
         self.ema_x_int = None
 
-    def __call__(self, x_int, skip_tracking=False, *args, **kwargs):
-       
+    def __call__(self,
+                 x_int: torch.Tensor,
+                 skip_tracking: bool = False,
+                 *args: Any,
+                 **kwargs: Any
+                 ) -> torch.Tensor:
+        
         # Apply weight freezing
         if self.frozen is not None:
             x_int = ~self.frozen * x_int + self.frozen * self.frozen_x_int
@@ -752,7 +885,9 @@ class TrackOscillation(torch.nn.Module):
 
         return x_int
 
-    def check_init(self, x_int):
+    def check_init(self,
+                   x_int: torch.Tensor
+                   ) -> None:
         if self.prev_x_int is None:
             # Init prev switch dir to 0
             self.prev_switch_dir = torch.zeros_like(x_int)
@@ -779,9 +914,14 @@ class DSQuantizer(UniformAffineQuantizer):
 
     def __init__(self,
         n_bits: int = 8,
-        group_size=None,
-        weight=None,
-        args=None,):
+        group_size: Optional[int] = None,
+        weight: Optional[torch.Tensor] = None,
+        args: Optional[dict] = None,
+    ) -> None:
+        if group_size is None:
+            raise ValueError("group_size must not be None")
+        if weight is None:
+            raise ValueError("weight must not be None")
         super().__init__(
             n_bits=n_bits,
             group_size=group_size,
@@ -794,7 +934,9 @@ class DSQuantizer(UniformAffineQuantizer):
         self.tanh_scale = tanh_scale
         self.tanh_k = tanh_k
 
-    def fake_quant(self, x):
+    def fake_quant(self,
+                   x: torch.Tensor
+                   ) -> torch.Tensor:
         tanh_scale = self.tanh_scale
         tanh_k = self.tanh_k
         scale = self.scale
@@ -804,7 +946,6 @@ class DSQuantizer(UniformAffineQuantizer):
 
         ori_shape = x.shape
         x = x.reshape(-1, self.group_size)
-
 
         x = x / scale + zero_point
         x = clamp_ste(x,quant_min,quant_max)

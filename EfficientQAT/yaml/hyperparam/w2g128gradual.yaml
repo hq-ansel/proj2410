@@ -15,3 +15,18 @@ slide_step: 1
 gradual_quant: True
 # gradual_factor = gradual_quant_step / total_step
 gradual_factor: 2.0
+# 用来添加dampen_loss 来自正则项控制的一篇文章
+# dampen_loss: True
+# 控制dampen_loss添加比例
+# dampen_loss_weight: 0.01
+
+# swa 有人也尝试过用swa来解决量化的问题
+# swa: True
+
+# iterative_freezing 和dampen_loss出自同一篇文章 oscillations-qat
+# iterative_freezing: True
+# 指数滑动平均参数
+# freeze_momentum: 0.004
+# 跳变阈值设置
+# This should be at least 2-3x the momentum value.
+# freeze_threshold

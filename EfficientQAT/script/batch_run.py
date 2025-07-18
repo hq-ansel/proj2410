@@ -22,6 +22,8 @@ def get_save_path(config: Dict) -> str:
 
 def main() -> None:
     config_files: List[str] = glob.glob('yaml/generate/*.yaml')
+    # 安装字符排序
+    config_files.sort()
     for config_path in config_files:
         env: Dict[str, str] = os.environ.copy()
         env['HF_HOME'] = HF_HOME

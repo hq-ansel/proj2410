@@ -1,6 +1,6 @@
 cluster_settings:
   cuda_ids:
-  - 2
+  - 1
 model_settings:
   net: Llama2-7b
   model: /home/ubuntu/data/exp/proj2410/model/Llama2-7b

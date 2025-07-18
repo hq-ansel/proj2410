@@ -1,10 +1,10 @@
 cluster_settings:
   cuda_ids:
-  - 2
+  - 1
 model_settings:
-  net: Qwen2.5-0.5B
-  model: /home/ubuntu/data/exp/proj2410/model/Qwen2.5-0.5B
-  save_parent_dir: /home/ubuntu/data/exp/proj2410/quant_model/Qwen2.5-0.5B
+  net: Llama2-70b
+  model: /home/ubuntu/data/exp/proj2410/model/Llama2-70b
+  save_parent_dir: /home/ubuntu/data/exp/proj2410/quant_model/Llama2-70B
 hyperparam_settings:
   wbits: 2
   group_size: 128
@@ -46,6 +46,6 @@ train_param_settings:
   with_catcher: false
   quant_method: block_ap
 method: w2g128
-save_dir: /home/ubuntu/data/exp/proj2410/quant_model/Qwen2.5-0.5B/EfficientQAT/w2g128/
-output_dir: /home/ubuntu/data/exp/proj2410/quant_model/Qwen2.5-0.5B/EfficientQAT/w2g128/
-log_loss: /home/ubuntu/data/exp/proj2410/quant_model/Qwen2.5-0.5B/EfficientQAT/w2g128/loss.csv
+save_dir: /home/ubuntu/data/exp/proj2410/quant_model/Llama2-70B/EfficientQAT/w2g128/
+output_dir: /home/ubuntu/data/exp/proj2410/quant_model/Llama2-70B/EfficientQAT/w2g128/
+log_loss: /home/ubuntu/data/exp/proj2410/quant_model/Llama2-70B/EfficientQAT/w2g128/loss.csv

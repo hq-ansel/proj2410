@@ -22,12 +22,12 @@ TRANSFORMERS_MODELS = [
     # Qwen 系列
     'Qwen/Qwen2.5-7B',
     'Qwen/Qwen2.5-14B',
-    'Qwen/Qwen3-8B',
+    # 'Qwen/Qwen3-8B',
     # LLaMA 系列
-    'meta-llama/Llama-2-7b-hf',
-    'meta-llama/Llama-2-13b-hf',
-    'meta-llama/Llama-2-70b-hf',
-    'meta-llama/Meta-Llama-3-8B',
+    # 'meta-llama/Llama-2-7b-hf',
+    # 'meta-llama/Llama-2-13b-hf',
+    # 'meta-llama/Llama-2-70b-hf',
+    # 'meta-llama/Meta-Llama-3-8B',
 ]
 
 SAVE_DIR = "/home/ubuntu/data/exp/proj2410/model"
@@ -52,15 +52,18 @@ def download_transformers_models(model_list, save_dir):
 # ===================== modelscope 下载 =====================
 MODELSCOPE_MODELS = [
     # LLaMA2/3 系列
-    'llama2-13b',
-    'llama2-70b',
-    'llama3-8b',
+    # 'llama2-13b',
+    # 'llama2-70b',
+    # 'llama3-8b',
+    # Qwen 系列
+    'qwen3-8b',
 ]
 
 MODELSCOPE_MODEL_IDS = {
     'llama2-13b': 'modelscope/Llama-2-13b-ms',
     'llama2-70b': 'AI-ModelScope/Llama-2-70b-hf',
     'llama3-8b': 'LLM-Research/Meta-Llama-3-8B',
+    'qwen3-8b': 'Qwen/Qwen3-8B',
 }
 
 MODELSCOPE_SAVE_DIR = os.path.join(SAVE_DIR, "modelscope")
@@ -81,7 +84,15 @@ def download_modelscope_models(model_list, save_dir):
             continue
         print(f"[ModelScope] 正在下载 {model_id} ...")
         try:
-            snapshot_download(model_id, cache_dir=save_path, revision=None)
+            snapshot_download(
+                model_id, 
+                cache_dir=save_path,
+                ignore_patterns=[
+                    "*.bin",
+                    "*.pth",
+                    "*.pt",
+                ], 
+                revision=None)
             print(f"[ModelScope] 保存到 {save_path}")
         except Exception as e:
             print(f"[ModelScope] 下载 {model_id} 失败: {e}")

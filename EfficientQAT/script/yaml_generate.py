@@ -141,7 +141,7 @@ def main():
     """
     base_dir = 'yaml'
     # 除了baseline.yaml，还有 gradual_quant.yaml
-    template_path = os.path.join(base_dir, 'template', 'baseline.yaml')
+    template_path = os.path.join(base_dir, 'template', 'gradual_quant.yaml')
     output_dir = os.path.join(base_dir, 'generate')
     os.makedirs(output_dir, exist_ok=True)
     with open(template_path, 'r') as f:

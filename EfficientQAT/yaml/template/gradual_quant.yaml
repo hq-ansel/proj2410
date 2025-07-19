@@ -1,4 +1,4 @@
-dd# cluster settings
+# cluster settings
 cluster_settings: cluster/s16754.yaml
 # options
 # cluster_settings: cluster/

@@ -39,7 +39,7 @@ from ..loss_utils import get_loss_func
 from torch.optim.lr_scheduler import CosineAnnealingLR
 
 
-amp_enabled = os.environ.get("AMP_ENABLED", "False").lower() == "true"
+amp_enabled = True
 print(f"AMP enabled: {amp_enabled}")
 
 
@@ -145,8 +145,6 @@ def train_units_layers(model: PreTrainedModel,
     total_training_iteration = train_params['epochs'] * train_params['train_size'] / train_params['batch_size']
     layer_idx_set = set(trainable_layer_idx_list)
     step = 0
-    param_groups = []
-    param_group_index = 0
     assert float(train_params['quant_lr']) > 0 or float(train_params['weight_lr']) > 0
 
     # 使用amp仍然需要权重为float32
@@ -164,8 +162,12 @@ def train_units_layers(model: PreTrainedModel,
     for name, param in model.named_parameters():
         param.requires_grad = False
     for layer_idx in trainable_layer_idx_list:
+        param_groups = []
+        param_group_index = 0
         qlayer = model.model.layers[layer_idx]
         set_quant_state(qlayer,True)
+        with torch.no_grad():
+            qlayer.float()
         if float(train_params['quant_lr']) > 0:
             set_quant_parameters(qlayer,True)
             param_groups.append({"params":quant_parameters(qlayer),
@@ -288,7 +290,7 @@ def train_units_layers(model: PreTrainedModel,
                 optimizer.zero_grad()
                 with torch.autocast(device_type="cuda",
                                     enabled=amp_enabled,
-                                    dtype=train_params['dtype'] if amp_enabled else torch.float32):
+                                    ):
                     inp,target = input_data
                     # 强制要求激活值是float32
                     inp = inp.to(train_params['dev'],dtype=train_params['dtype'])
@@ -836,7 +838,8 @@ def custom_shedule_train(model:PreTrainedModel,
 
         with torch.no_grad():
             for layer_idx in train_layer_window:
-                qlayer = model.model.layers[layer_idx]
+                qlayer = model.model.layers[layer_idx].half()
+                quant_inplace(qlayer)
                 set_quant_state(qlayer,False)
                 # step 7: pack quantized weights into low-bits format, note that this process is slow on poor CPU or busy CPU
                 if train_params.get("real_quant"):
@@ -878,7 +881,6 @@ def custom_shedule_train(model:PreTrainedModel,
                         q_linear.pack(module.cpu(),  scales.cpu().half().float(), zeros.cpu())
                         set_op_by_name(qlayer, name, q_linear)       
                         logger.info(f"pack quantized {name} finished")
-                        # import pdb;pdb.set_trace()
                         del module
             torch.cuda.empty_cache()
             gc.collect()
@@ -893,9 +895,8 @@ def custom_shedule_train(model:PreTrainedModel,
         if not train_params.get("with_catcher"):
             if train_layer_window != shedule_list[-1]:
                 with torch.no_grad():
-                    # with torch.autocast(device_type="cuda",
-                    #                     enabled=amp_enabled,
-                    #                     dtype=train_params['dtype'] if amp_enabled else torch.float32):
+                    with torch.autocast(device_type="cuda",
+                                        enabled=amp_enabled):
                         for slide_base in train_layer_window:
                             # 更新后的input 需要经过[windows_start,windows_start+slide_step)层的输出
                             if slide_base == train_layer_window[0]+hyper_params['slide_step']:
@@ -967,7 +968,7 @@ def greedy_local_train(
         logger.info("offload the training dataset to disk, saving CPU memory, but may slowdown the training due to additional I/O...")
     
     dev = config["cluster_settings"]['cuda_ids'][0] if torch.cuda.is_available() else 'cpu'
-    dtype = torch.bfloat16 if amp_enabled else torch.float32
+    dtype = torch.float16 
     train_params['dev'] = dev
     train_params['dtype'] = dtype
     

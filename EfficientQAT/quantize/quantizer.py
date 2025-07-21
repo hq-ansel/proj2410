@@ -15,12 +15,6 @@ def round_ste(x: torch.Tensor) -> torch.Tensor:
     """
     return (x.round() - x).detach() + x
 
-# 感觉lsq+实现是这样的吗？
-# def clamp_ste(x: torch.Tensor, min, max):
-#     clamped = x.clamp(min, max)
-#     gradient_mask = (x >= min) & (x <= max)  # 仅保留在范围内的梯度
-#     return (clamped - x).detach() + x * gradient_mask
-
 class HighPassRoundSTE(torch.autograd.Function):
     """
     result = round(x)
@@ -125,10 +119,6 @@ class BaseQuantizer(nn.Module):
             raise ValueError("weight must not be None")
         if group_size is None:
             raise ValueError("group_size must not be None")
-        if weight.dtype == torch.float32 or weight.dtype == torch.float16:
-            scale_dtype = torch.float16
-        else:
-            scale_dtype = torch.bfloat16
         with torch.no_grad():
             x = weight.reshape(-1,group_size)
             xmin = x.amin([-1], keepdim=True)
@@ -139,19 +129,14 @@ class BaseQuantizer(nn.Module):
                 scale = scale.clamp(min=1e-4, max=1e4)
             elif clamp_method == "MAD":
                 scale = clamp_mad(scale, 1e-4, 1e4)
-            zero_point = -xmin/scale
-            return scale.to(scale_dtype), zero_point.round().to(scale_dtype)
+            zero_point = -(xmin/scale).clamp(min=-1e4, max=1e4)
+            return scale, zero_point.round()
         
     def cal_qparams(self,
                     scale: torch.Tensor,
                     zero_point: torch.Tensor,
                     clamp_method: str = "STE"
                     ) -> Tuple[torch.Tensor, torch.Tensor]:
-        # 兼容nn.Parameter类型
-        if hasattr(scale, 'data'):
-            scale = scale.data
-        if hasattr(zero_point, 'data'):
-            zero_point = zero_point.data
         if clamp_method == "STE":
             scale_dtype = scale.dtype
             scale = clamp_ste(scale,1e-4, 1e4).to(scale_dtype)
@@ -179,7 +164,7 @@ class BaseQuantizer(nn.Module):
                     ) -> torch.Tensor:
         if round_zero_point is not None:
             x_int = x_int.sub(round_zero_point)
-        x_float = x_int * scale
+        x_float = x_int.mul(scale)
         return x_float
     
     def fake_quant(self,
@@ -228,7 +213,7 @@ class UniformAffineQuantizer(BaseQuantizer):
             freeze_threshold=args.get("freeze_threshold",0.0),
             use_ema_x_int=True
             )
-    @torch.compile
+
     def fake_quant(self,
                    x: torch.Tensor
                    ) -> torch.Tensor:
@@ -473,7 +458,6 @@ class GradualUniformAffineQuantizer(BaseQuantizer):
         else:
             raise ValueError("interpolate should be between 0 and 1.")
 
-    @torch.compile
     def fake_quant(self,
                    x: torch.Tensor
                    ) -> torch.Tensor:

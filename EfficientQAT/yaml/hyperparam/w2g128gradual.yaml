@@ -1,7 +1,7 @@
 # basic quantization settings
 wbits: 2
 group_size: 128
-method_name: w2g128
+method_name: w2g128gradual
 
 # extra training settings
 # float, min_lr = lr/min_lr_factor
@@ -13,8 +13,8 @@ crossblock_window_size: 1
 slide_step: 1
 # gradual quant参数
 gradual_quant: True
-# gradual_factor = gradual_quant_step / total_step
-gradual_factor: 2.0
+# gradual_factor = total_step/ gradual_quant_step / 
+gradual_factor: 1.0
 # 用来添加dampen_loss 来自正则项控制的一篇文章
 # dampen_loss: True
 # 控制dampen_loss添加比例

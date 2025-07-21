@@ -127,7 +127,7 @@ def main() -> None:
             attn_implementation="eager",
             config=model_config,
             device_map='cpu',
-            torch_dtype=torch.float16 if amp_enabled else torch.float32
+            torch_dtype=torch.float16 
         )
         for param in model.parameters():
             param.requires_grad = False

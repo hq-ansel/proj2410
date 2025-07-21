@@ -21,8 +21,8 @@ from .quantize.crossblockquant import cross_block_quantization
 from .quantize.greedy_trainer import greedy_local_train, timer
 from .liger_kernel_utils import apply_liger_kernel
 
-amp_enabled = os.environ.get("AMP_ENABLED", "False").lower() == "true"
-torch.set_float32_matmul_precision('high')
+# amp_enabled = os.environ.get("AMP_ENABLED", "False").lower() == "true"
+# torch.set_float32_matmul_precision('high')
 
 @torch.no_grad()
 def evaluate(model: Any, tokenizer: AutoTokenizer, config: Dict[str, Any], logger: Optional[Any] = None) -> Dict[str, Any]:
@@ -84,8 +84,8 @@ def set_rng_env(seed: int):
     torch.cuda.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
     os.environ['PYTHONHASHSEED'] = str(seed)
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
+    # torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = True
 
 def main() -> None:
     import argparse

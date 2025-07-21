@@ -1,6 +1,6 @@
 cluster_settings:
   cuda_ids:
-  - 1
+  - 7
 model_settings:
   net: Llama2-7b
   model: /home/ubuntu/data/exp/proj2410/model/Llama2-7b
@@ -15,7 +15,7 @@ hyperparam_settings:
   crossblock_window_size: 1
   slide_step: 1
   gradual_quant: true
-  gradual_factor: 1.0
+  gradual_factor: 3.0
 train_param_settings:
   cache_dir: /home/ubuntu/data/exp/proj2410/cache
   output_dir: ./log/

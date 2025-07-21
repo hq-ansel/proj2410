@@ -313,13 +313,13 @@ def train_units_layers(model: PreTrainedModel,
                         hidden_state = layer_outputs[0]
                     loss = loss_func(hidden_state, trg)
                     # insert part
-                    if index == 32:
-                        tmp = {
-                            "hidden_state":inp,
-                            # "attention_mask":attention_mask,
-                            # "position_embeddings":position_embeddings,
-                        }
-                        print(f"layers {trainable_layer_idx_list} input_data {tmp} output {hidden_state} target {target} ")
+                    # if index == 32:
+                    #     tmp = {
+                    #         "hidden_state":inp,
+                    #         # "attention_mask":attention_mask,
+                    #         # "position_embeddings":position_embeddings,
+                    #     }
+                    #     print(f"layers {trainable_layer_idx_list} input_data {tmp} output {hidden_state} target {target} ")
                     # print(f"index {index} loss {loss}")
 
                     # insert dampen loss
@@ -397,7 +397,7 @@ def train_units_layers(model: PreTrainedModel,
                 dataloader = DataLoader(val_dataset,
                                         batch_size=train_params['batch_size'],
                                         # num_workers=0,
-                                        # pin_memory=True,
+                                        pin_memory=True,
                                         # prefetch_factor=32,  
                                         shuffle=False,
                                         )
@@ -595,7 +595,7 @@ def train_units_layers_with_catcher(model: PreTrainedModel,
             dataloader = DataLoader(train_dataset,
                                     batch_size=train_params['batch_size'],
                                     num_workers=0,
-                                    # pin_memory=True,
+                                    pin_memory=True,
                                     # prefetch_factor=32,  
                                     shuffle=True
                                     )
@@ -617,9 +617,9 @@ def train_units_layers_with_catcher(model: PreTrainedModel,
                         except StopException as e:
                             pass
                         target_output = fp_layers[align_index].outs[0]
-                    if index == 0:
-                        inp = qlayers[align_index].inps
-                        print(f"input {inp} output {output} target_output {target_output}")
+                    # if index == 0:
+                    #     inp = qlayers[align_index].inps
+                    #     print(f"input {inp} output {output} target_output {target_output}")
                     loss = loss_func(output, target_output.to(train_params['dev'],dtype=torch.float32))
 
                     if hyper_params.get("dampen_loss",False):
@@ -681,7 +681,7 @@ def train_units_layers_with_catcher(model: PreTrainedModel,
             dataloader = DataLoader(val_dataset,
                                     batch_size=train_params['batch_size'],
                                     num_workers=0,
-                                    # pin_memory=True,
+                                    pin_memory=True,
                                     # prefetch_factor=32,  
                                     shuffle=True
                                     )
@@ -833,8 +833,8 @@ def custom_shedule_train(model:PreTrainedModel,
                         config=config)
             selected_layers= nn.ModuleList([model.model.layers[i] for i in train_layer_window])
         quant_inplace(selected_layers)
-        print(f"q_proj",selected_layers[0].self_attn.q_proj.weight)
-        print(f"q_proj scale",selected_layers[0].self_attn.q_proj.weight_quantizer.scale)
+        # print(f"q_proj",selected_layers[0].self_attn.q_proj.weight)
+        # print(f"q_proj scale",selected_layers[0].self_attn.q_proj.weight_quantizer.scale)
 
         with torch.no_grad():
             for layer_idx in train_layer_window:

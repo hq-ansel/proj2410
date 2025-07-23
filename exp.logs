@@ -232,3 +232,80 @@ Evaluating on tasks: ['piqa', 'arc_easy', 'arc_challenge', 'hellaswag', 'winogra
 |winogrande   |      1|none  |     0|acc     |↑  |0.6377|±  |0.0135|
 
 Average Acc: 60.07%
+
+[32mINFO[0m  ENV: Auto setting PYTORCH_CUDA_ALLOC_CONF='expandable_segments:True' for memory saving.
+[32mINFO[0m  ENV: Auto setting CUDA_DEVICE_ORDER=PCI_BUS_ID for correctness.          
+AMP enabled: True
+Loading quantized model from /home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/EfficientQAT/w2g128
+Loading pre-computed quantized weights...
+Loading pre-computed quantized weights Successfully
+Loading Wikitext-2 dataset...
+wikitext2: 8.080133438110352
+get_c4
+c4: 9.83586597442627
+wikitext2 perplexity: 8.08
+c4 perplexity: 9.84
+Evaluating on tasks: ['piqa', 'arc_easy', 'arc_challenge', 'hellaswag', 'winogrande']
+|    Tasks    |Version|Filter|n-shot| Metric |   |Value |   |Stderr|
+|-------------|------:|------|-----:|--------|---|-----:|---|-----:|
+|arc_challenge|      1|none  |     0|acc     |↑  |0.3473|±  |0.0139|
+|             |       |none  |     0|acc_norm|↑  |0.3592|±  |0.0140|
+|arc_easy     |      1|none  |     0|acc     |↑  |0.6995|±  |0.0094|
+|             |       |none  |     0|acc_norm|↑  |0.6498|±  |0.0098|
+|hellaswag    |      1|none  |     0|acc     |↑  |0.4858|±  |0.0050|
+|             |       |none  |     0|acc_norm|↑  |0.6388|±  |0.0048|
+|piqa         |      1|none  |     0|acc     |↑  |0.7356|±  |0.0103|
+|             |       |none  |     0|acc_norm|↑  |0.7470|±  |0.0101|
+|winogrande   |      1|none  |     0|acc     |↑  |0.6369|±  |0.0135|
+
+Average Acc: 58.10%
+Loading quantized model from /home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/EfficientQAT/w2g128gradual_factor3
+Loading pre-computed quantized weights...
+Loading pre-computed quantized weights Successfully
+Loading Wikitext-2 dataset...
+wikitext2: 8.048348426818848
+get_c4
+c4: 9.847241401672363
+wikitext2 perplexity: 8.05
+c4 perplexity: 9.85
+Evaluating on tasks: ['piqa', 'arc_easy', 'arc_challenge', 'hellaswag', 'winogrande']
+|    Tasks    |Version|Filter|n-shot| Metric |   |Value |   |Stderr|
+|-------------|------:|------|-----:|--------|---|-----:|---|-----:|
+|arc_challenge|      1|none  |     0|acc     |↑  |0.3345|±  |0.0138|
+|             |       |none  |     0|acc_norm|↑  |0.3609|±  |0.0140|
+|arc_easy     |      1|none  |     0|acc     |↑  |0.7016|±  |0.0094|
+|             |       |none  |     0|acc_norm|↑  |0.6439|±  |0.0098|
+|hellaswag    |      1|none  |     0|acc     |↑  |0.4881|±  |0.0050|
+|             |       |none  |     0|acc_norm|↑  |0.6402|±  |0.0048|
+|piqa         |      1|none  |     0|acc     |↑  |0.7280|±  |0.0104|
+|             |       |none  |     0|acc_norm|↑  |0.7443|±  |0.0102|
+|winogrande   |      1|none  |     0|acc     |↑  |0.6330|±  |0.0135|
+
+Average Acc: 57.70%
+
+[32mINFO[0m  ENV: Auto setting PYTORCH_CUDA_ALLOC_CONF='expandable_segments:True' for memory saving.
+[32mINFO[0m  ENV: Auto setting CUDA_DEVICE_ORDER=PCI_BUS_ID for correctness.          
+AMP enabled: True
+Loading quantized model from /home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/EfficientQAT/w2g128gradual
+Loading pre-computed quantized weights...
+Loading pre-computed quantized weights Successfully
+Loading Wikitext-2 dataset...
+wikitext2: 8.014564514160156
+get_c4
+c4: 9.805839538574219
+wikitext2 perplexity: 8.01
+c4 perplexity: 9.81
+Evaluating on tasks: ['piqa', 'arc_easy', 'arc_challenge', 'hellaswag', 'winogrande']
+|    Tasks    |Version|Filter|n-shot| Metric |   |Value |   |Stderr|
+|-------------|------:|------|-----:|--------|---|-----:|---|-----:|
+|arc_challenge|      1|none  |     0|acc     |↑  |0.3490|±  |0.0139|
+|             |       |none  |     0|acc_norm|↑  |0.3567|±  |0.0140|
+|arc_easy     |      1|none  |     0|acc     |↑  |0.7033|±  |0.0094|
+|             |       |none  |     0|acc_norm|↑  |0.6532|±  |0.0098|
+|hellaswag    |      1|none  |     0|acc     |↑  |0.4868|±  |0.0050|
+|             |       |none  |     0|acc_norm|↑  |0.6426|±  |0.0048|
+|piqa         |      1|none  |     0|acc     |↑  |0.7378|±  |0.0103|
+|             |       |none  |     0|acc_norm|↑  |0.7383|±  |0.0103|
+|winogrande   |      1|none  |     0|acc     |↑  |0.6448|±  |0.0135|
+
+Average Acc: 58.43%

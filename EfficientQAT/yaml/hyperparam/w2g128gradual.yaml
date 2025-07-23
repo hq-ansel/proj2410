@@ -14,7 +14,7 @@ slide_step: 1
 # gradual quant参数
 gradual_quant: True
 # gradual_factor = total_step/ gradual_quant_step / 
-gradual_factor: 1.0
+gradual_factor: 4.0
 # 用来添加dampen_loss 来自正则项控制的一篇文章
 # dampen_loss: True
 # 控制dampen_loss添加比例

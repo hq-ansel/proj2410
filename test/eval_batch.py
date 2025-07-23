@@ -66,7 +66,7 @@ quant_path_list = [
     # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-subspace-lr1/redpajama-4096/checkpoint-256",
     # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-gradual-quant-nocli/redpajama-4096/checkpoint-256",
 
-    "/home/ubuntu/data/exp/proj2410/quant_model/Qwen2.5-0.5B/EfficientQAT/w2g128",
+    # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen2.5-0.5B/EfficientQAT/w2g128",
     # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-freeze-weight",
     # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-dampenloss",
     # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-gradual-quant",
@@ -76,7 +76,7 @@ quant_path_list = [
     # "/home/ubuntu/data/exp/proj2410/model/Llama3-8B",
     
     # "/home/ubuntu/data/exp/proj2410/model/Qwen2.5-3B",
-    "/home/ubuntu/data/exp/proj2410/quant_model/Qwen2.5-3B/EfficientQAT/w2g128",
+    # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen2.5-3B/EfficientQAT/w2g128",
     # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen2.5-3B/EfficientQAT/w2gs128-gradual-quant",
     # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen2.5-3B/EfficientQAT/w3gs128",
     # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen2.5-3B/EfficientQAT/w3gs128-gradual-quant",
@@ -87,6 +87,9 @@ quant_path_list = [
     # "/home/ubuntu/data/exp/proj2410/quant_model/Llama3-8B/EfficientQAT/w2gs128-gradual-quant"
     # "/home/ubuntu/data/exp/proj2410/quant_model/Llama3-8B/EfficientQAT/w4gs128",
     # "/home/ubuntu/data/exp/proj2410/baseline/EfficientQAT/output/e2e-qp-output/Llama-3-8b-w2g128-alpaca-4096/checkpoint-10000",
+    # "/home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/EfficientQAT/w2g128",
+    # "/home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/EfficientQAT/w2g128gradual_factor3"
+    "/home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/EfficientQAT/w2g128gradual"
 ]
 # CUDA_VISIBLE_DEVICES=2 python -m test.eval_batch
 # CUDA_VISIBLE_DEVICES=2 python -m test.eval_batch > exp.logs
@@ -107,8 +110,8 @@ for quant_path in quant_path_list:
         tokenizer = AutoTokenizer.from_pretrained(quant_path)
     args = EasyDict()
     args["train_param_settings"]={}
-    args["train_param_settings"]["eval_ppl"] = False
-    args["train_param_settings"]["eval_tasks"] = ""
+    args["train_param_settings"]["eval_ppl"] = True
+    # args["train_param_settings"]["eval_tasks"] = ""
     args["train_param_settings"]["max_memory"] = "24GB"
     args["train_param_settings"]["ppl_seqlen"] = 2048
     args["train_param_settings"]["batch_size"] = 1

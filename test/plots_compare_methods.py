@@ -38,7 +38,8 @@ def args_parser():
     # /home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/EfficientQAT/w2g128gradual/loss.csv
     parser.add_argument(
         "--w4_loss_path",
-        default="/home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/EfficientQAT/w4g128/loss.csv",
+        # /home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/EfficientQAT/w2g128gradual_fator1/loss.csv
+        default="/home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/EfficientQAT/w2g128gradual/loss.csv",
         type=str,
         help="path to 4-bit loss file"
     )
@@ -103,17 +104,17 @@ def plot_bit_comparison(w4_loss_path, w2_loss_path, args):
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(6, 3))
     
     # 直接使用 CMYK 颜色
-    ax1.plot(steps, w4_avg, label='4-bit Average Loss', linewidth=2, 
+    ax1.plot(steps, w4_avg, label='PQ Average Loss', linewidth=2, 
              color="#FF4D00")  # 青色
-    ax1.set_title('4-bit Quantization Training')
+    ax1.set_title('Progressive Quantization Training')
     ax1.set_xlabel('Steps')
     ax1.set_ylabel('Loss')
     ax1.legend()
     ax1.grid(True, alpha=0.3)
     
-    ax2.plot(steps, w2_avg, label='2-bit Average Loss', linewidth=2, 
+    ax2.plot(steps, w2_avg, label='One Shot Average Loss', linewidth=2, 
              color="#00FF4D")  # 品红
-    ax2.set_title('2-bit Quantization Training')
+    ax2.set_title('One Shot Quantization Training')
     ax2.set_xlabel('Steps')
     ax2.set_ylabel('Loss')
     ax2.legend()
@@ -122,7 +123,7 @@ def plot_bit_comparison(w4_loss_path, w2_loss_path, args):
     plt.tight_layout()
     
     # 保存为 CMYK PDF
-    output_file = f"{args.out_dir}/bit_comparison.pdf"
+    output_file = f"{args.out_dir}/methods_comparison.pdf"
     from matplotlib.backends.backend_pdf import PdfPages
     with PdfPages(output_file) as pdf:
         pdf.savefig(fig, bbox_inches='tight')
@@ -136,7 +137,7 @@ def main(args):
         w2_loss_path=args.w2_loss_path,
         args=args
     )
-
+# python -m test.plots_compare_methods
 if __name__ == '__main__':
     args = args_parser()
     main(args)

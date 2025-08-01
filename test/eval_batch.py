@@ -19,80 +19,43 @@ from EfficientQAT.main_block_ap import evaluate
 # curl测试是否可以链接到huggingface
 
 quant_path_list = [
-    # 仅block wise
-    # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128",
-    # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-crossblock",
-    # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-gradual-quant",
-    # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-gradual-quant-slide2",
-    # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-slide2",
-    # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-slide12",
-    # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-slide4",
-    # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-slide6",
-    # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-slide8",
-    # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-slide10",
-
-    # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-alpaca-4096/checkpoint-10000",
-    # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-slide2-alpaca-4096/checkpoint-10000",
-    # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-gradual-quant-slide2-alpaca-4096/checkpoint-10000",
-    # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-slide4-alpaca-4096/checkpoint-10000",
-    # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-slide6-alpaca-4096/checkpoint-10000",
-    # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-slide8-alpaca-4096/checkpoint-10000",
-    # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-slide10-alpaca-4096/checkpoint-10000",
-    # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-slide12-alpaca-4096/checkpoint-10000",
-
-    # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-redpajama-4096/checkpoint-256",
-    # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-gradual-quant-redpajama-4096/checkpoint-256",
-    # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-gradual-quant-slide2-redpajama-4096/checkpoint-256",
-    # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-slide2-redpajama-4096/checkpoint-256",
-    # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-slide4-redpajama-4096/checkpoint-256",
-    # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-slide10-redpajama-4096/checkpoint-256",
-    # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-slide6-redpajama-4096/checkpoint-256",
-    # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-slide8-redpajama-4096/checkpoint-256",
-    # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-slide12-redpajama-4096/checkpoint-256",
-
-    # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-subspace",
-    # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-subspace-lr1",
-    # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-subspace-lr2",
-    # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-subspace-lr3",
-
-    # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-linearv2",
-    # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-gradual-quant",
-    # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-gradual-quant-cli1",
-    # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-gradual-quant-nocli",
-
-    # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-linearv2/redpajama-4096/checkpoint-256",
-    # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-lr1/redpajama-4096/checkpoint-256",
-    # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128/redpajama-4096/checkpoint-256",
-    # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-subspace-lr1/redpajama-4096/checkpoint-256",
-    # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-gradual-quant-nocli/redpajama-4096/checkpoint-256",
-
-    # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen2.5-0.5B/EfficientQAT/w2g128",
-    # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-freeze-weight",
-    # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-dampenloss",
-    # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-gradual-quant",
-    # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen-2.5-0.5B/EfficientQAT/w2gs128-gradual-quant-cli1-v2",
-    # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen2.5-7B/EfficientQAT/w2gs128",
-    # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen2.5-7B/EfficientQAT/w2gs128-gradual-quant",
-    # "/home/ubuntu/data/exp/proj2410/model/Llama3-8B",
-    
-    # "/home/ubuntu/data/exp/proj2410/model/Qwen2.5-3B",
-    # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen2.5-3B/EfficientQAT/w2g128",
-    # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen2.5-3B/EfficientQAT/w2gs128-gradual-quant",
-    # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen2.5-3B/EfficientQAT/w3gs128",
-    # "/home/ubuntu/data/exp/proj2410/quant_model/Qwen2.5-3B/EfficientQAT/w3gs128-gradual-quant",
-    # "/home/ubuntu/data/exp/proj2410/quant_model/Llama3-8B/EfficientQAT/w2gs128",
-    # "/home/ubuntu/data/exp/proj2410/quant_model/Llama3-8B/EfficientQAT/w2gs128-swa60",
-
-    # "/home/ubuntu/data/exp/proj2410/baseline/EfficientQAT/output/block_ap_models/Llama-3-8b-w2g128",
-    # "/home/ubuntu/data/exp/proj2410/quant_model/Llama3-8B/EfficientQAT/w2gs128-gradual-quant"
-    # "/home/ubuntu/data/exp/proj2410/quant_model/Llama3-8B/EfficientQAT/w4gs128",
-    # "/home/ubuntu/data/exp/proj2410/baseline/EfficientQAT/output/e2e-qp-output/Llama-3-8b-w2g128-alpaca-4096/checkpoint-10000",
     # "/home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/EfficientQAT/w2g128",
-    # "/home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/EfficientQAT/w2g128gradual_factor3"
-    "/home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/EfficientQAT/w2g128gradual"
+    # "/home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/EfficientQAT/w2g128dampenloss",
+    # "/home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/EfficientQAT/w2g128gradual",
+    # "/home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/EfficientQAT/w2g128gradual_factor3",
+    # "/home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/EfficientQAT/w2g128gradual_fator1",
+    # "/home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/EfficientQAT/w2g128interativeFreezing",
+    # "/home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/EfficientQAT/w4g128dampenloss",
+    # "/home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/EfficientQAT/w4g128gradual",
+    # "/home/ubuntu/data/exp/proj2410/quant_model/Llama3-8B/EfficientQAT/w2g128",
+    # "/home/ubuntu/data/exp/proj2410/quant_model/Llama3-8B/EfficientQAT/w2g128dampenloss",
+    # "/home/ubuntu/data/exp/proj2410/quant_model/Llama3-8B/EfficientQAT/w2g128gradual",
+    # "/home/ubuntu/data/exp/proj2410/quant_model/Llama3-8B/EfficientQAT/w4g128dampenloss",
+    # "/home/ubuntu/data/exp/proj2410/quant_model/Llama3-8B/EfficientQAT/w4g128gradual",
+    # "/home/ubuntu/data/exp/proj2410/model/Llama2-7b",
+    # "/home/ubuntu/data/exp/proj2410/model/Llama3-8B",
+    # "/home/ubuntu/data/exp/proj2410/model/Llama3.2-1B",
+    # "/home/ubuntu/data/exp/proj2410/model/Llama3.2-3B",
+    # "/home/ubuntu/data/exp/proj2410/model/Qwen2.5-0.5B",
+    # "/home/ubuntu/data/exp/proj2410/model/Qwen2.5-1.5B",
+    # "/home/ubuntu/data/exp/proj2410/model/Qwen2.5-3B",
+    # "/home/ubuntu/data/exp/proj2410/model/Qwen2.5-7B",
+    # "/home/ubuntu/data/exp/proj2410/model/Qwen2.5-14B",
+    # "/home/ubuntu/data/exp/proj2410/model/Qwen3-8B",
+    # "/home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/EfficientQAT/w4g128",
+    # "/home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/EfficientQAT/w4g128gradual",
+    # "/home/ubuntu/data/exp/proj2410/quant_model/Llama3-8B/EfficientQAT/w4g128",
+    # "/home/ubuntu/data/exp/proj2410/quant_model/Llama3-8B/EfficientQAT/w2g128interativeFreezing",
+    # "/home/ubuntu/data/exp/proj2410/quant_model/Llama3-8B/EfficientQAT/w4g128gradual",
+    # "/home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/EfficientQAT/progq2bit_cali_w2",
+    # "/home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/EfficientQAT/w2g128gradualfactor2",
+    # "/home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/EfficientQAT/w2g128interativeFreezing"
+    "/home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/EfficientQAT/iterative_freezingw4bit",
 ]
 # CUDA_VISIBLE_DEVICES=2 python -m test.eval_batch
-# CUDA_VISIBLE_DEVICES=2 python -m test.eval_batch > exp.logs
+# CUDA_VISIBLE_DEVICES=0,1,2,3  python -m test.eval_batch > exp.logs
+# CUDA_VISIBLE_DEVICES=0  python -m test.eval_batch > expfp16.logs
+# CUDA_VISIBLE_DEVICES=0 python -m test.eval_batch >> exp_res.logs
 import re
 patterns = r"w(\d+)"
 for quant_path in quant_path_list:
@@ -105,9 +68,10 @@ for quant_path in quant_path_list:
         quant_model,tokenizer = load_quantized_model(quant_path,wbit,128)
     else:
         quant_model = AutoModelForCausalLM.from_pretrained(quant_path,
-                                                           dtype=torch.float16,
+                                                           torch_dtype=torch.float16,
                                                            device_map="auto")
         tokenizer = AutoTokenizer.from_pretrained(quant_path)
+        print("Loading model from",quant_path)
     args = EasyDict()
     args["train_param_settings"]={}
     args["train_param_settings"]["eval_ppl"] = True
@@ -121,7 +85,7 @@ for quant_path in quant_path_list:
     args["train_param_settings"]["seed"] = 42
     args["train_param_settings"]["eval_tasks"]="piqa,arc_easy,arc_challenge,hellaswag,winogrande"
     # args.eval_tasks="xsum,cnn_dailymail,openbookqa,copa,mathqa,rte"
-    args.eval_batch_size=4
+    args.eval_batch_size=8
     args.training_seqlen = 2048
     evaluate(quant_model,tokenizer,args)
     torch.cuda.synchronize()

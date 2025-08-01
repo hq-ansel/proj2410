@@ -1,0 +1,17 @@
+# basic quantization settings
+wbits: 2
+group_size: 128
+method_name: w2g128interativeFreezing
+
+# extra training settings
+# float, min_lr = lr/min_lr_factor
+min_lr_factor: 20
+clamp_method: STE
+align_type: tail
+# 验证crossblock的参数
+crossblock_window_size: 1
+slide_step: 1
+
+iterative_freezing: True
+freeze_momentum: 0.004
+freeze_threshold: 0.2

@@ -140,28 +140,39 @@ def main():
     主函数：读取模板，解析设置，生成所有组合的完整嵌套配置文件。
     """
     base_dir = 'yaml'
-    # 除了baseline.yaml，还有 gradual_quant.yaml
-    template_path = os.path.join(base_dir, 'template', 'gradual_quant.yaml')
-    output_dir = os.path.join(base_dir, 'generate')
-    os.makedirs(output_dir, exist_ok=True)
-    with open(template_path, 'r') as f:
-        template_yaml = yaml.safe_load(f)
-    settings = extract_settings(template_yaml)
-    candidates = {}
-    for k, v in settings.items():
-        _, items = parse_setting(v, base_dir)
-        candidates[k] = items
-    keys = ['cluster_settings', 'model_settings', 'hyperparam_settings', 'train_param_settings']
-    all_combos = list(product(*(candidates[k] for k in keys)))
-    template_name = get_template_name(template_path)
-    for combo in all_combos:
-        combo_paths = dict(zip(keys, combo))
-        config = build_config(template_path, combo_paths, base_dir)
-        out_name = generate_output_name(combo, template_name)
-        out_path = os.path.join(output_dir, out_name)
-        with open(out_path, 'w') as f:
-            yaml.dump(config, f, allow_unicode=True, sort_keys=False)
-        print(f"生成: {out_path}")
+    tmp_list = [
+        # 'baseline.yaml',
+        # 'baseline4bit.yaml',
+        'dampenloss.yaml',
+        'dampenloss4bit.yaml',
+        # 'gradual_quant.yaml',
+        # 'gradual_quant4bit.yaml',
+        'iterativeFreezing.yaml',
+        'iterativeFreezing4bit.yaml',
+    ]
+    # 除了 baseline.yaml，还有 gradual_quant.yaml baseline4bit.yaml gradual_quant4bit.yaml
+    for suffix in tmp_list:
+        template_path = os.path.join(base_dir, 'template', suffix)
+        output_dir = os.path.join(base_dir, 'generate')
+        os.makedirs(output_dir, exist_ok=True)
+        with open(template_path, 'r') as f:
+            template_yaml = yaml.safe_load(f)
+        settings = extract_settings(template_yaml)
+        candidates = {}
+        for k, v in settings.items():
+            _, items = parse_setting(v, base_dir)
+            candidates[k] = items
+        keys = ['cluster_settings', 'model_settings', 'hyperparam_settings', 'train_param_settings']
+        all_combos = list(product(*(candidates[k] for k in keys)))
+        template_name = get_template_name(template_path)
+        for combo in all_combos:
+            combo_paths = dict(zip(keys, combo))
+            config = build_config(template_path, combo_paths, base_dir)
+            out_name = generate_output_name(combo, template_name)
+            out_path = os.path.join(output_dir, out_name)
+            with open(out_path, 'w') as f:
+                yaml.dump(config, f, allow_unicode=True, sort_keys=False)
+            print(f"生成: {out_path}")
 
 
 if __name__ == '__main__':

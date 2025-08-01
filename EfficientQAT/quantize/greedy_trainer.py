@@ -335,7 +335,7 @@ def train_units_layers(model: PreTrainedModel,
 
                 if not math.isfinite(loss.item()) or loss.item()==0:
                     logger.info("Loss is NAN, stopping training")
-                    pdb.set_trace()
+                    # pdb.set_trace()
                 loss_cpu = loss.data.cpu()
                 if config.get("log_loss"):
                     loss_recorder.record(f"blk{trainable_layer_idx_list}",

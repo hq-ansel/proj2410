@@ -1,0 +1,53 @@
+# cluster settings
+cluster_settings: cluster/s16754.yaml
+# options
+# cluster_settings: cluster/
+#cuda_ids: "0,1"
+
+# model settings
+# content
+model_settings: model
+# model_settings: model/qwen2.5-3b.yaml
+# net: Qwen2.5-3B
+# model: /home/ubuntu/data/exp/proj2410/model/Qwen2.5-3B
+# save_parent_dir: /home/ubuntu/data/exp/proj2410/quant_model/Qwen2.5-3B 
+
+
+# hyperparam settings
+hyperparam_settings: hyperparam/w4g128gradual.yaml
+# options
+# # basic quantization settings
+# wbits: 2
+# group_size: 128
+
+# # extra training settings
+# min_lr_factor: 20
+# clamp_method: STE
+# align_type: tail
+
+# # training settings
+train_param_settings: train-param/base-param.yaml
+
+# epochs: 4
+# rank: 4
+# world_size: 4
+# batch_size: 2
+# quant_lr: 0.0001
+# weight_lr: 0.0001
+# off_load_to_disk: False
+# loss_func: MSE # "MSE", "FKLD" , "RKLD", "FKLD_RKLD" ,"MSE_FKLD", "MSE_RKLD", "MSE_FKLD_RKLD"
+# crossblock_window_size: 1
+# train_size:  4096
+# slide_step: 1
+# clip_grad: 1
+
+# save settings
+
+# save_dir: {save_parent_dir}/EfficientQAT/w2gs128/
+# output_dir: {save_dir}
+# log_loss: {save_dir}/loss.csv
+method: "{hyperparam_settings.method_name}"
+# 从 model_settings 中获取 save_parent_dir
+save_dir: "{model_settings.save_parent_dir}/EfficientQAT/{method}/"
+output_dir: "{save_dir}"
+log_loss: "{save_dir}loss.csv"

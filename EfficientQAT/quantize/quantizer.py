@@ -643,7 +643,7 @@ class GradualUniformAffineQuantizerV2(nn.Module):
             self.round_method = round_ste
         elif args.get("round_method", "highpass"):
             self.round_method = HighPassRoundSTE.apply  # 新增高通滤波器
-        print("round_method:", args.get("round_method", "ste"))
+        # print("round_method:", args.get("round_method", "ste"))
         # self.round_method = lambda x: round_ste(x)
 
         # init scale and zero point through Max-Min quantization

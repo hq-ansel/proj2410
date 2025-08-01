@@ -572,7 +572,7 @@ def load_quantized_model(model_path, wbits, group_size):
     print(f"Loading quantized model from {model_path}")
 
     # import pdb;pdb.set_trace()
-    tokenizer = AutoTokenizer.from_pretrained(model_path, use_fast=False)
+    tokenizer = AutoTokenizer.from_pretrained(model_path)
     config = AutoConfig.from_pretrained(model_path)
     with init_empty_weights():
         model = AutoModelForCausalLM.from_config(config=config,torch_dtype=torch.float16, trust_remote_code=True)

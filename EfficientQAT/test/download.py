@@ -20,8 +20,8 @@ except ImportError:
 # ===================== transformers 下载 =====================
 TRANSFORMERS_MODELS = [
     # Qwen 系列
-    'Qwen/Qwen2.5-7B',
-    'Qwen/Qwen2.5-14B',
+    # 'Qwen/Qwen2.5-7B',
+    # 'Qwen/Qwen2.5-14B',
     # 'Qwen/Qwen3-8B',
     # LLaMA 系列
     # 'meta-llama/Llama-2-7b-hf',
@@ -60,9 +60,9 @@ MODELSCOPE_MODELS = [
 ]
 
 MODELSCOPE_MODEL_IDS = {
-    'llama2-13b': 'modelscope/Llama-2-13b-ms',
-    'llama2-70b': 'AI-ModelScope/Llama-2-70b-hf',
-    'llama3-8b': 'LLM-Research/Meta-Llama-3-8B',
+    # 'llama2-13b': 'modelscope/Llama-2-13b-ms',
+    # 'llama2-70b': 'AI-ModelScope/Llama-2-70b-hf',
+    # 'llama3-8b': 'LLM-Research/Meta-Llama-3-8B',
     'qwen3-8b': 'Qwen/Qwen3-8B',
 }
 

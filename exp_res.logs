@@ -1,0 +1,257 @@
+
+
+[32mINFO[0m  ENV: Auto setting PYTORCH_CUDA_ALLOC_CONF='expandable_segments:True' for memory saving.
+
+[32mINFO[0m  ENV: Auto setting CUDA_DEVICE_ORDER=PCI_BUS_ID for correctness.          
+AMP enabled: True
+Loading quantized model from /home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/EfficientQAT/w4g128
+Loading pre-computed quantized weights...
+Loading pre-computed quantized weights Successfully
+Loading Wikitext-2 dataset...
+wikitext2: 5.592419147491455
+get_c4
+c4: 7.070441722869873
+wikitext2 perplexity: 5.59
+c4 perplexity: 7.07
+Evaluating on tasks: ['piqa', 'arc_easy', 'arc_challenge', 'hellaswag', 'winogrande']
+|    Tasks    |Version|Filter|n-shot| Metric |   |Value |   |Stderr|
+|-------------|------:|------|-----:|--------|---|-----:|---|-----:|
+|arc_challenge|      1|none  |     0|acc     |↑  |0.4198|±  |0.0144|
+|             |       |none  |     0|acc_norm|↑  |0.4437|±  |0.0145|
+|arc_easy     |      1|none  |     0|acc     |↑  |0.7609|±  |0.0088|
+|             |       |none  |     0|acc_norm|↑  |0.7378|±  |0.0090|
+|hellaswag    |      1|none  |     0|acc     |↑  |0.5649|±  |0.0049|
+|             |       |none  |     0|acc_norm|↑  |0.7522|±  |0.0043|
+|piqa         |      1|none  |     0|acc     |↑  |0.7726|±  |0.0098|
+|             |       |none  |     0|acc_norm|↑  |0.7911|±  |0.0095|
+|winogrande   |      1|none  |     0|acc     |↑  |0.6788|±  |0.0131|
+
+Average Acc: 63.94%
+Loading quantized model from /home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/EfficientQAT/w4g128gradual
+Loading pre-computed quantized weights...
+Loading pre-computed quantized weights Successfully
+Loading Wikitext-2 dataset...
+wikitext2: 5.578732967376709
+get_c4
+c4: 7.069509506225586
+wikitext2 perplexity: 5.58
+c4 perplexity: 7.07
+Evaluating on tasks: ['piqa', 'arc_easy', 'arc_challenge', 'hellaswag', 'winogrande']
+|    Tasks    |Version|Filter|n-shot| Metric |   |Value |   |Stderr|
+|-------------|------:|------|-----:|--------|---|-----:|---|-----:|
+|arc_challenge|      1|none  |     0|acc     |↑  |0.4198|±  |0.0144|
+|             |       |none  |     0|acc_norm|↑  |0.4471|±  |0.0145|
+|arc_easy     |      1|none  |     0|acc     |↑  |0.7618|±  |0.0087|
+|             |       |none  |     0|acc_norm|↑  |0.7332|±  |0.0091|
+|hellaswag    |      1|none  |     0|acc     |↑  |0.5659|±  |0.0049|
+|             |       |none  |     0|acc_norm|↑  |0.7515|±  |0.0043|
+|piqa         |      1|none  |     0|acc     |↑  |0.7764|±  |0.0097|
+|             |       |none  |     0|acc_norm|↑  |0.7911|±  |0.0095|
+|winogrande   |      1|none  |     0|acc     |↑  |0.6851|±  |0.0131|
+
+Average Acc: 64.18%
+Loading quantized model from /home/ubuntu/data/exp/proj2410/quant_model/Llama3-8B/EfficientQAT/w4g128
+Loading pre-computed quantized weights...
+Loading pre-computed quantized weights Successfully
+Loading Wikitext-2 dataset...
+wikitext2: 6.446143627166748
+get_c4
+
+[32mINFO[0m  ENV: Auto setting PYTORCH_CUDA_ALLOC_CONF='expandable_segments:True' for memory saving.
+[32mINFO[0m  ENV: Auto setting CUDA_DEVICE_ORDER=PCI_BUS_ID for correctness.          
+AMP enabled: True
+Loading quantized model from /home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/EfficientQAT/w4g128gradual
+Loading pre-computed quantized weights...
+
+[32mINFO[0m  ENV: Auto setting PYTORCH_CUDA_ALLOC_CONF='expandable_segments:True' for memory saving.
+[32mINFO[0m  ENV: Auto setting CUDA_DEVICE_ORDER=PCI_BUS_ID for correctness.          
+AMP enabled: True
+Loading quantized model from /home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/EfficientQAT/w4g128gradual
+Loading pre-computed quantized weights...
+Loading pre-computed quantized weights Successfully
+Loading Wikitext-2 dataset...
+
+[32mINFO[0m  ENV: Auto setting PYTORCH_CUDA_ALLOC_CONF='expandable_segments:True' for memory saving.
+[32mINFO[0m  ENV: Auto setting CUDA_DEVICE_ORDER=PCI_BUS_ID for correctness.          
+AMP enabled: True
+Loading quantized model from /home/ubuntu/data/exp/proj2410/quant_model/Llama3-8B/EfficientQAT/w4g128
+Loading pre-computed quantized weights...
+Loading pre-computed quantized weights Successfully
+Loading Wikitext-2 dataset...
+wikitext2: 6.446143627166748
+get_c4
+c4: 9.284185409545898
+wikitext2 perplexity: 6.45
+c4 perplexity: 9.28
+Evaluating on tasks: ['piqa', 'arc_easy', 'arc_challenge', 'hellaswag', 'winogrande']
+|    Tasks    |Version|Filter|n-shot| Metric |   |Value |   |Stderr|
+|-------------|------:|------|-----:|--------|---|-----:|---|-----:|
+|arc_challenge|      1|none  |     0|acc     |↑  |0.4949|±  |0.0146|
+|             |       |none  |     0|acc_norm|↑  |0.5137|±  |0.0146|
+|arc_easy     |      1|none  |     0|acc     |↑  |0.7912|±  |0.0083|
+|             |       |none  |     0|acc_norm|↑  |0.7706|±  |0.0086|
+|hellaswag    |      1|none  |     0|acc     |↑  |0.5939|±  |0.0049|
+|             |       |none  |     0|acc_norm|↑  |0.7838|±  |0.0041|
+|piqa         |      1|none  |     0|acc     |↑  |0.7976|±  |0.0094|
+|             |       |none  |     0|acc_norm|↑  |0.8058|±  |0.0092|
+|winogrande   |      1|none  |     0|acc     |↑  |0.7356|±  |0.0124|
+
+Average Acc: 68.26%
+Loading quantized model from /home/ubuntu/data/exp/proj2410/quant_model/Llama3-8B/EfficientQAT/w2g128interativeFreezing
+Loading pre-computed quantized weights...
+Loading pre-computed quantized weights Successfully
+Loading Wikitext-2 dataset...
+wikitext2: 13.857738494873047
+get_c4
+c4: 17.476232528686523
+wikitext2 perplexity: 13.86
+c4 perplexity: 17.48
+Evaluating on tasks: ['piqa', 'arc_easy', 'arc_challenge', 'hellaswag', 'winogrande']
+|    Tasks    |Version|Filter|n-shot| Metric |   |Value |   |Stderr|
+|-------------|------:|------|-----:|--------|---|-----:|---|-----:|
+|arc_challenge|      1|none  |     0|acc     |↑  |0.3439|±  |0.0139|
+|             |       |none  |     0|acc_norm|↑  |0.3814|±  |0.0142|
+|arc_easy     |      1|none  |     0|acc     |↑  |0.6793|±  |0.0096|
+|             |       |none  |     0|acc_norm|↑  |0.6410|±  |0.0098|
+|hellaswag    |      1|none  |     0|acc     |↑  |0.4811|±  |0.0050|
+|             |       |none  |     0|acc_norm|↑  |0.6254|±  |0.0048|
+|piqa         |      1|none  |     0|acc     |↑  |0.7405|±  |0.0102|
+|             |       |none  |     0|acc_norm|↑  |0.7443|±  |0.0102|
+|winogrande   |      1|none  |     0|acc     |↑  |0.6377|±  |0.0135|
+
+Average Acc: 57.65%
+Loading quantized model from /home/ubuntu/data/exp/proj2410/quant_model/Llama3-8B/EfficientQAT/w4g128gradual
+Loading pre-computed quantized weights...
+Loading pre-computed quantized weights Successfully
+Loading Wikitext-2 dataset...
+wikitext2: 6.437845230102539
+get_c4
+c4: 9.289198875427246
+wikitext2 perplexity: 6.44
+c4 perplexity: 9.29
+Evaluating on tasks: ['piqa', 'arc_easy', 'arc_challenge', 'hellaswag', 'winogrande']
+|    Tasks    |Version|Filter|n-shot| Metric |   |Value |   |Stderr|
+|-------------|------:|------|-----:|--------|---|-----:|---|-----:|
+|arc_challenge|      1|none  |     0|acc     |↑  |0.4915|±  |0.0146|
+|             |       |none  |     0|acc_norm|↑  |0.5213|±  |0.0146|
+|arc_easy     |      1|none  |     0|acc     |↑  |0.7988|±  |0.0082|
+|             |       |none  |     0|acc_norm|↑  |0.7790|±  |0.0085|
+|hellaswag    |      1|none  |     0|acc     |↑  |0.5943|±  |0.0049|
+|             |       |none  |     0|acc_norm|↑  |0.7820|±  |0.0041|
+|piqa         |      1|none  |     0|acc     |↑  |0.7954|±  |0.0094|
+|             |       |none  |     0|acc_norm|↑  |0.8118|±  |0.0091|
+|winogrande   |      1|none  |     0|acc     |↑  |0.7427|±  |0.0123|
+
+Average Acc: 68.45%
+
+[32mINFO[0m  ENV: Auto setting PYTORCH_CUDA_ALLOC_CONF='expandable_segments:True' for memory saving.
+[32mINFO[0m  ENV: Auto setting CUDA_DEVICE_ORDER=PCI_BUS_ID for correctness.          
+AMP enabled: True
+Loading quantized model from /home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/EfficientQAT/w2g128interativeFreezing
+Loading pre-computed quantized weights...
+Loading pre-computed quantized weights Successfully
+Loading Wikitext-2 dataset...
+
+[32mINFO[0m  ENV: Auto setting PYTORCH_CUDA_ALLOC_CONF='expandable_segments:True' for memory saving.
+[32mINFO[0m  ENV: Auto setting CUDA_DEVICE_ORDER=PCI_BUS_ID for correctness.          
+AMP enabled: True
+Loading quantized model from /home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/EfficientQAT/progq2bit_cali_w2
+Loading pre-computed quantized weights...
+Loading pre-computed quantized weights Successfully
+Loading Wikitext-2 dataset...
+wikitext2: 6.857116222381592
+get_c4
+c4: 10.413562774658203
+wikitext2 perplexity: 6.86
+c4 perplexity: 10.41
+Evaluating on tasks: ['piqa', 'arc_easy', 'arc_challenge', 'hellaswag', 'winogrande']
+|    Tasks    |Version|Filter|n-shot| Metric |   |Value |   |Stderr|
+|-------------|------:|------|-----:|--------|---|-----:|---|-----:|
+|arc_challenge|      1|none  |     0|acc     |↑  |0.3532|±  |0.0140|
+|             |       |none  |     0|acc_norm|↑  |0.3532|±  |0.0140|
+|arc_easy     |      1|none  |     0|acc     |↑  |0.6886|±  |0.0095|
+|             |       |none  |     0|acc_norm|↑  |0.6503|±  |0.0098|
+|hellaswag    |      1|none  |     0|acc     |↑  |0.4812|±  |0.0050|
+|             |       |none  |     0|acc_norm|↑  |0.6451|±  |0.0048|
+|piqa         |      1|none  |     0|acc     |↑  |0.7252|±  |0.0104|
+|             |       |none  |     0|acc_norm|↑  |0.7361|±  |0.0103|
+|winogrande   |      1|none  |     0|acc     |↑  |0.6338|±  |0.0135|
+
+Average Acc: 57.64%
+Loading quantized model from /home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/EfficientQAT/w2g128gradualfactor2
+Loading pre-computed quantized weights...
+Loading pre-computed quantized weights Successfully
+Loading Wikitext-2 dataset...
+wikitext2: 8.168696403503418
+get_c4
+c4: 9.918495178222656
+wikitext2 perplexity: 8.17
+c4 perplexity: 9.92
+Evaluating on tasks: ['piqa', 'arc_easy', 'arc_challenge', 'hellaswag', 'winogrande']
+|    Tasks    |Version|Filter|n-shot| Metric |   |Value |   |Stderr|
+|-------------|------:|------|-----:|--------|---|-----:|---|-----:|
+|arc_challenge|      1|none  |     0|acc     |↑  |0.3404|±  |0.0138|
+|             |       |none  |     0|acc_norm|↑  |0.3669|±  |0.0141|
+|arc_easy     |      1|none  |     0|acc     |↑  |0.6944|±  |0.0095|
+|             |       |none  |     0|acc_norm|↑  |0.6494|±  |0.0098|
+|hellaswag    |      1|none  |     0|acc     |↑  |0.4875|±  |0.0050|
+|             |       |none  |     0|acc_norm|↑  |0.6393|±  |0.0048|
+|piqa         |      1|none  |     0|acc     |↑  |0.7345|±  |0.0103|
+|             |       |none  |     0|acc_norm|↑  |0.7361|±  |0.0103|
+|winogrande   |      1|none  |     0|acc     |↑  |0.6369|±  |0.0135|
+
+Average Acc: 57.88%
+Loading quantized model from /home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/EfficientQAT/w2g128interativeFreezing
+Loading pre-computed quantized weights...
+Loading pre-computed quantized weights Successfully
+Loading Wikitext-2 dataset...
+wikitext2: 8.073007583618164
+get_c4
+c4: 9.8153076171875
+wikitext2 perplexity: 8.07
+c4 perplexity: 9.82
+Evaluating on tasks: ['piqa', 'arc_easy', 'arc_challenge', 'hellaswag', 'winogrande']
+|    Tasks    |Version|Filter|n-shot| Metric |   |Value |   |Stderr|
+|-------------|------:|------|-----:|--------|---|-----:|---|-----:|
+|arc_challenge|      1|none  |     0|acc     |↑  |0.3515|±  |0.0140|
+|             |       |none  |     0|acc_norm|↑  |0.3660|±  |0.0141|
+|arc_easy     |      1|none  |     0|acc     |↑  |0.7125|±  |0.0093|
+|             |       |none  |     0|acc_norm|↑  |0.6545|±  |0.0098|
+|hellaswag    |      1|none  |     0|acc     |↑  |0.4850|±  |0.0050|
+|             |       |none  |     0|acc_norm|↑  |0.6417|±  |0.0048|
+|piqa         |      1|none  |     0|acc     |↑  |0.7378|±  |0.0103|
+|             |       |none  |     0|acc_norm|↑  |0.7448|±  |0.0102|
+|winogrande   |      1|none  |     0|acc     |↑  |0.6369|±  |0.0135|
+
+Average Acc: 58.47%
+
+[32mINFO[0m  ENV: Auto setting PYTORCH_CUDA_ALLOC_CONF='expandable_segments:True' for memory saving.
+[32mINFO[0m  ENV: Auto setting CUDA_DEVICE_ORDER=PCI_BUS_ID for correctness.          
+AMP enabled: True
+
+[32mINFO[0m  ENV: Auto setting PYTORCH_CUDA_ALLOC_CONF='expandable_segments:True' for memory saving.
+[32mINFO[0m  ENV: Auto setting CUDA_DEVICE_ORDER=PCI_BUS_ID for correctness.          
+AMP enabled: True
+Loading quantized model from /home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/EfficientQAT/iterative_freezingw4bit
+Loading pre-computed quantized weights...
+Loading pre-computed quantized weights Successfully
+Loading Wikitext-2 dataset...
+wikitext2: 5.59516716003418
+get_c4
+c4: 7.076791286468506
+wikitext2 perplexity: 5.60
+c4 perplexity: 7.08
+Evaluating on tasks: ['piqa', 'arc_easy', 'arc_challenge', 'hellaswag', 'winogrande']
+|    Tasks    |Version|Filter|n-shot| Metric |   |Value |   |Stderr|
+|-------------|------:|------|-----:|--------|---|-----:|---|-----:|
+|arc_challenge|      1|none  |     0|acc     |↑  |0.4266|±  |0.0145|
+|             |       |none  |     0|acc_norm|↑  |0.4514|±  |0.0145|
+|arc_easy     |      1|none  |     0|acc     |↑  |0.7630|±  |0.0087|
+|             |       |none  |     0|acc_norm|↑  |0.7412|±  |0.0090|
+|hellaswag    |      1|none  |     0|acc     |↑  |0.5670|±  |0.0049|
+|             |       |none  |     0|acc_norm|↑  |0.7521|±  |0.0043|
+|piqa         |      1|none  |     0|acc     |↑  |0.7742|±  |0.0098|
+|             |       |none  |     0|acc_norm|↑  |0.7884|±  |0.0095|
+|winogrande   |      1|none  |     0|acc     |↑  |0.6811|±  |0.0131|
+
+Average Acc: 64.24%

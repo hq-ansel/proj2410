@@ -50,7 +50,10 @@ quant_path_list = [
     # "/home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/EfficientQAT/progq2bit_cali_w2",
     # "/home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/EfficientQAT/w2g128gradualfactor2",
     # "/home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/EfficientQAT/w2g128interativeFreezing"
-    "/home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/EfficientQAT/iterative_freezingw4bit",
+    # "/home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/EfficientQAT/iterative_freezingw4bit",
+    # "/home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/EfficientQAT/progq-train512w2",
+    # "/home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/EfficientQAT/progq-train2048w2",
+    "/home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/EfficientQAT/progqw2bit_cali_c4",
 ]
 # CUDA_VISIBLE_DEVICES=2 python -m test.eval_batch
 # CUDA_VISIBLE_DEVICES=0,1,2,3  python -m test.eval_batch > exp.logs
@@ -85,7 +88,7 @@ for quant_path in quant_path_list:
     args["train_param_settings"]["seed"] = 42
     args["train_param_settings"]["eval_tasks"]="piqa,arc_easy,arc_challenge,hellaswag,winogrande"
     # args.eval_tasks="xsum,cnn_dailymail,openbookqa,copa,mathqa,rte"
-    args.eval_batch_size=8
+    args.eval_batch_size=16
     args.training_seqlen = 2048
     evaluate(quant_model,tokenizer,args)
     torch.cuda.synchronize()

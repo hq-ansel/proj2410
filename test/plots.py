@@ -11,10 +11,10 @@ def set_aaai_style():
     plt.rcParams['font.serif'] = ['Times New Roman'] + plt.rcParams['font.serif']
     plt.rcParams['font.size'] = 10
     plt.rcParams['axes.titlesize'] = 10
-    plt.rcParams['axes.labelsize'] = 9
-    plt.rcParams['xtick.labelsize'] = 9
-    plt.rcParams['ytick.labelsize'] = 9
-    plt.rcParams['legend.fontsize'] = 9
+    plt.rcParams['axes.labelsize'] = 10
+    plt.rcParams['xtick.labelsize'] = 10
+    plt.rcParams['ytick.labelsize'] = 10
+    plt.rcParams['legend.fontsize'] = 10
     plt.rcParams['axes.titleweight'] = 'normal'
     plt.rcParams['font.style'] = 'normal'
     
@@ -136,7 +136,7 @@ def main(args):
         w2_loss_path=args.w2_loss_path,
         args=args
     )
-
+# python -m test.plots
 if __name__ == '__main__':
     args = args_parser()
     main(args)

@@ -40,7 +40,7 @@ def run_command(cmd):
 
 
 def main() -> None:
-    batchsize = 1
+    batchsize = 2
     config_files: List[str] = glob.glob('yaml/generate/*.yaml')
     config_files.sort()
     

@@ -1,6 +1,6 @@
 cluster_settings:
   cuda_ids:
-  - 1
+  - 2
 model_settings:
   net: Llama2-7b
   model: /home/ubuntu/data/exp/proj2410/model/Llama2-7b
@@ -23,10 +23,10 @@ train_param_settings:
   real_quant: true
   resume_quant: None
   calib_dataset: redpajama
-  train_size: 2048
+  train_size: 4096
   val_size: 64
   training_seqlen: 2048
-  batch_size: 8
+  batch_size: 2
   epochs: 2
   ppl_seqlen: 2048
   seed: 42
@@ -34,7 +34,7 @@ train_param_settings:
   eval_tasks: piqa
   eval_batch_size: 16
   quant_lr: 0.0001
-  weight_lr: 8.0e-05
+  weight_lr: 2.0e-05
   clip_grad: 1
   wd: 0
   max_memory: 70GiB
@@ -48,6 +48,6 @@ train_param_settings:
   with_catcher: false
   quant_method: block_ap
 method: gradualquant
-save_dir: /home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/EfficientQAT/progq-train2048/
-output_dir: /home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/EfficientQAT/progq-train2048/
-log_loss: /home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/EfficientQAT/progq-train2048/loss.csv
+save_dir: /home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/EfficientQAT/w2g128gradual
+output_dir: /home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/EfficientQAT/w2g128gradual
+log_loss: /home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/EfficientQAT/w2g128gradualloss.csv

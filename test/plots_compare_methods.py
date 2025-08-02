@@ -11,10 +11,10 @@ def set_aaai_style():
     plt.rcParams['font.serif'] = ['Times New Roman'] + plt.rcParams['font.serif']
     plt.rcParams['font.size'] = 10
     plt.rcParams['axes.titlesize'] = 10
-    plt.rcParams['axes.labelsize'] = 9
-    plt.rcParams['xtick.labelsize'] = 9
-    plt.rcParams['ytick.labelsize'] = 9
-    plt.rcParams['legend.fontsize'] = 9
+    plt.rcParams['axes.labelsize'] = 10
+    plt.rcParams['xtick.labelsize'] = 10
+    plt.rcParams['ytick.labelsize'] = 10
+    plt.rcParams['legend.fontsize'] = 10
     plt.rcParams['axes.titleweight'] = 'normal'
     plt.rcParams['font.style'] = 'normal'
     
@@ -104,7 +104,7 @@ def plot_bit_comparison(w4_loss_path, w2_loss_path, args):
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(6, 3))
     
     # 直接使用 CMYK 颜色
-    ax1.plot(steps, w4_avg, label='PQ Average Loss', linewidth=2, 
+    ax1.plot(steps, w4_avg, label='ProgQ Average Loss', linewidth=2, 
              color="#FF4D00")  # 青色
     ax1.set_title('Progressive Quantization Training')
     ax1.set_xlabel('Steps')

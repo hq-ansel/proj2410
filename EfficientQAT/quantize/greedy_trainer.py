@@ -11,6 +11,7 @@ from contextlib import contextmanager
 from typing import List, Tuple, Dict, Union, Callable, Any
 from concurrent.futures import ThreadPoolExecutor
 from tqdm import tqdm
+import json
 
 import numpy as np
 import torch
@@ -35,6 +36,24 @@ from .utils import (
     )
 from ..datautils_block import BlockTrainDataset,OptimBlockTrainDataset,LazyLoadDataset,generate_block_train_data,LazyLoadDatasetV2
 from ..loss_utils import get_loss_func
+
+# 添加对新可视化模块的导入
+try:
+    from .visualization import VisualizationRecorder
+    VISUALIZATION_AVAILABLE = True
+except ImportError:
+    VisualizationRecorder = None
+    VISUALIZATION_AVAILABLE = False
+
+# 添加对调试工具的导入
+try:
+    from .debug_utils import check_loss_anomaly, save_debug_info, collect_gradients, debug_model_state, print_tensor_anomalies
+    DEBUG_UTILS_AVAILABLE = True
+    # 检查是否启用了调试模式
+    QAT_DEBUG = os.environ.get('QAT_DEBUG', '').lower() in ('1', 'true', 'yes')
+except ImportError:
+    DEBUG_UTILS_AVAILABLE = False
+    QAT_DEBUG = False
 
 from torch.optim.lr_scheduler import CosineAnnealingLR
 
@@ -137,8 +156,9 @@ def train_units_layers(model: PreTrainedModel,
                         attention_mask: torch.Tensor,
                         position_embeddings: Tuple[torch.Tensor,torch.Tensor],
                         loss_recorder,
-                        logger,
-                        config: Dict[str, Any]):
+                        vis_recorder=None,  # 添加可视化记录器参数
+                        logger=None,
+                        config: Dict[str, Any]=None):
     train_params = config.get('train_param_settings', {})
     hyper_params = config.get('hyperparam_settings', {})
 
@@ -337,10 +357,66 @@ def train_units_layers(model: PreTrainedModel,
                     logger.info("Loss is NAN, stopping training")
                     # pdb.set_trace()
                 loss_cpu = loss.data.cpu()
+                
+                # 检查loss异常，仅在QAT_DEBUG环境变量开启时启用
+                if QAT_DEBUG and DEBUG_UTILS_AVAILABLE:
+                    loss_threshold = float(config.get('debug_loss_threshold', 1000.0))
+                    if check_loss_anomaly(loss_cpu, threshold=loss_threshold):
+                        logger.warning(f"Abnormal loss detected: {loss_cpu.item()} at step {step}, epoch {epoch}")
+                        logger.warning(f"Trainable layers: {trainable_layer_idx_list}")
+                        
+                        # 保存调试信息
+                        debug_save_dir = os.path.join(config.get('output_dir', './'), 
+                                                    f"debug_loss_anomaly_blk{trainable_layer_idx_list}_step{step}_epoch{epoch}")
+                        
+                        # 准备调试信息
+                        debug_inputs = {
+                            "input": inp.detach().cpu() if isinstance(inp, torch.Tensor) else inp,
+                            "target": trg.detach().cpu() if isinstance(trg, torch.Tensor) else trg,
+                            "attention_mask": attention_mask.detach().cpu() if isinstance(attention_mask, torch.Tensor) else attention_mask,
+                            "position_ids": position_ids.detach().cpu() if isinstance(position_ids, torch.Tensor) else position_ids
+                        }
+                        
+                        debug_outputs = {
+                            "hidden_state": hidden_state.detach().cpu() if isinstance(hidden_state, torch.Tensor) else hidden_state,
+                            "layer_outputs": layer_outputs
+                        }
+                        
+                        try:
+                            debug_model_state(
+                                model=selected_layers,
+                                inputs=debug_inputs,
+                                outputs=debug_outputs,
+                                loss=loss,
+                                save_dir=debug_save_dir
+                            )
+                            logger.info(f"Debug information saved to {debug_save_dir}")
+                        except Exception as e:
+                            logger.error(f"Failed to save debug information: {e}")
+                        
+                        # 打印张量异常信息
+                        print_tensor_anomalies(inp, "input", loss_threshold)
+                        print_tensor_anomalies(hidden_state, "hidden_state", loss_threshold)
+                        print_tensor_anomalies(trg, "target", loss_threshold)
+                        
+                        # 如果设置了在检测到异常时停止训练
+                        if config.get('debug_stop_on_anomaly', False):
+                            logger.error("Stopping training due to loss anomaly")
+                            raise RuntimeError(f"Loss anomaly detected: {loss_cpu.item()}")
+                    
                 if config.get("log_loss"):
                     loss_recorder.record(f"blk{trainable_layer_idx_list}",
                                         step,
                                         loss_cpu.item())
+                    
+                # 记录训练损失到可视化工具
+                if vis_recorder is not None:
+                    vis_recorder.record_loss(
+                        blk_id=f"blk{trainable_layer_idx_list}",
+                        step=step,
+                        loss=loss_cpu.item(),
+                        loss_type="train_loss"
+                    )
                     
                 if hyper_params.get("gradual_quant",False):
                     graualWarmupScheduler.update() 
@@ -427,6 +503,32 @@ def train_units_layers(model: PreTrainedModel,
                 logger.info(f"blocks {trainable_layer_idx_list} epoch {epoch} recon_loss:{loss_mean} val_loss:{val_loss_mean} ")
                 logger.info(f"quant_lr:{quant_scheduler.get_lr()[0]} weight_lr:{weight_scheduler.get_lr()[0]} norm:{norm_mean:.8f}  ")
                 logger.info(f"max memory_allocated {torch.cuda.max_memory_allocated(train_params['dev']) / 1024**2} time {time.time()-start_time} ")
+                
+                # 记录验证损失到可视化工具
+                if vis_recorder is not None:
+                    vis_recorder.record_loss(
+                        blk_id=f"blk{trainable_layer_idx_list}",
+                        step=epoch,
+                        loss=val_loss_mean.item(),
+                        loss_type="val_loss"
+                    )
+                    # 同时记录学习率
+                    vis_recorder.record_scalar(
+                        name=f"learning_rate/quant_lr_blk{trainable_layer_idx_list}",
+                        value=quant_scheduler.get_lr()[0],
+                        step=epoch
+                    )
+                    vis_recorder.record_scalar(
+                        name=f"learning_rate/weight_lr_blk{trainable_layer_idx_list}",
+                        value=weight_scheduler.get_lr()[0],
+                        step=epoch
+                    )
+                    vis_recorder.record_scalar(
+                        name=f"gradient_norm/blk{trainable_layer_idx_list}",
+                        value=norm_mean.item(),
+                        step=epoch
+                    )
+                
                 if val_loss_mean < best_val_loss:
                     best_val_loss = val_loss_mean
                 else:
@@ -450,8 +552,9 @@ def train_units_layers_with_catcher(model: PreTrainedModel,
                         val_dataset: LazyLoadDataset,
                         target_model: PreTrainedModel,
                         loss_recorder,
-                        logger,
-                        config: Dict[str, Any]):
+                        vis_recorder=None,  # 添加可视化记录器参数
+                        logger=None,
+                        config: Dict[str, Any]=None):
     # 解冻当前层，并冻结其它层
     train_params = config.get('train_param_settings', {})
     hyper_params = config.get('hyperparam_settings', {})
@@ -631,10 +734,65 @@ def train_units_layers_with_catcher(model: PreTrainedModel,
                 if not math.isfinite(loss.item()) or loss.item()==0:
                     logger.info("Loss is NAN, stopping training")
                     pdb.set_trace()
+                
+                # 检查loss异常，仅在QAT_DEBUG环境变量开启时启用
+                if QAT_DEBUG and DEBUG_UTILS_AVAILABLE:
+                    loss_threshold = float(config.get('debug_loss_threshold', 1000.0))
+                    if check_loss_anomaly(loss, threshold=loss_threshold):
+                        logger.warning(f"Abnormal loss detected: {loss.item()} at step {step}, epoch {epoch}")
+                        logger.warning(f"Trainable layers: {trainable_layer_idx_list}")
+                        
+                        # 保存调试信息
+                        debug_save_dir = os.path.join(config.get('output_dir', './'), 
+                                                    f"debug_loss_anomaly_blk{trainable_layer_idx_list}_step{step}_epoch{epoch}")
+                        
+                        # 准备调试信息
+                        debug_inputs = {
+                            "input": inp.detach().cpu() if isinstance(inp, torch.Tensor) else inp,
+                            "output": output.detach().cpu() if isinstance(output, torch.Tensor) else output,
+                            "target_output": target_output.detach().cpu() if isinstance(target_output, torch.Tensor) else target_output
+                        }
+                        
+                        debug_outputs = {
+                            "loss": loss.detach().cpu() if isinstance(loss, torch.Tensor) else loss
+                        }
+                        
+                        try:
+                            debug_model_state(
+                                model=selected_layers,
+                                inputs=debug_inputs,
+                                outputs=debug_outputs,
+                                loss=loss,
+                                save_dir=debug_save_dir
+                            )
+                            logger.info(f"Debug information saved to {debug_save_dir}")
+                        except Exception as e:
+                            logger.error(f"Failed to save debug information: {e}")
+                        
+                        # 打印张量异常信息
+                        print_tensor_anomalies(inp, "input", loss_threshold)
+                        print_tensor_anomalies(output, "output", loss_threshold)
+                        print_tensor_anomalies(target_output, "target_output", loss_threshold)
+                        
+                        # 如果设置了在检测到异常时停止训练
+                        if config.get('debug_stop_on_anomaly', False):
+                            logger.error("Stopping training due to loss anomaly")
+                            raise RuntimeError(f"Loss anomaly detected: {loss.item()}")
+                
                 if config.get("log_loss"):
                     loss_recorder.record(f"blk{trainable_layer_idx_list}",
                                         step,
                                         loss.data.cpu().item())
+                
+                # 记录训练损失到可视化工具
+                if vis_recorder is not None:
+                    vis_recorder.record_loss(
+                        blk_id=f"blk{trainable_layer_idx_list}",
+                        step=step,
+                        loss=loss.data.cpu().item(),
+                        loss_type="train_loss"
+                    )
+                    
                 graualWarmupScheduler.update() if hyper_params.get("gradual_quant",False) else None
                 loss_list.append(loss.data.cpu())
                 # 反向传播和优化
@@ -719,6 +877,32 @@ def train_units_layers_with_catcher(model: PreTrainedModel,
             val_loss_mean = torch.stack(val_loss_list).mean()
             norm_mean = torch.stack(norm_list).mean()
             logger.info(f"blocks {trainable_layer_idx_list} epoch {epoch} recon_loss:{loss_mean} val_loss:{val_loss_mean} quant_lr:{quant_scheduler.get_lr()[0]} norm:{norm_mean:.8f} max memory_allocated {torch.cuda.max_memory_allocated(train_params['dev']) / 1024**2} time {time.time()-start_time} ")
+            
+            # 记录验证损失到可视化工具
+            if vis_recorder is not None:
+                vis_recorder.record_loss(
+                    blk_id=f"blk{trainable_layer_idx_list}",
+                    step=epoch,
+                    loss=val_loss_mean.item(),
+                    loss_type="val_loss"
+                )
+                # 同时记录学习率
+                vis_recorder.record_scalar(
+                    name=f"learning_rate/quant_lr_blk{trainable_layer_idx_list}",
+                    value=quant_scheduler.get_lr()[0],
+                    step=epoch
+                )
+                vis_recorder.record_scalar(
+                    name=f"learning_rate/weight_lr_blk{trainable_layer_idx_list}",
+                    value=weight_scheduler.get_lr()[0],
+                    step=epoch
+                )
+                vis_recorder.record_scalar(
+                    name=f"gradient_norm/blk{trainable_layer_idx_list}",
+                    value=norm_mean.item(),
+                    step=epoch
+                )
+            
             if val_loss_mean < best_val_loss:
                 best_val_loss = val_loss_mean
             else:
@@ -732,8 +916,6 @@ def train_units_layers_with_catcher(model: PreTrainedModel,
         # step 7: pack quantized weights into low-bits format, note that this process is slow on poor CPU or busy CPU
         
     torch.cuda.empty_cache()
-
-
 
 
 def trans_quant_block(qlayer:nn.Module,hyper_params):
@@ -787,6 +969,26 @@ def custom_shedule_train(model:PreTrainedModel,
     loss_func = get_loss_func(train_params['loss_func'])
     loss_recorder = utils.BlockLossRecorder(file_path=config['log_loss'],)
     
+    # 初始化可视化记录器
+    vis_recorder = None
+    if VISUALIZATION_AVAILABLE and config.get('enable_visualization', False):
+        vis_type = config.get('visualization_type', 'tensorboard')  # 'tensorboard' 或 'wandb'
+        if vis_type == 'tensorboard':
+            log_dir = config.get('tensorboard_log_dir', './tensorboard_logs')
+            vis_recorder = VisualizationRecorder(
+                visualization_type='tensorboard',
+                log_dir=log_dir,
+                experiment_name=config.get('experiment_name', 'efficientqat')
+            )
+        elif vis_type == 'wandb':
+            project_name = config.get('wandb_project', 'efficientqat')
+            experiment_name = config.get('experiment_name', 'experiment')
+            vis_recorder = VisualizationRecorder(
+                visualization_type='wandb',
+                project_name=project_name,
+                experiment_name=experiment_name
+            )
+    
     for train_layer_window in shedule_list:
         if not train_params.get("quant_shedule_type") == "full" :
             for layer_idx in train_layer_window:
@@ -819,6 +1021,7 @@ def custom_shedule_train(model:PreTrainedModel,
                             attention_mask=attention_mask,
                             position_embeddings=position_embeddings,
                             loss_recorder=loss_recorder,
+                            vis_recorder=vis_recorder,  # 传递可视化记录器
                             logger=logger,
                             config=config)
                 else: 
@@ -829,6 +1032,7 @@ def custom_shedule_train(model:PreTrainedModel,
                         val_dataset=val_dataset,
                         target_model=target_model,
                         loss_recorder=loss_recorder,
+                        vis_recorder=vis_recorder,  # 传递可视化记录器
                         logger=logger,
                         config=config)
             selected_layers= nn.ModuleList([model.model.layers[i] for i in train_layer_window])
@@ -947,6 +1151,11 @@ def custom_shedule_train(model:PreTrainedModel,
             # 保存模型
     if train_params.get("log_loss"):
         loss_recorder.save_to_file()
+    
+    # 关闭可视化记录器
+    if vis_recorder is not None:
+        vis_recorder.close()
+        
     torch.cuda.empty_cache()
     gc.collect()
 

@@ -355,3 +355,54 @@ Evaluating on tasks: ['piqa', 'arc_easy', 'arc_challenge', 'hellaswag', 'winogra
 |winogrande   |      1|none  |     0|acc     |↑  |0.6496|±  |0.0134|
 
 Average Acc: 58.77%
+
+[32mINFO[0m  ENV: Auto setting PYTORCH_CUDA_ALLOC_CONF='expandable_segments:True' for memory saving.
+[32mINFO[0m  ENV: Auto setting CUDA_DEVICE_ORDER=PCI_BUS_ID for correctness.          
+AMP enabled: True
+Loading quantized model from /home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/EfficientQAT/w2g128gradual
+Loading pre-computed quantized weights...
+Loading pre-computed quantized weights Successfully
+Loading Wikitext-2 dataset...
+wikitext2: 7.9893798828125
+get_c4
+
+[32mINFO[0m  ENV: Auto setting PYTORCH_CUDA_ALLOC_CONF='expandable_segments:True' for memory saving.
+[32mINFO[0m  ENV: Auto setting CUDA_DEVICE_ORDER=PCI_BUS_ID for correctness.          
+AMP enabled: True
+Loading quantized model from /home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/EfficientQAT/w2g128gradual
+Loading pre-computed quantized weights...
+Loading pre-computed quantized weights Successfully
+Loading Wikitext-2 dataset...
+wikitext2: 7.9893798828125
+get_c4
+c4: 9.811264991760254
+wikitext2 perplexity: 7.99
+c4 perplexity: 9.81
+Evaluating on tasks: ['piqa', 'arc_easy', 'arc_challenge', 'hellaswag', 'winogrande']
+
+[32mINFO[0m  ENV: Auto setting PYTORCH_CUDA_ALLOC_CONF='expandable_segments:True' for memory saving.
+[32mINFO[0m  ENV: Auto setting CUDA_DEVICE_ORDER=PCI_BUS_ID for correctness.          
+AMP enabled: True
+Loading quantized model from /home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/EfficientQAT/w2g128gradual
+Loading pre-computed quantized weights...
+Loading pre-computed quantized weights Successfully
+Loading Wikitext-2 dataset...
+wikitext2: 7.9893798828125
+get_c4
+c4: 9.811264991760254
+wikitext2 perplexity: 7.99
+c4 perplexity: 9.81
+Evaluating on tasks: ['piqa', 'arc_easy', 'arc_challenge', 'hellaswag', 'winogrande']
+|    Tasks    |Version|Filter|n-shot| Metric |   |Value |   |Stderr|
+|-------------|------:|------|-----:|--------|---|-----:|---|-----:|
+|arc_challenge|      1|none  |     0|acc     |↑  |0.3430|±  |0.0139|
+|             |       |none  |     0|acc_norm|↑  |0.3669|±  |0.0141|
+|arc_easy     |      1|none  |     0|acc     |↑  |0.6961|±  |0.0094|
+|             |       |none  |     0|acc_norm|↑  |0.6566|±  |0.0097|
+|hellaswag    |      1|none  |     0|acc     |↑  |0.4897|±  |0.0050|
+|             |       |none  |     0|acc_norm|↑  |0.6441|±  |0.0048|
+|piqa         |      1|none  |     0|acc     |↑  |0.7301|±  |0.0104|
+|             |       |none  |     0|acc_norm|↑  |0.7394|±  |0.0102|
+|winogrande   |      1|none  |     0|acc     |↑  |0.6401|±  |0.0135|
+
+Average Acc: 57.98%

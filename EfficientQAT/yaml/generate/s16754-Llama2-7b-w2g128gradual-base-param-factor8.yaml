@@ -1,12 +1,12 @@
 cluster_settings:
   cuda_ids:
-  - 3
-
-  net: Llama3-8b
-  model: /home/ubuntu/data/exp/proj2410/model/Llama3-8B
-  save_parent_dir: /home/ubuntu/data/exp/proj2410/quant_model/Llama3-8B
+  - 2
+model_settings:
+  net: Llama2-7b
+  model: /home/ubuntu/data/exp/proj2410/model/Llama2-7b
+  save_parent_dir: /home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B
 hyperparam_settings:
-  wbits: 4
+  wbits: 2
   group_size: 128
   method_name: gradualquant
   min_lr_factor: 20
@@ -15,10 +15,7 @@ hyperparam_settings:
   crossblock_window_size: 1
   slide_step: 1
   gradual_quant: True
-  gradual_factor: 4.0
-  iterative_freezing: true
-  freeze_momentum: 0.004
-  freeze_threshold: 0.2
+  gradual_factor: 8.0
 train_param_settings:
   cache_dir: /home/ubuntu/data/exp/proj2410/cache
   output_dir: ./log/
@@ -51,6 +48,6 @@ train_param_settings:
   with_catcher: false
   quant_method: block_ap
 method: gradualquant
-save_dir: /home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/EfficientQAT/w4g128gradual-iterative
-output_dir: /home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/EfficientQAT/w4g128gradual-iterative
-log_loss: /home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/EfficientQAT/w4g128gradual-iterativeloss.csv
+save_dir: /home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/EfficientQAT/w2g128gradual
+output_dir: /home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/EfficientQAT/w2g128gradual
+log_loss: /home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/EfficientQAT/w2g128gradualloss.csv

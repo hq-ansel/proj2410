@@ -88,4 +88,5 @@ Last updated: 2025-02-14
 
 **Status**
 - ✅ Base runner + hook set landed in `EfficientQAT/core/pipeline/`.
-- ⏩ Next: pilot integration for the block pipelines, extracting shared strategies (dataset prep, block scheduling, loss/eval, export) into reusable hooks before rolling out to greedy/GPTQ flows.
+- ✅ `quantize/block_ap.py` now uses `PipelineRunner`, encapsulating setup/data-prep/scheduling/training/export via hook methods.
+- ⏩ Next: adapt `block_ap_explore.py` (and later `crossblockquant.py`) to reuse the same pipeline hooks, then promote shared strategies into a reusable block-pipeline module before rolling out to greedy/GPTQ flows.

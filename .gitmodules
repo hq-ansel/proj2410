@@ -4,3 +4,12 @@
 [submodule "opponent/GPTQModel"]
 	path = opponent/GPTQModel
 	url = https://github.com/ModelCloud/GPTQModel.git
+[submodule "opponent/AQLM"]
+	path = opponent/AQLM
+	url = https://github.com/Vahe1994/AQLM.git
+[submodule "opponent/qtip"]
+	path = opponent/qtip
+	url = https://github.com/Cornell-RelaxML/qtip.git
+[submodule "opponent/VPTQ"]
+	path = opponent/VPTQ
+	url = https://github.com/microsoft/VPTQ.git

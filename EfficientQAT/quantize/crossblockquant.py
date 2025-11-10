@@ -18,7 +18,12 @@ from transformers import PreTrainedModel
 import logging
 
 from .. import utils
-from . import int_linear_fake, int_linear_real
+from EfficientQAT.core.quantization import (
+    build_real_quant_linear,
+    export_scale_tensor,
+    export_zero_tensor,
+)
+from . import int_linear_fake
 from .utils import (
     quant_parameters,weight_parameters,trainable_parameters,
     set_quant_state,quant_inplace,set_quant_parameters,
@@ -392,17 +397,26 @@ def cross_block_quantization(
             for qlayer in qlayers[start_idx:start_idx+slide_step]:
                 named_linears = get_named_linears(qlayer, int_linear_fake.QuantLinear)
                 for name, module in named_linears.items():
-                    scales = module.weight_quantizer.scale.clamp(1e-4,1e4).detach()
-                    zeros = module.weight_quantizer.zero_point.detach().cuda().round().cpu()
+                    quantizer_version = getattr(module, "quantizer_version", getattr(args, "quantizer_version", "v1"))
+                    scales = export_scale_tensor(module.weight_quantizer)
+                    zeros = export_zero_tensor(module.weight_quantizer, quantizer_version)
                     group_size = module.weight_quantizer.group_size
                     dim0 = module.weight.shape[0]
                     scales = scales.view(dim0,-1).transpose(0,1).contiguous()
                     zeros = zeros.view(dim0,-1).transpose(0,1).contiguous()
-                    q_linear = int_linear_real.QuantLinear(args.wbits, group_size, module.in_features,module.out_features,not module.bias is None)
-                    q_linear.pack(module.cpu(),  scales.float().cpu(), zeros.float().cpu())
-                    set_op_by_name(qlayer, name, q_linear)       
+                    q_linear = build_real_quant_linear(
+                        version=quantizer_version,
+                        wbits=args.wbits,
+                        group_size=group_size,
+                        in_features=module.in_features,
+                        out_features=module.out_features,
+                        bias=module.bias is not None,
+                        clamp_input=getattr(args, "clamp_input", False),
+                    )
+                    q_linear.pack(module.cpu(),  scales.float(), zeros.float())
+                    set_op_by_name(qlayer, name, q_linear)
                     logger.info(f"pack quantized {name} finished")
-                    del module        
+                    del module
         del ori_layers
         torch.cuda.empty_cache()
 
@@ -418,4 +432,3 @@ def cross_block_quantization(
     gc.collect()                    
     model.config.use_cache = use_cache
     return model
-

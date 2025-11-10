@@ -59,6 +59,7 @@ Last updated: 2025-02-14
 
 1. ✅ Extract the sampler primitives into `EfficientQAT/core/sampling.py`, add a `SamplerPipeline` class, and update `data_sampler.py` to rely on it (keeps CLI thin, improves readability, and shares logic).
 2. ✅ Introduce a reusable quantizer registry/factory so modules no longer replicate the `quantizer_version` selection logic.
-3. Replace bespoke packing/export logic in training scripts with shared helpers:
+3. ✅ Replace bespoke packing/export logic in training scripts with shared helpers:
    - Provide utilities for exporting scales/zero-points and instantiating the correct real-quant `QuantLinear`.
    - Update `greedy_trainer.py`, `greedy_trainer_distribute.py`, and future pipelines to consume those helpers.
+4. Adopt the shared quantizer packing helpers in the remaining pipelines (`block_ap*.py`, `crossblockquant.py`, etc.) and then tackle dataset builders so they rely on the central `SamplerPipeline`.

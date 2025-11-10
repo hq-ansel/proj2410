@@ -2,6 +2,20 @@
 
 Last updated: 2025-02-14
 
+## Current Focus & Status (reverse chronology)
+
+1. **Pipeline orchestration (in progress)**  
+   - `EfficientQAT/core/pipeline` now hosts `PipelineRunner`/hooks.  
+   - `quantize/block_ap.py` has been ported to the runner; `block_ap_explore` → `crossblockquant` are next.  
+   - Goal: move shared block hooks into a reusable module, then expand to greedy/GPTQ flows.
+2. **Quantizer export consolidation (done)**  
+   - Shared helpers for scales/zeros/real-quant modules live in `core/quantization.py`.  
+   - All block/greedy scripts now call the same packing logic.
+3. **Sampling abstraction (done)**  
+   - `core/sampling.py` exposes `SamplerPipeline`, and `data_sampler.py` is a thin CLI wrapper.
+
+*(Detailed component map and historical milestones continue below for context.)*
+
 ## 1. Component Map
 
 ### 1.1 Data & Sampling
@@ -55,14 +69,17 @@ Last updated: 2025-02-14
    - Move shared sampling utilities into `EfficientQAT/core/sampling.py`.
    - Subsequent steps can apply the same treatment to quantization/training pipelines (e.g., shared optimizer/quantizer orchestration helpers).
 
-## 4. Next Implementation Steps
+## 4. Implementation Milestones (newest → oldest)
 
-1. ✅ Extract the sampler primitives into `EfficientQAT/core/sampling.py`, add a `SamplerPipeline` class, and update `data_sampler.py` to rely on it (keeps CLI thin, improves readability, and shares logic).
-2. ✅ Introduce a reusable quantizer registry/factory so modules no longer replicate the `quantizer_version` selection logic.
-3. ✅ Replace bespoke packing/export logic in training scripts with shared helpers:
-   - Provide utilities for exporting scales/zero-points and instantiating the correct real-quant `QuantLinear`.
-   - Update `greedy_trainer.py`, `greedy_trainer_distribute.py`, and future pipelines to consume those helpers.
-4. Adopt the shared quantizer packing helpers in the remaining pipelines (`block_ap*.py`, `crossblockquant.py`, etc.) and then tackle dataset builders so they rely on the central `SamplerPipeline`.
+1. **Pipeline Runner rollout (⏩ continuing)**  
+   - `core/pipeline` skeleton shipped; `block_ap` now runs via hooks.  
+   - Next: `block_ap_explore`, `crossblockquant`, then greedy/GPTQ integrations.
+2. **Quantizer export unification (✅)**  
+   - Shared helpers now drive `block_ap*`, `crossblockquant`, and greedy trainers.
+3. **Quantizer factory (✅)**  
+   - `core/quantization.build_weight_quantizer` removes per-module version branching.
+4. **Sampler pipeline (✅)**  
+   - `core/sampling` + `SamplerPipeline`; CLI delegates to it.
 
 ## 5. Pipeline Stage Mapping
 

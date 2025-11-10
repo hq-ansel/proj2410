@@ -18,6 +18,12 @@ from .sampling import (  # noqa: F401
     ReservoirSampler,
     extract_random_chunks,
 )
+from .quantization import (  # noqa: F401
+    build_weight_quantizer,
+    build_real_quant_linear,
+    export_scale_tensor,
+    export_zero_tensor,
+)
 
 __all__ = [
     "SamplerConfig",
@@ -31,4 +37,8 @@ __all__ = [
     "Chunker",
     "ReservoirSampler",
     "extract_random_chunks",
+    "build_weight_quantizer",
+    "build_real_quant_linear",
+    "export_scale_tensor",
+    "export_zero_tensor",
 ]

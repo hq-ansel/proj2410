@@ -31,6 +31,11 @@ import logging
 
 from .. import utils
 from . import int_linear_fake, int_linear_real
+from EfficientQAT.core.quantization import (
+    build_real_quant_linear,
+    export_scale_tensor,
+    export_zero_tensor,
+)
 from .utils import (
     quant_parameters,weight_parameters,trainable_parameters,
     set_quant_state,quant_inplace,set_quant_parameters,
@@ -845,32 +850,26 @@ def custom_shedule_train(model:PreTrainedModel,
             if args.real_quant:
                 named_linears = get_named_linears(qlayer, int_linear_fake.QuantLinear)
                 for name, module in named_linears.items():
-                    scales = module.weight_quantizer.scale.clamp(1e-4,1e4).detach()
-                    quantizer_version = args.get("quantizer_version","v1")
-                    if quantizer_version == "v1":
-                        zeros = module.weight_quantizer.zero_point.detach().cuda().round().cpu()
-                    elif quantizer_version == "v2":
-                        zeros = module.weight_quantizer.zero_point.detach().cpu()
+                    quantizer_version = getattr(
+                        module, "quantizer_version", args.get("quantizer_version", "v1")
+                    )
+                    scales = export_scale_tensor(module.weight_quantizer)
+                    zeros = export_zero_tensor(module.weight_quantizer, quantizer_version)
                     group_size = module.weight_quantizer.group_size
-                    print(f"pack quantized {name} with group_size {group_size} and scales {scales} and zeros {zeros}")
+                    print(f"pack quantized {name} with group_size {group_size}")
                     dim0 = module.weight.shape[0]
-                    scales = scales.view(dim0,-1).transpose(0,1).contiguous()
-                    zeros = zeros.view(dim0,-1).transpose(0,1).contiguous()
-                    if quantizer_version == "v1":
-                        q_linear = int_linear_real.QuantLinear(args.wbits,
-                                                    group_size,
-                                                    module.in_features,
-                                                    module.out_features,
-                                                    not module.bias is None,
-                                                    clamp_input= args.get("clamp_input",False))
-                    elif quantizer_version == "v2":
-                        q_linear = int_linear_real.QuantLinearV2(args.wbits,
-                                                    group_size,
-                                                    module.in_features,
-                                                    module.out_features,
-                                                    not module.bias is None,
-                                                    clamp_input= args.get("clamp_input",False))
-                    q_linear.pack(module.cpu(),  scales.float().cpu(), zeros.float().cpu())
+                    scales = scales.view(dim0, -1).transpose(0, 1).contiguous()
+                    zeros = zeros.view(dim0, -1).transpose(0, 1).contiguous()
+                    q_linear = build_real_quant_linear(
+                        version=quantizer_version,
+                        wbits=args.wbits,
+                        group_size=group_size,
+                        in_features=module.in_features,
+                        out_features=module.out_features,
+                        bias=module.bias is not None,
+                        clamp_input=args.get("clamp_input", False),
+                    )
+                    q_linear.pack(module.cpu(), scales.float(), zeros.float())
                     set_op_by_name(qlayer, name, q_linear)    
                     if rank == 0:   
                         logger.info(f"pack quantized {name} finished")
@@ -1040,4 +1039,3 @@ def greedy_local_train(
     gc.collect()                    
     model.config.use_cache = use_cache
     return model
-

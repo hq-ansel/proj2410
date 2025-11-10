@@ -63,3 +63,29 @@ Last updated: 2025-02-14
    - Provide utilities for exporting scales/zero-points and instantiating the correct real-quant `QuantLinear`.
    - Update `greedy_trainer.py`, `greedy_trainer_distribute.py`, and future pipelines to consume those helpers.
 4. Adopt the shared quantizer packing helpers in the remaining pipelines (`block_ap*.py`, `crossblockquant.py`, etc.) and then tackle dataset builders so they rely on the central `SamplerPipeline`.
+
+## 5. Pipeline Stage Mapping
+
+| Script | Data Prep | Layer / Block Scheduling | Training Loop | Evaluation | Export |
+| --- | --- | --- | --- | --- | --- |
+| `quantize/block_ap.py` | `BlockTrainDataset` + optional disk cache | Sequential block window (single block) | Cosine LR on quant/weight params, AMP-enabled loop | Reconstruction + validation loss per block | Manual traversal replacing int linear with packed kernels |
+| `quantize/block_ap_explore.py` | Same as `block_ap` | Sliding block exploration windows | Same as `block_ap` with exploration-specific metrics | Same as `block_ap` | Same as `block_ap` |
+| `quantize/crossblockquant.py` | `QuantFPDataset` combining quant/fp pairs | Sliding window across multiple blocks (`slide_step`) | Similar optimizer/AMP loop but trains chunk of layers jointly | Validation per block window | Same pack logic as block pipelines |
+| `quantize/greedy_trainer.py` | `LazyLoadDatasetV2` / streaming catchers | Layer schedule controlled by `shedule_list` | Iterative training with custom schedulers and warmups | Optional val + vis recorder | Exports scales/zeros for real quant |
+| `quantize/greedy_trainer_distribute.py` | Distributed datasets with DDP | Same schedule concept, per-rank updates | DDP-aware training loop | Optional validation guarded by rank 0 | Same export as greedy trainer |
+| `quantize/aqlm_pipeline.py` | Custom dataset config (HF) | Model-level (no sliding windows) | Plain trainer with optimizer | Optional eval via huggingface metrics | Pack via GPTQ real kernels |
+| `quantize/gptq_pipeline.py` | `datasets` loaders + calibrations | None (global) | GPTQ solver loop | Perplexity eval | gptq packers |
+
+**Shared blocks**: dataset caching/loading, AMP/autocast management, optimizer / scheduler lifecycle, quantization state toggles, validation logging, packing/export. **Differences**: scheduling strategy, optimizer hyper-params, loss definitions, distributed coordination, logging/visualization hooks.
+
+## 6. Unified Pipeline Skeleton Plan
+
+- Introduce `EfficientQAT/core/pipeline/` with:
+  - `PipelineConfig` dataclass describing shared knobs (data, schedule, loss, export).
+  - `PipelineHooks` (strategy-style callables) for each stage: `prepare_data`, `schedule`, `train_step`, `evaluate`, `export`.
+  - `PipelineRunner` template that executes: `setup -> prepare_data -> for stage in schedule: train -> maybe eval -> export`.
+- Each existing script will wrap its specifics inside hook implementations rather than duplicating boilerplate. CLI/entrypoints pass hooks/config to the runner, similar to how `SamplerPipeline` works for data sampling.
+
+**Status**
+- ✅ Base runner + hook set landed in `EfficientQAT/core/pipeline/`.
+- ⏩ Next: pilot integration for the block pipelines, extracting shared strategies (dataset prep, block scheduling, loss/eval, export) into reusable hooks before rolling out to greedy/GPTQ flows.

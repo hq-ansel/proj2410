@@ -57,5 +57,6 @@ Last updated: 2025-02-14
 
 ## 4. Next Implementation Steps
 
-1. Extract the sampler primitives into `EfficientQAT/core/sampling.py`, add a `SamplerPipeline` class, and update `data_sampler.py` to rely on it (keeps CLI thin, improves readability, and shares logic).
-2. Introduce a lightweight registry (in a follow-up) so quantization pipelines can declare their stages similarly to the sampler pipeline.
+1. ✅ Extract the sampler primitives into `EfficientQAT/core/sampling.py`, add a `SamplerPipeline` class, and update `data_sampler.py` to rely on it (keeps CLI thin, improves readability, and shares logic).
+2. Introduce a reusable quantizer registry/factory so modules no longer replicate the `quantizer_version` selection logic.
+3. Once the factory is in place, progressively migrate `quantize/int_linear_*.py`, pipeline scripts, and tests onto the shared abstraction to shrink code size and keep feature flags consistent.

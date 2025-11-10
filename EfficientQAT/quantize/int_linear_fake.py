@@ -3,12 +3,8 @@ from typing import Dict
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from .quantizer import (UniformAffineQuantizer,GradualUniformAffineQuantizer,GradualUniformAffineQuantizerV2,
-                        UniformAffineQuantizerV2)
-from . import quantizer,quantizerv2,quantizerv3
 
-
-
+from EfficientQAT.core.quantization import build_weight_quantizer
 
 class QuantLinear(nn.Module):
     """
@@ -35,35 +31,14 @@ class QuantLinear(nn.Module):
         self.out_features = org_module.out_features
         # de-activate the quantized forward default
         self.use_weight_quant = False
-        # initialize quantizer
-        # self.weight_quantizer = UniformAffineQuantizer(wbits, group_size, weight=org_module.weight,args=args)
-        quantizer_version = args.get("quantizer_version","v1")
-        if quantizer_version == "v1":
-            quantizer_pkg = quantizer
-        elif quantizer_version == "v2":
-            quantizer_pkg = quantizerv2
-        elif quantizer_version == "v3":
-            quantizer_pkg = quantizerv3
-        else:
-            raise ValueError("Invalid quantizer version: {}".format(quantizer_version))
-        # 确定 quantizer的具体版本
-        if args.get("gradual_quant", False):
-            self.weight_quantizer = quantizer_pkg.GradualUniformAffineQuantizer(wbits,
-                                                            group_size,
-                                                            weight=org_module.weight,
-                                                            args=args)
-        elif args.get("iterative_freezing", False):
-            self.weight_quantizer = quantizer_pkg.GradualUniformAffineQuantizerV2(wbits,
-                                                                     group_size,
-                                                                     weight=org_module.weight,
-                                                                     args=args)
-        elif args.get("dsq", False):
-            self.weight_quantizer = quantizer_pkg.DSQuantizer(wbits,
-                                                               group_size,
-                                                               weight=org_module.weight,
-                                                               args=args)
-        else:
-            self.weight_quantizer = quantizer_pkg.UniformAffineQuantizer(wbits, group_size, weight=org_module.weight,args=args)
+        args = args or {}
+        self.quantizer_version = args.get("quantizer_version", "v1")
+        self.weight_quantizer = build_weight_quantizer(
+            weight=org_module.weight,
+            wbits=wbits,
+            group_size=group_size,
+            args=args,
+        )
 
         self.use_temporary_parameter = False
         self.clamp_input = args.get('clamp_input',False)

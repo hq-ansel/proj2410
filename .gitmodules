@@ -1,0 +1,6 @@
+[submodule "opponent/llm-compressor"]
+	path = opponent/llm-compressor
+	url = https://github.com/vllm-project/llm-compressor.git
+[submodule "opponent/GPTQModel"]
+	path = opponent/GPTQModel
+	url = https://github.com/ModelCloud/GPTQModel.git

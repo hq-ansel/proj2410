@@ -51,7 +51,6 @@ quant_path_list = [
     # "/home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/EfficientQAT/w2g128gradualfactor2",
     # "/home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/EfficientQAT/w2g128interativeFreezing"
     # "/home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/EfficientQAT/iterative_freezingw4bit",
-<<<<<<< HEAD
     # "/home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/EfficientQAT/progq-train512w2",
     # "/home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/EfficientQAT/progq-train2048w2",
     # "/home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/EfficientQAT/progqw2bit_cali_c4",

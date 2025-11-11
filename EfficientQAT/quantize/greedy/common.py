@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 import math
-from typing import Dict, Iterable, List, Optional
+from typing import Dict, Iterable, List
 
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset
 
 from ..utils import Catcher
+
+
 
 __all__ = [
     "CosineAnnealingScheduler",

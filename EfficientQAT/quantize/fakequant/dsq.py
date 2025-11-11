@@ -1,17 +1,13 @@
 import math
 
-import torch
-
 from mqbench.fake_quantize.quantize_base import QuantizeBase
 from mqbench.utils import is_tracing_state
 from mqbench.utils.hook import PerChannelLoadHook
+import torch
 import torch._C._onnx as _C_onnx
-from torch.onnx import _type_utils
-from torch.onnx import (
-    _type_utils,
-    symbolic_helper,
-    symbolic_opset9 as opset9,
-)
+from torch.onnx import _type_utils, symbolic_opset9 as opset9
+
+
 def dsq_function_per_tensor(x, scale, zero_point, quant_min, quant_max, alpha):
     tanh_scale = 1 / (1 - alpha)
     tanh_k = math.log((tanh_scale + 1) / (tanh_scale - 1))

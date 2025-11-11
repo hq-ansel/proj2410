@@ -12,14 +12,9 @@ from torch.optim.lr_scheduler import CosineAnnealingLR
 from torch.utils.data import DataLoader
 from transformers import PreTrainedModel
 
+from . import int_linear_fake
 from .. import utils
 from ..loss_utils import get_loss_func
-from EfficientQAT.core.quantization import (
-    build_real_quant_linear,
-    export_scale_tensor,
-    export_zero_tensor,
-)
-from . import int_linear_fake
 from .block_pipeline import (
     BlockContext,
     BlockPipeline,
@@ -39,6 +34,13 @@ from .utils import (
     trainable_parameters_num,
     weight_parameters,
 )
+from EfficientQAT.core.quantization import (
+    build_real_quant_linear,
+    export_scale_tensor,
+    export_zero_tensor,
+)
+
+
 
 amp_enabled = os.environ.get("AMP_ENABLED", "True").lower() == "true"
 

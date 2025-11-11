@@ -1,12 +1,12 @@
-from collections import OrderedDict
-from typing  import Optional, Tuple, Union, List, Dict
+from typing import List, Optional, Tuple, Union
 
 import torch
 from torch import nn
 from torch.utils.checkpoint import checkpoint
-from concurrent.futures import ThreadPoolExecutor
 
 from .int_linear_fake import QuantLinear
+
+
 
 
 class StopException(Exception):
@@ -378,7 +378,6 @@ def set_op_by_name(layer, name, new_module):
 #         setattr(original_module, name, added_module)   
 
 import csv
-import os
 
 class BlockLossRecorder:
     def __init__(self, file_path:str):
@@ -478,9 +477,6 @@ def plot_loss(block_loss_data, blk_id):
 #     loss_data = recorder.get_loss_data("block1")
 #     print("block1的loss数据:", loss_data)
 
-
-import torch
-import gc
 
 def get_tensor_size(tensor):
     """获取张量的内存大小，单位是字节"""

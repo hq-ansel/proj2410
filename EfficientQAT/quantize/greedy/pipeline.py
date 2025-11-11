@@ -1,21 +1,45 @@
+"""Greedy block-wise quantization pipeline that plugs into the shared runner."""
+
 from __future__ import annotations
 
 import copy
 import gc
-from typing import Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 import torch
 from transformers.modeling_utils import PreTrainedModel
 
-from .. import int_linear_fake, utils
-from ..datautils_block import LazyLoadDatasetV2
-from ..loss_utils import get_loss_func
-from ..utils import set_op_by_name
-from .common import CommonInputDataset
-from EfficientQAT.core.quantization import BlockContext, BlockPipeline, PipelineStage, build_block_schedule
+
 
 try:
-    from .visualization import VisualizationRecorder
+    from EfficientQAT.quantize import int_linear_fake, utils
+except ImportError:  # pragma: no cover - fallback for relative import
+    from .. import int_linear_fake, utils
+
+try:
+    from EfficientQAT.datautils_block import LazyLoadDatasetV2
+except ImportError:  # pragma: no cover - fallback for relative import
+    from ...datautils_block import LazyLoadDatasetV2
+
+try:
+    from EfficientQAT.quantize.loss_utils import get_loss_func
+except ImportError:  # pragma: no cover - fallback for relative import
+    from ...loss_utils import get_loss_func
+
+try:
+    from EfficientQAT.quantize.block_pipeline import (
+        BlockContext,
+        BlockPipeline,
+        build_block_schedule,
+    )
+except ImportError:  # pragma: no cover - fallback for relative import
+    from ..block_pipeline import BlockContext, BlockPipeline, build_block_schedule
+
+from EfficientQAT.core.pipeline import PipelineStage
+from .common import CommonInputDataset
+
+try:
+    from ..visualization import VisualizationRecorder
     VISUALIZATION_AVAILABLE = True
 except ImportError:  # pragma: no cover - optional dependency
     VisualizationRecorder = None
@@ -25,6 +49,7 @@ __all__ = ["GreedyBlockPipeline", "trans_quant_block"]
 
 
 def trans_quant_block(qlayer: torch.nn.Module, hyper_params: Dict) -> torch.nn.Module:
+    """Replace every linear module in a layer with its quantized counterpart."""
     for name, module in qlayer.named_modules():
         if isinstance(module, torch.nn.Linear):
             quantlinear = int_linear_fake.QuantLinear(
@@ -34,7 +59,7 @@ def trans_quant_block(qlayer: torch.nn.Module, hyper_params: Dict) -> torch.nn.M
                 hyper_params,
             )
             quantlinear.set_quant_state(True)
-            set_op_by_name(qlayer, name, quantlinear)
+            utils.set_op_by_name(qlayer, name, quantlinear)
     return qlayer
 
 
@@ -48,7 +73,7 @@ class GreedyBlockPipeline(BlockPipeline):
     def __init__(
         self,
         model: PreTrainedModel,
-        config: Dict[str, any],
+        config: Dict[str, Any],
         trainloader,
         valloader,
         *,
@@ -60,6 +85,10 @@ class GreedyBlockPipeline(BlockPipeline):
         self.hyper_params = config.get("hyperparam_settings", {})
         self.cluster_settings = config.get("cluster_settings", {})
         self._schedule_cache: Optional[List[PipelineStage]] = None
+        self.model = model
+        self.trainloader = trainloader
+        self.valloader = valloader
+        self.use_cache: bool = model.config.use_cache
         loss_path = config.get("log_loss")
         loss_factory = (lambda: utils.BlockLossRecorder(file_path=loss_path)) if loss_path else None
 
@@ -92,16 +121,20 @@ class GreedyBlockPipeline(BlockPipeline):
         train_params = self.train_params
         hyper_params = self.hyper_params
         config = self.config
+        trainloader = self.trainloader
+        valloader = self.valloader
+        if trainloader is None or valloader is None:
+            raise ValueError("Train/validation loaders must be provided before data preparation.")
 
         if train_params.get("quant_shedule_type") == "full":
-            for idx in range(len(self.model.model.layers)):
+            for idx, layer in enumerate(self.model.model.layers):
                 self.model.model.layers[idx] = trans_quant_block(
-                    qlayer=self.model.model.layers[idx],
+                    qlayer=layer,
                     hyper_params=hyper_params,
                 )
         is_quant_layer = [
             train_params.get("quant_shedule_type") == "full"
-            for _ in range(len(self.model.model.layers))
+            for _ in self.model.model.layers
         ]
         ctx.extras["is_quant_layer"] = is_quant_layer
 
@@ -130,13 +163,13 @@ class GreedyBlockPipeline(BlockPipeline):
         if not train_params.get("with_catcher"):
             train_dataset = LazyLoadDatasetV2(
                 model=self.model,
-                dataloader=self.trainloader,
+                dataloader=trainloader,
                 crossblock_window_size=hyper_params["crossblock_window_size"],
                 device=train_params["dev"],
             )
             val_dataset = LazyLoadDatasetV2(
                 model=self.model,
-                dataloader=self.valloader,
+                dataloader=valloader,
                 crossblock_window_size=hyper_params["crossblock_window_size"],
                 device=train_params["dev"],
             )
@@ -151,8 +184,8 @@ class GreedyBlockPipeline(BlockPipeline):
             ctx.attention_mask = attention_mask
             ctx.position_ids = position_embeddings
         else:
-            train_inputs = [batch[0] for batch in self.trainloader]
-            val_inputs = [batch[0] for batch in self.valloader]
+            train_inputs = [batch[0] for batch in trainloader]
+            val_inputs = [batch[0] for batch in valloader]
             train_dataset = CommonInputDataset(train_inputs)
             val_dataset = CommonInputDataset(val_inputs)
             ctx.attention_mask = None
@@ -177,6 +210,7 @@ class GreedyBlockPipeline(BlockPipeline):
         gc.collect()
 
     def _teardown(self, ctx):
+        del ctx
         self.model.config.use_cache = self.use_cache
 
     # ------------------------------------------------------------------ Helpers

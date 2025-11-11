@@ -10,10 +10,12 @@ chunking and sampling text streams.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Callable, Iterable, Iterator, List, Optional, Protocol, Type, TypeVar
 import json
+from pathlib import Path
 import random
+from typing import Iterable, Iterator, List, Optional, Protocol, Type, TypeVar
+
+
 
 __all__ = [
     "TextSource",

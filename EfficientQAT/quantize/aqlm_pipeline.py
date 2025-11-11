@@ -1,52 +1,21 @@
-import shutil
-import functools
-import time
-import os
-import copy
-import pdb
-import gc
-import math
-from functools import wraps
 from itertools import chain
-from collections import defaultdict
-from contextlib import contextmanager
-from typing import List, Tuple, Dict, Union, Callable,Sequence,Any
-from concurrent.futures import ThreadPoolExecutor
-from regex import E, T
-from tqdm import tqdm
-from tqdm import trange
-from tqdm.auto import trange
-
-import logging
 import json
-import numpy as np
-import torch
-import torch.nn as nn
-import torch.amp
-from torch.utils.data import Dataset
-from torch.utils.checkpoint import checkpoint
-from torch.amp import autocast, GradScaler
-import torch.nn.functional as F
-from torch.optim.lr_scheduler import CosineAnnealingLR
-from torch.utils.data import DataLoader
-from transformers import PreTrainedModel,AutoTokenizer,AutoModelForCausalLM,AutoConfig
-from transformers.models.bloom.modeling_bloom import BloomForCausalLM
-from transformers.models.opt.modeling_opt import OPTForCausalLM
-from transformers.models.llama.modeling_llama import LlamaForCausalLM
-from transformers.models.qwen2.modeling_qwen2 import Qwen2ForCausalLM
-from easydict import EasyDict as edict
-from accelerate import (
-    init_empty_weights,
-    infer_auto_device_map,
-    dispatch_model,
-    load_checkpoint_in_model,
-)
-from accelerate.utils.modeling import get_balanced_memory
+import os
+import shutil
+import time
+from typing import Any, Dict, List, Sequence, Tuple
 
+from easydict import EasyDict as edict
 from llm_aqlm.aq_engine import AQEngine
 from llm_aqlm.src.aq import QuantizedLinear
-from llm_aqlm.src.utils import using_tf32
 from llm_aqlm.src.finetune import finetune_groupwise
+from llm_aqlm.src.utils import using_tf32
+import torch
+import torch.nn as nn
+from tqdm.auto import trange
+from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer, PreTrainedModel
+
+
 
 MODEL_ERROR_MSG = "Unsupported model type {} - only 'llama', 'Yi', 'opt', 'falcon', 'phi3' are supported"
 FALCON_TYPES = ("falcon", "refinedweb", "refinedwebmodel")

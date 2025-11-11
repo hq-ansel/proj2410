@@ -5,6 +5,12 @@ Currently exposes the sampling pipeline primitives so that CLI tools and
 dataset builders can rely on a single implementation.
 """
 
+from .quantization import (  # noqa: F401
+    build_weight_quantizer,
+    build_real_quant_linear,
+    export_scale_tensor,
+    export_zero_tensor,
+)
 from .sampling import (  # noqa: F401
     SamplerConfig,
     SamplerPipeline,
@@ -18,12 +24,8 @@ from .sampling import (  # noqa: F401
     ReservoirSampler,
     extract_random_chunks,
 )
-from .quantization import (  # noqa: F401
-    build_weight_quantizer,
-    build_real_quant_linear,
-    export_scale_tensor,
-    export_zero_tensor,
-)
+
+
 
 __all__ = [
     "SamplerConfig",

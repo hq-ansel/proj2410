@@ -1,49 +1,48 @@
-import shutil
-import functools
-import time
-import os
 import copy
-import pdb
-import gc
-import math
 from functools import wraps
-from contextlib import contextmanager
-from typing import List, Tuple, Dict, Union, Callable
-from concurrent.futures import ThreadPoolExecutor
-from tqdm import tqdm
-
-import numpy as np
+import gc
+import logging
+import math
+import os
+import pdb
+import time
+from typing import Callable, List, Tuple
 
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
 import torch.amp
-from torch.amp import autocast, GradScaler
-from torch.optim.lr_scheduler import CosineAnnealingLR
-import torch.optim as optim
 import torch.distributed as dist
-from torch.utils.data import DataLoader, Dataset
-from torch.utils.checkpoint import checkpoint
+import torch.nn as nn
 from torch.nn.parallel import DistributedDataParallel as DDP
-
+from torch.optim.lr_scheduler import CosineAnnealingLR
+from torch.utils.data import DataLoader, Dataset
 from transformers import PreTrainedModel
-import logging
 
+from . import int_linear_fake
 from .. import utils
-from . import int_linear_fake, int_linear_real
+from ..datautils_block import LazyLoadDataset, LazyLoadDatasetV2
+from ..loss_utils import get_loss_func
+from .utils import (
+    quant_parameters,
+    weight_parameters,
+    trainable_parameters,
+    set_quant_state,
+    quant_inplace,
+    set_quant_parameters,
+    set_weight_parameters,
+    trainable_parameters_num,
+    get_named_linears,
+    set_op_by_name,
+    Catcher,
+    StopException,
+    sub_space_clean,
+)
 from EfficientQAT.core.quantization import (
     build_real_quant_linear,
     export_scale_tensor,
     export_zero_tensor,
 )
-from .utils import (
-    quant_parameters,weight_parameters,trainable_parameters,
-    set_quant_state,quant_inplace,set_quant_parameters,
-    set_weight_parameters,trainable_parameters_num,get_named_linears,set_op_by_name,
-    Catcher,StopException,MultiBlock,sub_space_clean
-    )
-from ..datautils_block import BlockTrainDataset,OptimBlockTrainDataset,LazyLoadDataset,generate_block_train_data,LazyLoadDatasetV2
-from ..loss_utils import get_loss_func
+
+
 
 
 amp_enabled = os.environ.get("AMP_ENABLED", "False").lower() == "true"

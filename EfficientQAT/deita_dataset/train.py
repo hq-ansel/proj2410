@@ -19,18 +19,18 @@ import json
 import pathlib
 from typing import Dict, Optional
 
+from datasets import load_dataset
+from deita_dataset.conversation import SeparatorStyle,get_conv_template
 import numpy as np
 import torch
 from torch.utils.data import Dataset
 import transformers
 from transformers import Trainer
-from transformers.trainer_pt_utils import LabelSmoother
-from datasets import load_dataset
-
-from deita_dataset.conversation import SeparatorStyle,get_conv_template
 # from conversation import get_conv_template
-
 from transformers import Trainer
+from transformers.trainer_pt_utils import LabelSmoother
+
+
 
 IGNORE_TOKEN_ID = LabelSmoother.ignore_index
 

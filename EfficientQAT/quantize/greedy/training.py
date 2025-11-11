@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import copy
-import math
 import time
 from typing import Any, Dict, List, Tuple
 
@@ -17,17 +16,14 @@ from ..utils import (
     weight_parameters,
     trainable_parameters,
     set_quant_state,
-    quant_inplace,
     set_quant_parameters,
     set_weight_parameters,
     trainable_parameters_num,
-    get_named_linears,
-    set_op_by_name,
-    Catcher,
     StopException,
 )
-
 from .common import CatcherManager, CosineAnnealingScheduler
+
+
 
 
 def train_units_layers(

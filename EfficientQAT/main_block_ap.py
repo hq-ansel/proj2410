@@ -1,25 +1,22 @@
 import os
-import sys
-import random
-import yaml
-import time
-from typing import Dict, Any, List, Tuple, Optional
-from tqdm import tqdm
 from pathlib import Path
+import random
+import time
+from typing import Any, Dict, Optional
+
 import numpy as np
 import torch
-import torch.nn as nn
-from transformers.models.auto.tokenization_auto import AutoTokenizer
 from transformers.models.auto.configuration_auto import AutoConfig
 from transformers.models.auto.modeling_auto import AutoModelForCausalLM
-from accelerate import infer_auto_device_map, dispatch_model
+from transformers.models.auto.tokenization_auto import AutoTokenizer
+import yaml
+
 from . import utils
 from .datautils_block import get_loaders, test_ppl
+from .quantize.greedy_trainer import greedy_local_train
 from .quantize.int_linear_real import load_quantized_model  # 假设修复了模块
-from .quantize.block_ap import block_ap
-from .quantize.crossblockquant import cross_block_quantization
-from .quantize.greedy_trainer import greedy_local_train, timer
-from .liger_kernel_utils import apply_liger_kernel
+
+
 
 # amp_enabled = os.environ.get("AMP_ENABLED", "False").lower() == "true"
 # torch.set_float32_matmul_precision('high')
@@ -154,15 +151,15 @@ def main() -> None:
                 torch.save(valloader, cache_valloader)
             if config['train_param_settings']['quant_method'] == "block_ap":
                 greedy_local_train(model, config, trainloader, valloader, logger)
-            elif config['train_param_settings']['quant_method'] == "awq":
-                from .quantize.awq_pipeline import awq_pipline
-                awq_pipline(model, trainloader, config)
+            # elif config['train_param_settings']['quant_method'] == "awq":
+            #     from .quantize.awq_pipeline import awq_pipline
+            #     awq_pipline(model, trainloader, config)
             elif config['train_param_settings']['quant_method'] == "gptq":
                 from .quantize.gptq_pipeline import gptq_pipeline
                 model = gptq_pipeline(model, trainloader, config)
-            elif config['train_param_settings']['quant_method'] == "aqlm":
-                from .quantize.aqlm_pipeline import aqlm_pipeline
-                _, model = aqlm_pipeline(model, trainloader, valloader, config)
+            # elif config['train_param_settings']['quant_method'] == "aqlm":
+            #     from .quantize.aqlm_pipeline import aqlm_pipeline
+            #     _, model = aqlm_pipeline(model, trainloader, valloader, config)
             else:
                 raise NotImplementedError(f"quantization method {config['train_param_settings']['quant_method']} not implemented")
             logger.info(time.time() - tick)

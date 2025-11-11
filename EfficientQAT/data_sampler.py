@@ -9,13 +9,14 @@ from pathlib import Path
 from EfficientQAT.core import (
     FilePerLineTextSource,
     JSONLWriter,
-    MockTokenizer,
     SamplerConfig,
     SamplerPipeline,
     TextSource,
     Tokenizer,
     Writer,
 )
+
+
 
 
 def _build_cli() -> argparse.ArgumentParser:
@@ -69,7 +70,7 @@ def _build_cli() -> argparse.ArgumentParser:
 def main() -> None:
     args = _build_cli().parse_args()
 
-    tokenizer: Tokenizer = MockTokenizer()  # Swap with HF/tiktoken tokenizer as needed
+    tokenizer: Tokenizer = None  # Swap with HF/tiktoken tokenizer as needed
     config = SamplerConfig(
         seq_len=args.seq_len,
         num_samples=args.num_samples,

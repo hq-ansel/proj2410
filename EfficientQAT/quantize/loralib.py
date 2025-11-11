@@ -3,12 +3,15 @@
 #  Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 #  ------------------------------------------------------------------------------------------
 #  copy from https://github.com/microsoft/LoRA/blob/main/loralib/layers.py
+
+import math
+from typing import List
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-import math
-from typing import Optional, List
+
 
 class LoRALayer():
     def __init__(

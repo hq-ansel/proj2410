@@ -1,9 +1,12 @@
-import torch
-from datautils_block import test_ppl
-from transformers import AutoTokenizer
-from gptqmodel import GPTQModel, QuantizeConfig, get_backend
 from pathlib import Path
 import time
+
+from datautils_block import test_ppl
+from gptqmodel import GPTQModel, QuantizeConfig, get_backend
+import torch
+from transformers import AutoTokenizer
+
+
 
 def main():
     import argparse

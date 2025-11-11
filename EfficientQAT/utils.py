@@ -1,14 +1,13 @@
+import logging
 from math import inf
 import os
 import time
-import sys
 
-import pdb
+import sys
 from termcolor import colored
-import logging
 import torch
-import torch.nn as nn
-from torch.optim import Optimizer
+
+
 
 def ampscaler_get_grad_norm(parameters, norm_type: float = 2.0) -> torch.Tensor:
     if isinstance(parameters, torch.Tensor):

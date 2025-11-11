@@ -6,9 +6,12 @@
 依赖：
     pip install transformers modelscope torch
 """
-from transformers.models.auto.tokenization_auto import AutoTokenizer
-from transformers.models.auto.modeling_auto import AutoModelForCausalLM
 import os
+
+from transformers.models.auto.modeling_auto import AutoModelForCausalLM
+from transformers.models.auto.tokenization_auto import AutoTokenizer
+
+
 
 # 可选：如需用 modelscope 下载 LLaMA 系列
 try:

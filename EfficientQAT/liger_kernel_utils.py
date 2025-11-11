@@ -13,11 +13,8 @@
 # limitations under the License.
 
 import inspect
-from typing import TYPE_CHECKING
 
 
-if TYPE_CHECKING:
-    from transformers import PretrainedConfig
 
 def apply_liger_kernel(
     config: "PretrainedConfig",

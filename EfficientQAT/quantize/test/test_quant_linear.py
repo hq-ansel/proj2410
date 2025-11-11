@@ -1,17 +1,17 @@
-import torch
-import numpy as np
-from typing import Optional
-import pytest
-import torch.nn.functional as F
-from torch.nn import Linear
-import torch.nn.init as init
 
 import math
+
+import pytest
+import torch
+from torch.nn import Linear
+import torch.nn.init as init
 
 # from ..int_linear_fake import QuantLinear as QuantLinearFake
 # from ..int_linear_real import QuantLinear as QuantLinearReal
 from EfficientQAT.quantize.int_linear_fake import QuantLinear as QuantLinearFake
 from EfficientQAT.quantize.int_linear_real import QuantLinear as QuantLinearReal
+
+
 
 @torch.no_grad()
 def init_fake_real_linear( linear:Linear):

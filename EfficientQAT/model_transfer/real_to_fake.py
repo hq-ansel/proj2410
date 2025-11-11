@@ -1,7 +1,10 @@
-from ..quantize.int_linear_real import load_quantized_model, QuantLinear
-import torch
-from ..datautils_block import test_ppl
 from pathlib import Path
+
+import torch
+
+from ..quantize.int_linear_real import load_quantized_model, QuantLinear
+
+
 
 def main():
     import argparse

@@ -1,24 +1,24 @@
-import os
-import random
-from regex import F
-from sympy import det
-from tqdm import tqdm
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
-import shutil
-from concurrent.futures import ThreadPoolExecutor
-import gc
-import pdb
 
 
 import asyncio
-import torch
-import torch.nn as nn
-from torch.utils.data import Dataset,DataLoader
-from transformers import AutoTokenizer,PreTrainedTokenizer,PreTrainedModel
+from concurrent.futures import ThreadPoolExecutor
+import gc
+import os
+import pdb
+import random
+from typing import Any, Callable, Dict, List, Tuple, Union
+
 from datasets import load_dataset
 import numpy as np
+import torch
+import torch.nn as nn
+from torch.utils.data import Dataset
+from tqdm import tqdm
+from transformers import PreTrainedModel, PreTrainedTokenizer
 
-from .quantize.utils import StopException,Catcher
+from .quantize.utils import StopException
+
+
 
 
 def generate_llama_mask_and_position_embedding(seq_len,

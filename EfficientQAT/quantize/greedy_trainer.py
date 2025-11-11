@@ -1,55 +1,32 @@
-import shutil
-import functools
-import time
-import os
-import pdb
-import gc
-import math
 from functools import wraps
-from contextlib import contextmanager
-from typing import List, Tuple, Dict, Union, Callable, Any, Optional
-import json
+import gc
+import logging
+import time
+from typing import Any, Dict, List, Tuple
 
 import torch
 import torch.nn as nn
-import torch.amp
-from torch.amp.autocast_mode import autocast
-from torch.amp.grad_scaler import GradScaler
 from transformers.modeling_utils import PreTrainedModel
-import logging
-import bitsandbytes as bnb
 
-from .. import utils
-from . import int_linear_fake, int_linear_real
-from EfficientQAT.core.quantization import (
-    build_real_quant_linear,
-    export_scale_tensor,
-    export_zero_tensor,
-)
-from .utils import (
-    quant_parameters,weight_parameters,trainable_parameters,
-    set_quant_state,quant_inplace,set_quant_parameters,
-    set_weight_parameters,trainable_parameters_num,get_named_linears,set_op_by_name,
-    Catcher,StopException,MultiBlock,sub_space_clean
-    )
-from ..loss_utils import get_loss_func
+from . import int_linear_fake
 from .greedy import GreedyBlockPipeline, trans_quant_block
 from .greedy.training import (
     train_units_layers,
     train_units_layers_with_catcher,
 )
+from .utils import (
+    set_quant_state,
+    quant_inplace,
+    get_named_linears,
+    set_op_by_name,
+)
+from EfficientQAT.core.quantization import (
+    build_real_quant_linear,
+    export_scale_tensor,
+    export_zero_tensor,
+)
 
-# 添加对调试工具的导入
-try:
-    from .debug_utils import check_loss_anomaly, save_debug_info, collect_gradients, debug_model_state, print_tensor_anomalies
-    DEBUG_UTILS_AVAILABLE = True
-    # 检查是否启用了调试模式
-    QAT_DEBUG = os.environ.get('QAT_DEBUG', '').lower() in ('1', 'true', 'yes')
-except ImportError:
-    DEBUG_UTILS_AVAILABLE = False
-    QAT_DEBUG = False
 
-from torch.optim.lr_scheduler import CosineAnnealingLR
 
 
 amp_enabled = True

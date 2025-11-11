@@ -1,8 +1,11 @@
-from typing import List, Tuple, Dict, Any
-import os
-import yaml
 from itertools import product
+import os
 import re
+from typing import List, Tuple, Dict, Any
+
+import yaml
+
+
 
 
 def list_yaml_files(folder: str) -> List[str]:

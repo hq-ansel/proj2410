@@ -6,8 +6,11 @@ from typing import Iterable, Optional
 
 import torch
 
-from .block_pipeline import BlockPipeline, BlockContext, PipelineStage, build_block_schedule
+from .block_pipeline import BlockPipeline, BlockContext, build_block_schedule
 from .gptq_pipeline import gptq_pipeline
+from EfficientQAT.core.pipeline import PipelineStage
+
+
 
 
 class _GPTQBlockPipeline(BlockPipeline):

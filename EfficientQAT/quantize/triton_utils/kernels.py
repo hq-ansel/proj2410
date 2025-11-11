@@ -1,12 +1,12 @@
-import torch
-from torch.cuda.amp import custom_bwd, custom_fwd
 from logging import getLogger
 
+import torch
 import triton
 import triton.language as tl
 
 from . import custom_autotune
-import pdb
+
+
 
 logger = getLogger(__name__)
 
@@ -256,9 +256,6 @@ def dequant_dim1(qweight, bits, maxq, infeatures, outfeatures, dtype=torch.float
             output.stride(0), output.stride(1),
         )
         return output
-
-
-
 
 
 

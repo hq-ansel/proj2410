@@ -8,19 +8,21 @@ import torch.nn as nn
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from torch.utils.data import DataLoader
 
-from .. import utils
-from EfficientQAT.core.quantization import (
-    build_real_quant_linear,
-    export_scale_tensor,
-    export_zero_tensor,
-)
 from . import int_linear_fake
+from .. import utils
 from .block_pipeline import BlockContext, BlockPipeline, CombinedDataset, update_dataset
 from .utils import (
     quant_parameters, weight_parameters, trainable_parameters,
     set_quant_state, quant_inplace, set_quant_parameters,
     set_weight_parameters, trainable_parameters_num, get_named_linears, set_op_by_name,
 )
+from EfficientQAT.core.quantization import (
+    build_real_quant_linear,
+    export_scale_tensor,
+    export_zero_tensor,
+)
+
+
 
 
 def _train_block_explore(ctx: BlockContext, stage) -> None:

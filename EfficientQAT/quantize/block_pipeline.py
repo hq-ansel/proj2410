@@ -1,18 +1,20 @@
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 import gc
 import logging
 import os
+from pathlib import Path
 import shutil
 import time
-from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Optional, Protocol, Sequence, Union
 
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset
 
+from .. import utils
+from ..datautils_block import BlockTrainDataset
 from EfficientQAT.core.pipeline import (
     PipelineConfig,
     PipelineHooks,
@@ -20,8 +22,7 @@ from EfficientQAT.core.pipeline import (
     PipelineStage,
 )
 
-from .. import utils
-from ..datautils_block import BlockTrainDataset
+
 
 __all__ = [
     "BlockContext",

@@ -1,10 +1,13 @@
-import torch
 import warnings
-import torch.nn as nn
-from torch.autograd import Function
+
 from awq.utils.module import try_import
-from awq.utils.utils import get_best_device
 from awq.utils.packing_utils import dequantize_gemm
+from awq.utils.utils import get_best_device
+import torch
+from torch.autograd import Function
+import torch.nn as nn
+
+
 
 # NOTE: We check if awq_ext or triton is available. awq_ext will be preferred if both are installed.
 

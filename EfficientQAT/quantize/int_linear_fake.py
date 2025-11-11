@@ -6,6 +6,8 @@ import torch.nn.functional as F
 
 from EfficientQAT.core.quantization import build_weight_quantizer
 
+
+
 class QuantLinear(nn.Module):
     """
     Quantized Module that can perform quantized convolution or normal convolution.

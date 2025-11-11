@@ -4,14 +4,53 @@ Last updated: 2025-02-14
 
 ## Current Focus & Status (reverse chronology)
 
-1. **Pipeline orchestration (in progress)**  
+0. **Block pipeline consolidation (✅ done)**  
+   - Shared capture/training/export helpers now live in `quantize/block_pipeline.py`
+     and power both `block_ap.py` + `block_ap_explore.py`.  
+   - LOC across the pair dropped ~30% while preserving their per-script
+     behaviour.  Loss recorder + packing now execute via the shared hooks.
+
+1. **Cross-block adoption (✅ done)**  
+   - `BlockPipeline` now ships window scheduling helpers + shared dataset
+     hooks; `crossblockquant.py` runs entirely on the facade.  
+   - Sliding windows, multi-layer updates, and packing/export call the same
+     executor used by block pipelines, eliminating ~300 LOC of duplicate glue.
+
+2. **Greedy/GPTQ rollout (✅ done for local)**  
+   - `greedy_trainer.py` now runs entirely on `BlockPipeline` via the new
+     `_GreedyBlockPipeline` + stage executor; bespoke schedule/dataset glue is
+     gone.  
+   - Draft GPTQ hooks (`quantize/gptq_hooks.py`) provide a pipeline-aware
+     executor so GPTQ quantization can reuse the same runner semantics.
+
+3. **Greedy core cleanup (⏩ highest priority)**  
+   - `quantize/greedy_trainer.py` is still bloated (>1.2k LOC) even after the
+     pipeline port; next step is to split it into focused modules (`scheduler`,
+     `executors`, `dataset_adapters`) and trim dead code (legacy schedulers,
+     unused utils).  
+   - Success target: shrink the file by ~40%, push shared helpers into
+     `core/`/`quantize/` submodules, and make the stage executor + dataset code
+     unit-testable.
+
+4. **Distributed + GPTQ adoption (📌 queued)**  
+   - Once the local greedy cleanup lands, extend the shared executor to
+     `greedy_trainer_distribute.py` (multi-rank dataset capture + DDP-aware
+     refresh).  
+   - Wire the GPTQ hooks into `gptq_pipeline.py` + CLI/entrypoints when the
+     executor covers calibration/export behaviour.  
+   - Add regression tests covering both single-rank + DDP greedy flows once the
+     refactor settles.
+
+5. **Pipeline orchestration (in progress)**  
    - `EfficientQAT/core/pipeline` now hosts `PipelineRunner`/hooks.  
-   - `quantize/block_ap.py` has been ported to the runner; `block_ap_explore` → `crossblockquant` are next.  
+   - `quantize/block_ap.py`, `block_ap_explore.py`, and `crossblockquant.py`
+     all sit on the runner via `BlockPipeline`; greedy/GPTQ integrations are
+     upcoming.  
    - Goal: move shared block hooks into a reusable module, then expand to greedy/GPTQ flows.
-2. **Quantizer export consolidation (done)**  
+6. **Quantizer export consolidation (done)**  
    - Shared helpers for scales/zeros/real-quant modules live in `core/quantization.py`.  
    - All block/greedy scripts now call the same packing logic.
-3. **Sampling abstraction (done)**  
+7. **Sampling abstraction (done)**  
    - `core/sampling.py` exposes `SamplerPipeline`, and `data_sampler.py` is a thin CLI wrapper.
 
 *(Detailed component map and historical milestones continue below for context.)*
@@ -56,6 +95,17 @@ Last updated: 2025-02-14
 
 3. **Training Scripts**
    - Rely on `datautils_*` for dataset creation, `loss_utils` for evaluation, and `quantize` modules for model mutation.
+
+**2025-02-14 import graph snapshot**
+- Top-level entrypoints (`quantize/block_ap*.py`, `crossblockquant.py`, `greedy_trainer*.py`) now depend on:
+  - `EfficientQAT.core.quantization` for pack/export utilities.
+  - `EfficientQAT.quantize.block_pipeline` (or the new `quantize.greedy.*` helpers) for orchestration.
+  - `EfficientQAT.utils` for loss recorders + AMP helpers.
+- Shared greedy modules:
+  - `quantize/greedy/pipeline.py` imports `core.quantization`, `datautils_block`, `loss_utils`, `quantize.visualization`, and `utils`.
+  - `quantize/greedy/training.py` consumes `quantize.common`, `utils`, and `int_linear_fake`.
+  - `quantize/greedy/common.py` only depends on `quantize.utils` (for `Catcher`).
+- Support modules with minimal internal deps: `core/pipeline/base.py`, `core/sampling.py`, `loss_utils.py`, and most `model_transfer/*` files have no EfficientQAT imports, i.e., they sit at the bottom of the dependency graph.
 
 ## 3. Refactor Objectives
 

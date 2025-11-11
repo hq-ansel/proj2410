@@ -1,16 +1,12 @@
-import shutil
-import time
-import os
 import copy
-import pdb
-import gc
 import math
+import pdb
+import time
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from torch.optim.lr_scheduler import CosineAnnealingLR
-from torch.utils.data import DataLoader,Dataset
+from torch.utils.data import DataLoader
 
 from .. import utils
 from EfficientQAT.core.quantization import (
@@ -19,343 +15,211 @@ from EfficientQAT.core.quantization import (
     export_zero_tensor,
 )
 from . import int_linear_fake
+from .block_pipeline import BlockContext, BlockPipeline, CombinedDataset, update_dataset
 from .utils import (
-    quant_parameters,weight_parameters,trainable_parameters,
-    set_quant_state,quant_inplace,set_quant_parameters,
-    set_weight_parameters,trainable_parameters_num,get_named_linears,set_op_by_name)
-from ..datautils_block import BlockTrainDataset
-class CombinedDataset(Dataset):
-    def __init__(self, quant_dataset, fp_dataset):
-        assert len(quant_dataset) == len(fp_dataset), "Datasets must have the same length"
-        self.quant_dataset = quant_dataset
-        self.fp_dataset = fp_dataset
+    quant_parameters, weight_parameters, trainable_parameters,
+    set_quant_state, quant_inplace, set_quant_parameters,
+    set_weight_parameters, trainable_parameters_num, get_named_linears, set_op_by_name,
+)
 
-    def __len__(self):
-        return len(self.quant_dataset)
 
-    def __getitem__(self, idx):
-        quant_data = self.quant_dataset[idx]
-        fp_data = self.fp_dataset[idx]
-        return quant_data, fp_data
+def _train_block_explore(ctx: BlockContext, stage) -> None:
+    block_index = stage.metadata["indices"][0]
+    args = ctx.args
+    dev = ctx.device
+    logger = ctx.logger
+    loss_func = nn.MSELoss()
+    fp_train = ctx.fp_train_inps
+    fp_val = ctx.fp_val_inps
+    quant_train = ctx.quant_train_inps
+    quant_val = ctx.quant_val_inps
+    if fp_train is None or fp_val is None or quant_train is None or quant_val is None:
+        raise RuntimeError("BlockPipeline datasets have not been initialised.")
 
-def update_dataset(layer, dataset, dev, attention_mask, position_ids):
-    with torch.no_grad():
-        with torch.cuda.amp.autocast():
-            for index, inps in enumerate(dataset):
-                inps = inps.to(dev)
-                if len(inps.shape)==2:
-                    inps = inps.unsqueeze(0)
-                new_data = layer(inps, attention_mask=attention_mask,position_ids=position_ids)[0].to('cpu')
-                dataset.update_data(index,new_data)
+    step = 1
+    logger.info(f"=== Start quantize blocks {block_index}===")
+    layer = ctx.layers[block_index].to(dev)
+    qlayer = copy.deepcopy(layer)
+    for name, module in qlayer.named_modules():
+        if isinstance(module, nn.Linear):
+            quantlinear = int_linear_fake.QuantLinear(module, args.wbits, args.group_size, args)
+            set_op_by_name(qlayer, name, quantlinear)
+            del module
+    qlayer.to(dev)
 
-                    
-def block_ap_explore(
-    model,
-    args,
-    trainloader,
-    valloader,
-    logger=None,
-):
-    logger.info("Starting ...")
-    if args.off_load_to_disk:
-        logger.info("offload the training dataset to disk, saving CPU memory, but may slowdown the training due to additional I/O...")
-    
-    dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    use_cache = model.config.use_cache
-    model.config.use_cache = False
-    
-    # step 1: move embedding layer and first layer to target device, only suppress llama models now
-    layers = model.model.layers
-    model.model.embed_tokens = model.model.embed_tokens.to(dev)
-    model.model.norm = model.model.norm.to(dev)
-    if hasattr(model.model, 'rotary_emb'):
-        # for llama-3.1
-        model.model.rotary_emb = model.model.rotary_emb.to(dev)
-    layers[0] = layers[0].to(dev)
-    dtype = torch.float16
+    set_quant_state(qlayer, weight_quant=False)
+    if args.epochs > 0:
+        update_dataset(qlayer, fp_train, dev, ctx.attention_mask, ctx.position_ids)
+        update_dataset(qlayer, fp_val, dev, ctx.attention_mask, ctx.position_ids)
+    set_quant_state(qlayer, weight_quant=True)
 
-    # step 2: init dataset
-    flag = time.time()
-    if args.off_load_to_disk:
-        fp_train_cache_path = f'{args.cache_dir}/{flag}/block_training_fp_train'
-        fp_val_cache_path = f'{args.cache_dir}/{flag}/block_training_fp_val'
-        quant_train_cache_path = f'{args.cache_dir}/{flag}/block_training_quant_train'
-        quant_val_cache_path = f'{args.cache_dir}/{flag}/block_training_quant_val'
-        for path in [fp_train_cache_path,fp_val_cache_path,quant_train_cache_path,quant_val_cache_path]:
-            if os.path.exists(path):
-                shutil.rmtree(path)
-    else:
-        fp_train_cache_path = None
-        fp_val_cache_path = None
-        quant_train_cache_path = None
-        quant_val_cache_path = None
-    fp_train_inps = BlockTrainDataset(args.train_size, args.training_seqlen, 
-                                model.config.hidden_size, args.batch_size, dtype, cache_path=fp_train_cache_path,off_load_to_disk=args.off_load_to_disk)
-    fp_val_inps = BlockTrainDataset(args.val_size, args.training_seqlen, 
-                                model.config.hidden_size, args.batch_size, dtype, cache_path=fp_val_cache_path,off_load_to_disk=args.off_load_to_disk)
-    
-    # step 3: catch the input of thefirst layer 
-    class Catcher(nn.Module):
-        def __init__(self, module, dataset):
-            super().__init__()
-            self.module = module
-            self.dataset = dataset
-            self.index = 0
-            self.attention_mask = None
-            self.position_ids = None
+    if args.epochs > 0:
+        with torch.no_grad():
+            qlayer.float()  # fp32 is required for AMP training
+        param = []
+        assert args.quant_lr > 0 or args.weight_lr > 0
+        param_group_index = 0
+        total_training_iteration = args.epochs * args.train_size / args.batch_size
+        if args.quant_lr > 0:
+            set_quant_parameters(qlayer, True)
+            param.append({"params": quant_parameters(qlayer), "lr": args.quant_lr})
+            empty_optimizer_1 = torch.optim.AdamW([torch.tensor(0)], lr=args.quant_lr)
+            quant_scheduler = CosineAnnealingLR(
+                empty_optimizer_1,
+                T_max=total_training_iteration,
+                eta_min=args.quant_lr/args.min_lr_factor,
+            )
+            quant_index = param_group_index
+            param_group_index += 1
+        else:
+            set_quant_parameters(qlayer, False)
 
-        def forward(self, inp, **kwargs):
-            self.dataset.update_data(self.index, inp.squeeze(0).to('cpu'))
-            self.index += 1
-            if self.attention_mask is None:
-                self.attention_mask = kwargs["attention_mask"]
-            if self.position_ids is None:
-                self.position_ids = kwargs["position_ids"]
-            raise ValueError
-    
-    # step 3.1: catch the input of training set
-    layers[0] = Catcher(layers[0],fp_train_inps)
-    iters = len(trainloader)//args.batch_size
-    with torch.no_grad():
-        for i in range(iters):
-            data = torch.cat([trainloader[j][0] for j in range(i*args.batch_size,(i+1)*args.batch_size)],dim=0)
-            try:
-                model(data.to(dev))
-            except ValueError:
-                pass
-    layers[0] = layers[0].module
+        if args.weight_lr > 0:
+            set_weight_parameters(qlayer, True)
+            param.append({"params": weight_parameters(qlayer), "lr": args.weight_lr})
+            empty_optimizer_2 = torch.optim.AdamW([torch.tensor(0)], lr=args.weight_lr)
+            weight_scheduler = CosineAnnealingLR(
+                empty_optimizer_2,
+                T_max=total_training_iteration,
+                eta_min=args.weight_lr/args.min_lr_factor,
+            )
+            weight_index = param_group_index
+            param_group_index += 1
+        else:
+            set_weight_parameters(qlayer, False)
+        optimizer = torch.optim.AdamW(param, weight_decay=args.wd, foreach=True)
+        loss_scaler = utils.NativeScalerWithGradNormCount()
+        trainable_number = trainable_parameters_num(qlayer)
+        logger.info(f"trainable parameter number: {trainable_number/1e6}M")
 
-    # step 3.2: catch the input of validation set
-    layers[0] = Catcher(layers[0],fp_val_inps)
-    iters = len(valloader)//args.batch_size
-    with torch.no_grad():
-        for i in range(iters):
-            data = torch.cat([valloader[j][0] for j in range(i*args.batch_size,(i+1)*args.batch_size)],dim=0)
-            try:
-                model(data.to(dev))
-            except ValueError:
-                pass
-    attention_mask = layers[0].attention_mask
-    position_ids = layers[0].position_ids
-    layers[0] = layers[0].module
-    if attention_mask is not None:
-        attention_mask_batch = attention_mask.repeat(args.batch_size,1,1,1).float()
-    else:
-        logger.info(
-            "No attention mask caught from the first layer."
-            " Seems that model's attention works without a mask."
-        )
-        attention_mask_batch = None
-    
-    # step 4: move embedding layer and first layer to cpu
-    layers[0] = layers[0].cpu()
-    model.model.embed_tokens = model.model.embed_tokens.cpu()
-    model.model.norm = model.model.norm.cpu()
-    if hasattr(model.model, 'rotary_emb'):
-        # for llama-3.1
-        model.model.rotary_emb = model.model.rotary_emb.cpu()
-    torch.cuda.empty_cache()
+        best_val_loss = 1e6
+        early_stop_flag = 0
+        combined_dataset = CombinedDataset(quant_train, fp_train)
+        combined_loader = DataLoader(combined_dataset, batch_size=1, shuffle=True)
+        for epoch in range(args.epochs):
+            loss_list = []
+            norm_list = []
+            start_time = time.time()
 
-    # step 5: copy fp input as the quant input, they are same at the first layer
-    if args.off_load_to_disk:
-        # copy quant input from fp input, they are same in first layer
-        shutil.copytree(fp_train_cache_path, quant_train_cache_path)
-        shutil.copytree(fp_val_cache_path, quant_val_cache_path)
-        quant_train_inps = BlockTrainDataset(args.train_size, args.training_seqlen, 
-                                    model.config.hidden_size, args.batch_size, dtype, cache_path=quant_train_cache_path,off_load_to_disk=args.off_load_to_disk)
-        quant_val_inps = BlockTrainDataset(args.val_size, args.training_seqlen, 
-                                    model.config.hidden_size, args.batch_size, dtype, cache_path=quant_val_cache_path,off_load_to_disk=args.off_load_to_disk)
-    else:
-        quant_train_inps = BlockTrainDataset(args.train_size, args.training_seqlen, 
-                                    model.config.hidden_size, args.batch_size, dtype, cache_path=quant_train_cache_path,off_load_to_disk=args.off_load_to_disk)
-        quant_val_inps = BlockTrainDataset(args.val_size, args.training_seqlen, 
-                                    model.config.hidden_size, args.batch_size, dtype, cache_path=quant_val_cache_path,off_load_to_disk=args.off_load_to_disk)
-        for index,data in enumerate(fp_train_inps):
-            quant_train_inps.update_data(index, data)
-        for index,data in enumerate(fp_val_inps):
-            quant_val_inps.update_data(index, data)
+            for quant_inps, fp_inps in combined_loader:
+                if len(quant_inps.shape) == 4:
+                    quant_inps = quant_inps.squeeze(0)
+                    fp_inps = fp_inps.squeeze(0)
+                with torch.cuda.amp.autocast(False):
+                    inp = quant_inps.to(dev, dtype=torch.float32)
+                    label = fp_inps.to(dev, dtype=torch.float32)
+                    quant_out = qlayer(
+                        inp,
+                        attention_mask=ctx.attention_mask_batch,
+                        position_ids=ctx.position_ids,
+                    )[0]
+                    reconstruction_loss = loss_func(label, quant_out)
+                    loss = reconstruction_loss
 
-    # step 6: start training    
-    loss_func = torch.nn.MSELoss()
+                if not math.isfinite(loss.item()):
+                    logger.info("Loss is NAN, stopping training")
+                    pdb.set_trace()
 
-    # step 6.1: setup loss recorder
-    loss_dir="/home/ubuntu/data/exp/proj2410/logs"
-    loss_recorder = utils.BlockLossRecorder(file_path=os.path.join(loss_dir,f"Llama2-7b-block-ap-loss.csv"),)
-    for block_index in range(len(layers)):
-        step = 1
-        logger.info(f"=== Start quantize blocks {block_index}===")
-        # step 6.1: replace torch.nn.Linear with QuantLinear for QAT
-        layer = layers[block_index].to(dev)
-        qlayer = copy.deepcopy(layer)
-        for name, module in qlayer.named_modules():
-            if isinstance(module,torch.nn.Linear):
-                quantlinear = int_linear_fake.QuantLinear(module, args.wbits, args.group_size,args)
-                set_op_by_name(qlayer, name, quantlinear)  
-                del module  
-        qlayer.to(dev)
-        
-        
-        # step 6.2: obtain output of full-precision model for MSE
-        set_quant_state(qlayer,weight_quant=False) # deactivate quantization for obtaining ground truth
-        if args.epochs > 0:
-            update_dataset(qlayer,fp_train_inps,dev,attention_mask,position_ids)
-            update_dataset(qlayer,fp_val_inps,dev,attention_mask,position_ids)
-        set_quant_state(qlayer,weight_quant=True)  # activate quantization
-        
-        
-        if args.epochs > 0:
-            with torch.no_grad():
-                qlayer.float()      # fp32 is required for AMP training
-            # step 6.3: create optimizer and learning rate schedule
-            param = []
-            assert args.quant_lr > 0 or args.weight_lr > 0
-            param_group_index = 0
-            total_training_iteration = args.epochs * args.train_size / args.batch_size 
-            if args.quant_lr > 0:
-                set_quant_parameters(qlayer,True)
-                param.append({"params":quant_parameters(qlayer),"lr":args.quant_lr})
-                empty_optimizer_1 = torch.optim.AdamW([torch.tensor(0)], lr=args.quant_lr)
-                quant_scheduler = CosineAnnealingLR(empty_optimizer_1, T_max=total_training_iteration, eta_min=args.quant_lr/args.min_lr_factor)
-                quant_index = param_group_index
-                param_group_index += 1
-            else:
-                set_quant_parameters(qlayer,False)
-                
-            if args.weight_lr > 0:
-                set_weight_parameters(qlayer,True)
-                param.append({"params":weight_parameters(qlayer),"lr":args.weight_lr})
-                empty_optimizer_2 = torch.optim.AdamW([torch.tensor(0)], lr=args.weight_lr)
-                weight_scheduler = CosineAnnealingLR(empty_optimizer_2, T_max=total_training_iteration, eta_min=args.weight_lr/args.min_lr_factor)
-                weight_index = param_group_index
-                param_group_index += 1
-            else:
-                set_weight_parameters(qlayer,False)
-            optimizer = torch.optim.AdamW(param, weight_decay=args.wd,foreach=True)
-            loss_scaler = utils.NativeScalerWithGradNormCount()
-            trainable_number = trainable_parameters_num(qlayer)
-            print(f"trainable parameter number: {trainable_number/1e6}M")
+                if ctx.loss_recorder is not None:
+                    ctx.loss_recorder.record(
+                        f"{block_index}",
+                        step,
+                        reconstruction_loss.detach().cpu().item(),
+                    )
+                loss_list.append(reconstruction_loss.detach().cpu())
+                optimizer.zero_grad()
+                norm = loss_scaler(loss, optimizer, parameters=trainable_parameters(qlayer)).cpu()
+                norm_list.append(norm.data)
 
-            best_val_loss = 1e6
-            early_stop_flag = 0
-            for epoch in range(args.epochs):
-                # step: 6.4 training
-                loss_list = []
-                norm_list = []
-                start_time = time.time()
-                combined_dataset = CombinedDataset(quant_train_inps, fp_train_inps)
-                combined_loader = DataLoader(combined_dataset, batch_size=1, shuffle=True)
+                if args.quant_lr > 0:
+                    quant_scheduler.step()
+                    optimizer.param_groups[quant_index]["lr"] = quant_scheduler.get_lr()[0]
+                if args.weight_lr > 0:
+                    weight_scheduler.step()
+                    optimizer.param_groups[weight_index]["lr"] = weight_scheduler.get_lr()[0]
+                step += 1
 
-                # for index, (quant_inps, fp_inps) in enumerate(zip(quant_train_inps, fp_train_inps)):    
-                for index, (quant_inps, fp_inps) in enumerate(combined_loader):
-                    # print(f"shape of quant_inps: {quant_inps.shape}, shape of fp_inps: {fp_inps.shape}")
-                    if len(quant_inps.shape)==4:
-                        quant_inps = quant_inps.squeeze(0)
-                        fp_inps = fp_inps.squeeze(0)
-                    # obtain output of quantization model
-                    with torch.cuda.amp.autocast(False):
-                        input = quant_inps.to(dev,dtype=torch.float32)
-                        label = fp_inps.to(dev,dtype=torch.float32)
-                        quant_out = qlayer(input, attention_mask=attention_mask_batch,position_ids=position_ids)[0]
+            val_loss_list = []
+            for quant_inps, fp_inps in zip(quant_val, fp_val):
+                with torch.no_grad():
+                    with torch.cuda.amp.autocast():
+                        inp = quant_inps.to(dev)
+                        label = fp_inps.to(dev)
+                        quant_out = qlayer(
+                            inp,
+                            attention_mask=ctx.attention_mask_batch,
+                            position_ids=ctx.position_ids,
+                        )[0]
                         reconstruction_loss = loss_func(label, quant_out)
-                        loss =  reconstruction_loss
+                val_loss_list.append(reconstruction_loss.cpu())
 
-                    if not math.isfinite(loss.item()):
-                        logger.info("Loss is NAN, stopping training")
-                        pdb.set_trace()
-                    loss_recorder.record(f"{block_index}",step,reconstruction_loss.detach().cpu().item())
-                    loss_list.append(reconstruction_loss.detach().cpu())
-                    optimizer.zero_grad()
-                    # # debug
-                    # print(f"Loss dtype: {loss.dtype}")
-                    # for param in qlayer.parameters():
-                    #     print(f"Param dtype: {param.dtype}")
-                    #     if param.grad is not None:
-                    #         print(f"Param grad dtype: {param.grad.dtype}")
+            train_mean_num = min(len(loss_list), 64)
+            loss_mean = torch.stack(loss_list)[-(train_mean_num-1):].mean()
+            val_loss_mean = torch.stack(val_loss_list).mean()
+            norm_mean = torch.stack(norm_list).mean()
+            logger.info(
+                f"blocks {block_index} epoch {epoch} recon_loss:{loss_mean} "
+                f"val_loss:{val_loss_mean} quant_lr:{quant_scheduler.get_lr()[0]} "
+                f"norm:{norm_mean:.8f} max memory_allocated {torch.cuda.max_memory_allocated(dev) / 1024**2} "
+                f"time {time.time()-start_time} "
+            )
+            if val_loss_mean < best_val_loss:
+                best_val_loss = val_loss_mean
+            else:
+                early_stop_flag += 1
+                if args.early_stop > 0 and early_stop_flag >= args.early_stop:
+                    break
 
-                    norm = loss_scaler(loss, optimizer,parameters=trainable_parameters(qlayer)).cpu()
-                    norm_list.append(norm.data)
+        optimizer.zero_grad()
+        del optimizer
 
-                    # adjust lr
-                    if args.quant_lr > 0:
-                        quant_scheduler.step()
-                        optimizer.param_groups[quant_index]['lr'] = quant_scheduler.get_lr()[0]
-                    if args.weight_lr >0 :
-                        weight_scheduler.step()
-                        optimizer.param_groups[weight_index]['lr'] = weight_scheduler.get_lr()[0]
-                    step += 1
+    qlayer.half()
+    quant_inplace(qlayer)
+    set_quant_state(qlayer, weight_quant=False)
 
-                # step 6.5: calculate validation loss
-                val_loss_list = []
-                for index, (quant_inps,fp_inps) in enumerate(zip(quant_val_inps, fp_val_inps)):  
-                    # obtain output of quantization model
-                    with torch.no_grad():
-                        with torch.cuda.amp.autocast():
-                            input = quant_inps.to(dev)
-                            label = fp_inps.to(dev)
-                            quant_out = qlayer(input, attention_mask=attention_mask_batch,position_ids=position_ids)[0]
-                            reconstruction_loss = loss_func(label, quant_out)
-                    val_loss_list.append(reconstruction_loss.cpu())
-                 
-                train_mean_num = min(len(loss_list),64) # calculate the average training loss of last train_mean_num samples
-                loss_mean = torch.stack(loss_list)[-(train_mean_num-1):].mean()
-                val_loss_mean = torch.stack(val_loss_list).mean()
-                norm_mean = torch.stack(norm_list).mean()
-                logger.info(f"blocks {block_index} epoch {epoch} recon_loss:{loss_mean} val_loss:{val_loss_mean} quant_lr:{quant_scheduler.get_lr()[0]} norm:{norm_mean:.8f} max memory_allocated {torch.cuda.max_memory_allocated(dev) / 1024**2} time {time.time()-start_time} ")
-                if val_loss_mean < best_val_loss:
-                    best_val_loss = val_loss_mean
-                else:
-                    early_stop_flag += 1
-                    if args.early_stop > 0 and early_stop_flag >=args.early_stop:
-                        break
-            optimizer.zero_grad()
-            del optimizer
+    if args.epochs > 0:
+        update_dataset(qlayer, quant_train, dev, ctx.attention_mask, ctx.position_ids)
+        update_dataset(qlayer, quant_val, dev, ctx.attention_mask, ctx.position_ids)
+    ctx.layers[block_index] = qlayer.to("cpu")
 
-        # step 6.6: directly replace the weight with fake quantization
-        qlayer.half()
-        quant_inplace(qlayer)
-        set_quant_state(qlayer,weight_quant=False)  # weight has been quantized inplace
+    if ctx.loss_recorder is not None:
+        ctx.loss_recorder.save_to_file()
 
-        # step 6.7: update inputs of quantization model
-        if args.epochs>0:
-            update_dataset(qlayer,quant_train_inps,dev,attention_mask,position_ids)
-            update_dataset(qlayer,quant_val_inps,dev,attention_mask,position_ids)
-        layers[block_index] = qlayer.to("cpu")
-
-        loss_recorder.save_to_file()
-        # step 7: pack quantized weights into low-bits format, note that this process is slow on poor CPU or busy CPU
-        if args.real_quant:
-            named_linears = get_named_linears(qlayer, int_linear_fake.QuantLinear)
-            for name, module in named_linears.items():
-                quantizer_version = getattr(module, "quantizer_version", getattr(args, "quantizer_version", "v1"))
-                scales = export_scale_tensor(module.weight_quantizer)
-                zeros = export_zero_tensor(module.weight_quantizer, quantizer_version)
-                group_size = module.weight_quantizer.group_size
-                dim0 = module.weight.shape[0]
-                scales = scales.view(dim0, -1).transpose(0, 1).contiguous()
-                zeros = zeros.view(dim0, -1).transpose(0, 1).contiguous()
-                q_linear = build_real_quant_linear(
-                    version=quantizer_version,
-                    wbits=args.wbits,
-                    group_size=group_size,
-                    in_features=module.in_features,
-                    out_features=module.out_features,
-                    bias=module.bias is not None,
-                    clamp_input=getattr(args, "clamp_input", False),
-                )
-                q_linear.pack(module.cpu(), scales.float(), zeros.float())
-                set_op_by_name(qlayer, name, q_linear)
-                logger.info(f"pack quantized {name} finished")
-                del module
-        del layer
-        torch.cuda.empty_cache()
-
-    # delete cached dataset
-    if args.off_load_to_disk:
-        for path in [fp_train_cache_path,fp_val_cache_path,quant_train_cache_path,quant_val_cache_path]:
-            if os.path.exists(path):
-                shutil.rmtree(path)
-
+    if args.real_quant:
+        named_linears = get_named_linears(qlayer, int_linear_fake.QuantLinear)
+        for name, module in named_linears.items():
+            quantizer_version = getattr(module, "quantizer_version", getattr(args, "quantizer_version", "v1"))
+            scales = export_scale_tensor(module.weight_quantizer)
+            zeros = export_zero_tensor(module.weight_quantizer, quantizer_version)
+            group_size = module.weight_quantizer.group_size
+            dim0 = module.weight.shape[0]
+            scales = scales.view(dim0, -1).transpose(0, 1).contiguous()
+            zeros = zeros.view(dim0, -1).transpose(0, 1).contiguous()
+            q_linear = build_real_quant_linear(
+                version=quantizer_version,
+                wbits=args.wbits,
+                group_size=group_size,
+                in_features=module.in_features,
+                out_features=module.out_features,
+                bias=module.bias is not None,
+                clamp_input=getattr(args, "clamp_input", False),
+            )
+            q_linear.pack(module.cpu(), scales.float(), zeros.float())
+            set_op_by_name(qlayer, name, q_linear)
+            logger.info(f"pack quantized {name} finished")
+            del module
+    del layer
     torch.cuda.empty_cache()
-    gc.collect()                    
-    model.config.use_cache = use_cache
+
+
+def block_ap_explore(model, args, trainloader, valloader, logger=None):
+    pipeline = BlockPipeline(
+        model,
+        args,
+        trainloader,
+        valloader,
+        executor=_train_block_explore,
+        logger=logger,
+    )
+    pipeline.run()
     return model

@@ -19,6 +19,7 @@ __pycache__/
 *.sqlite3
 *.log
 *.pot
+wandb/
 
 # 单元测试覆盖率报告
 htmlcov/

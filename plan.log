@@ -3,6 +3,18 @@
 Last updated: 2025-02-14
 
 ## Current Focus & Status (reverse chronology)
+TODO
+最近还打算实现一个思路
+- 需要重新设计量化器的结构，应该能够将linear包装进去，然后需要
+   - 实现对输入的量化，并且不影响梯度传递
+   - 实现对权重的量化，需要能主导自动求导功能，重点实际是能调整对应的梯度
+   - 实现估计误差功能(异步计算)，需要能够估计输入误差，权重误差，梯度误差
+- 需要实现一个全局的单例量化器管理器
+   - 每次存在一个这样的量化器实例，将{prefix,实例}注册在全局管理器中
+   - 能够通过全局管理器统一管理scale，zero point这样的参数，方便optimizer处理
+   - 需要一个管理所有示例的误差统计中心，搜集所有的误差结果方便分析
+
+
 
 0. **Block pipeline consolidation (✅ done)**  
    - Shared capture/training/export helpers now live in `quantize/block_pipeline.py`

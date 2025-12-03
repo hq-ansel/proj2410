@@ -24,8 +24,6 @@ from ..utils import (
 from .common import CatcherManager, CosineAnnealingScheduler
 
 
-
-
 def train_units_layers(
     model: PreTrainedModel,
     trainable_layer_idx_list: List[int],
@@ -93,7 +91,7 @@ def train_units_layers(
             quant_scheduler = CosineAnnealingLR(
                 empty_optimizer_1,
                 T_max=total_training_iteration,
-                eta_min=train_params["quant_lr"] / train_params["min_lr_factor"],
+                eta_min=train_params["quant_lr"] / hyper_params["min_lr_factor"],
             )
             quant_index = param_group_index
             param_group_index += 1
@@ -109,7 +107,7 @@ def train_units_layers(
             weight_scheduler = CosineAnnealingLR(
                 empty_optimizer_2,
                 T_max=total_training_iteration,
-                eta_min=train_params["weight_lr"] / train_params["min_lr_factor"],
+                eta_min=train_params["weight_lr"] / hyper_params["min_lr_factor"],
             )
             weight_index = param_group_index
             param_group_index += 1
@@ -182,9 +180,9 @@ def train_units_layers(
             ascend=True,
         )
 
-    position_ids = torch.arange(
-        train_params["training_seqlen"], dtype=torch.long, device=train_params["dev"]
-    ).unsqueeze(0).expand(train_params["batch_size"], -1).contiguous()
+    # position_ids = torch.arange(
+    #     train_params["training_seqlen"], dtype=torch.long, device=train_params["dev"]
+    # ).unsqueeze(0).expand(train_params["batch_size"], -1).contiguous()
 
     if hyper_params.get("swa", False):
         swa_model = torch.optim.swa_utils.AveragedModel(
@@ -216,9 +214,7 @@ def train_units_layers(
                     layer_outputs = qlayers[layer_idx](
                         hidden_states=hidden_state,
                         attention_mask=attention_mask.float(),
-                        position_ids=position_ids,
-                        output_attentions=False,
-                        use_cache=False,
+                        position_embeddings=position_embeddings,
                     )
                     hidden_state = layer_outputs[0]
                 loss = loss_func(hidden_state, trg)
@@ -287,7 +283,7 @@ def train_units_layers(
                         layer_outputs = qlayers[layer_idx](
                             hidden_states=hidden_state,
                             attention_mask=attention_mask.float(),
-                            position_ids=position_ids,
+                            position_embeddings=position_embeddings,
                             output_attentions=False,
                             use_cache=False,
                         )

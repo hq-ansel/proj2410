@@ -1,0 +1,111 @@
+# Llama2-7B Quantization Comparison Plan
+
+## Targets
+- Base FP16 checkpoint: `/home/ubuntu/data/exp/proj2410/model/Llama2-7b`.
+- Quantized artifacts per algorithm under `/home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/<algo>/w2g128`.
+- Validation/calibration always uses the **train** split of `togethercomputer/RedPajama-Data-1T-Sample` via streaming, mirroring the helper in `opponent/AQLM/src/datautils.py:24-132`.
+
+## Shared streaming data + orchestration
+1. **Streaming cache helper**  
+   - Reuse the logic from `get_red_pajama` (`opponent/AQLM/src/datautils.py:57-132`) to sample `nsamples × seqlen` tokens without downloading the whole dataset.  
+   - The helper writes cached tensors (shape `[1, seqlen]`) under `cache/redpajama_stream/<hash>.pt` and replays them for every algorithm to avoid redundant sampling.
+2. **Plan runner**  
+   - Script: `opponent/plan_pipeline.py`.  
+   - Responsibilities:
+     - Offer `stream_redpajama_cache(nsamples, seqlen, seed, build)` that optionally materializes the streaming cache.  
+     - Define `plan_aqlm`, `plan_gptqmodel`, `plan_qtip`, `plan_vptq` functions. Each function:
+       - Returns the target output directory (`quant_model/.../<algo>/w2g128`) and exact launch command/arguments.
+       - Records which cache file / tokenizer config must be used.
+     - `main()` executes the plan functions sequentially and prints structured instructions; optional `--materialize-cache` flag builds all required caches up front so each downstream script can read from disk instead of touching `datasets` again.
+
+## Algorithm-specific steps
+
+### 1. AQLM
+- **Reference**: CLI workflow in `opponent/AQLM/README.md:200-245` plus RedPajama recommendation in `opponent/AQLM/README.md:148-233`.
+- **Calibration**: `nsamples=1024`, `seqlen=4096`, cache built once through the shared helper and passed as `$DATASET_PATH`.
+- **Quantization command** (stored in `plan_pipeline.py` and mirrored here):
+  ```
+  CUDA_VISIBLE_DEVICES=0 \
+  python opponent/AQLM/main.py \
+    /home/ubuntu/data/exp/proj2410/model/Llama2-7b \
+    /home/ubuntu/data/exp/proj2410/cache/redpajama_stream/aqlm_sl4096_n1024_seed42.pt \
+    --nsamples=1024 \
+    --val_size=128 \
+    --num_codebooks=1 \
+    --nbits_per_codebook=16 \
+    --in_group_size=8 \
+    --relative_mse_tolerance=0.01 \
+    --finetune_batch_size=32 \
+    --finetune_max_epochs=10 \
+    --finetune_early_stop=3 \
+    --finetune_keep_best \
+    --local_batch_size=1 \
+    --offload_activations \
+    --save /home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/aqlm/w2g128
+  ```
+- **Finetuning / PV-Tuning**: optional follow-up via `finetune.py` (`opponent/AQLM/README.md:252-310`) once the base quantization succeeds.
+- **Evaluation**: `python -m eval.perplexity ...` using the same cached dataset to keep validation consistent.
+
+### 2. GPTQModel (GPTQ/AWQ baseline)
+- **Reference**: toolkit overview at `opponent/GPTQModel/README.md:127-350` and example script at `opponent/GPTQModel/examples/quantization/basic_usage_wikitext2.py:6-72`.
+- **Needed adjustments**:
+  - Replace the `load_dataset(..., split="train")` call inside `get_wikitext2` with the shared streaming helper so that calibration samples come from RedPajama train without local snapshotting.
+  - Convert the cached tensors to the dict format expected by `GPTQModel.quantize` (`{"input_ids": ..., "attention_mask": ...}`) before invoking the API (`README.md:268-291`).
+  - Use `QuantizeConfig(bits=2, group_size=128)` to match the `w2g128` naming convention; AWQ/EoRA toggles can be added later via `QuantizeConfig` options described in `README.md:395-431`.
+- **Quantization entry point**:
+  - Script `opponent/plan_pipeline.py` provides `plan_gptqmodel()` plus a helper to run the following mini-program so everything stays colocated with the repo:
+    ```python
+    from gptqmodel import GPTQModel, QuantizeConfig
+    from opponent.plan_pipeline import load_cached_samples_for_gptqmodel
+
+    dataset = load_cached_samples_for_gptqmodel(cache_path)
+    model = GPTQModel.load("/home/ubuntu/data/exp/proj2410/model/Llama2-7b", QuantizeConfig(bits=2, group_size=128))
+    model.quantize(dataset, batch_size=1)
+    model.save("/home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/gptq/w2g128")
+    ```
+- **Validation**: reuse `calculate_avg_ppl` from the example file (`basic_usage_wikitext2.py:25-43`) but point it to the cached RedPajama samples to maintain parity with the other methods.
+
+### 3. QTIP
+- **Reference**:
+  - High-level usage in `opponent/qtip/README.md:14-59`.
+  - Dataset hooks located at `opponent/qtip/lib/utils/data_utils.py:188-279`.
+  - Main driver uses those hooks at `opponent/qtip/quantize_llama/quantize_finetune_llama.py:132-205`.
+- **Needed adjustments**:
+  1. Patch `sample_rp1t` / `sample_rp1t_concat` to call the shared streaming helper instead of instantiating the full `load_dataset('... RedPajama ...', split='train')`, which currently downloads the whole shard (lines 196-252).
+  2. Keep the returned tensor format identical (`torch.zeros((size, ctx_size))`) so the rest of the pipeline stays unchanged.
+  3. Expose CLI flags (`--devset_size`, `--ctx_size`, `--sample_proc`) through `plan_pipeline.py` so we can script runs such as:
+     ```
+     CUDA_VISIBLE_DEVICES=0,1 \
+     python opponent/qtip/quantize_llama/quantize_finetune_llama.py \
+       --base_model /home/ubuntu/data/exp/proj2410/model/Llama2-7b \
+       --save_path /home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/qtip/w2g128 \
+       --devset_size 384 \
+       --ctx_size 4096 \
+       --batch_size 16 \
+       --L 16 --K 2 --V 2 \
+       --decode_mode quantlut_sym \
+       --sample_proc 4
+     ```
+- **Evaluation**: use `eval/interactive_gen.py --hf_path <local saved model>` (README lines 40-48) to ensure throughput and quality match expectations.
+
+### 4. VPTQ
+- **Reference**:
+  - Installation requirements (`opponent/VPTQ/README.md:70-122`).
+  - Algorithm branch note (`opponent/VPTQ/README.md:59` and repeated at `opponent/VPTQ/README.md:256`) plus community models references (`README.md:181-240`).
+  - CLI / HF usage examples at `README.md:184-219`.
+- **Plan**:
+  1. Build the official wheel from source (or `pip install vptq`) to access `vptq.AutoModelForCausalLM`.
+  2. Pull the early-release quantization tutorial from the `algorithm` branch (external) and port the relevant scripts into `opponent/VPTQ` as needed, making sure any `datasets.load_dataset` calls delegate to our shared streaming helper.
+  3. Quantize `/home/ubuntu/data/exp/proj2410/model/Llama2-7b` with vector length `v=8`, codebook size `k=65536`, residual size `256` to approximate 2-bit weights; store outputs at `/home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/vptq/w2g128`.
+  4. Validate via both `python -m vptq --model <local path>` and the HF Transformers API snippet (`README.md:200-218`) to guarantee compatibility with downstream inference stacks.
+
+## Output layout & reproducibility
+- Every algorithm writes inside `/home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/<algo>/w2g128`, following the naming convention already used by EfficientQAT (`quant_model/Llama2-7B/EfficientQAT/w2g128`).
+- Dataset caches live under `/home/ubuntu/data/exp/proj2410/cache/redpajama_stream/` and are keyed by `(algorithm, seqlen, nsamples, seed)` so they can be reused (or deleted) independently.
+- `opponent/plan_pipeline.py` keeps all commands, paths, and helper utilities in one importable location; future automation (e.g., invoking each quantization function programmatically) can reuse those helpers without rewriting path logic.
+
+## Next steps once plan is approved
+1. Implement the actual streaming helper and per-algorithm runners inside `opponent/plan_pipeline.py`.
+2. Patch GPTQModel and QTIP dataset loaders to call the shared helper (dependency injection or small shim).
+3. Mirror the same helper in any VPTQ quantization scripts we bring over from the algorithm branch.
+4. Execute each quantization run, log metrics (perplexity, throughput) into `plan.log`, and compare across algorithms using the same validation cache.

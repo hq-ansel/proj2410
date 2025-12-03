@@ -1,0 +1,9 @@
+README.md
+pyproject.toml
+efficientqat.egg-info/PKG-INFO
+efficientqat.egg-info/SOURCES.txt
+efficientqat.egg-info/dependency_links.txt
+efficientqat.egg-info/requires.txt
+efficientqat.egg-info/top_level.txt
+test/test_linear.py
+test/test_uniform_affine.py

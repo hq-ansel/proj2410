@@ -15,7 +15,7 @@ from . import utils
 from .datautils_block import get_loaders, test_ppl
 from .quantize.greedy_trainer import greedy_local_train
 from .quantize.int_linear_real import load_quantized_model  # 假设修复了模块
-
+from lm_eval.tasks import TaskManager
 
 
 # amp_enabled = os.environ.get("AMP_ENABLED", "False").lower() == "true"
@@ -23,7 +23,7 @@ from .quantize.int_linear_real import load_quantized_model  # 假设修复了模
 
 @torch.no_grad()
 def evaluate(model: Any, tokenizer: AutoTokenizer, config: Dict[str, Any], logger: Optional[Any] = None) -> Dict[str, Any]:
-    block_class_name = model.model.layers[0].__class__.__name__
+    # block_class_name = model.model.layers[0].__class__.__name__
     results = {}
     if config["train_param_settings"]["eval_ppl"]:
         datasets = ["wikitext2", "c4"]
@@ -38,13 +38,14 @@ def evaluate(model: Any, tokenizer: AutoTokenizer, config: Dict[str, Any], logge
         from lm_eval.models.huggingface import HFLM
         from lm_eval.utils import make_table
         task_list = config['train_param_settings']['eval_tasks'].split(',')
+        num_fewshot = config['train_param_settings']['num_fewshot']
         model_eval = HFLM(pretrained=model, batch_size=config.get('eval_batch_size', 16))
         print(f"Evaluating on tasks: {task_list}")
-        task_manager = lm_eval.tasks.TaskManager()
+        task_manager = TaskManager()
         eval_results = lm_eval.simple_evaluate(
             model=model_eval,
             tasks=task_list,
-            num_fewshot=0,
+            num_fewshot=num_fewshot,
             task_manager=task_manager,
         )
         if logger is not None:

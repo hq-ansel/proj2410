@@ -1,3 +1,4 @@
+# quantizer/greedy_trainer
 from functools import wraps
 import gc
 import logging
@@ -89,7 +90,7 @@ def _greedy_stage_executor(ctx, stage):
                     train_dataset=train_dataset,
                     val_dataset=val_dataset,
                     attention_mask=ctx.attention_mask,
-                    position_embeddings=ctx.position_ids,
+                    position_embeddings=ctx.position_embeddings,
                     loss_recorder=loss_recorder,
                     vis_recorder=vis_recorder,
                     logger=ctx.logger,
@@ -172,14 +173,14 @@ def _greedy_stage_executor(ctx, stage):
                         next_module=next_layer,
                         layer_idx=layer_idx + hyper_params["slide_step"],
                         attention_mask=ctx.attention_mask,
-                        position_embeddings=ctx.position_ids,
+                        position_embeddings=ctx.position_embeddings,
                     )
                     val_dataset.update_dataset(
                         module=layer,
                         next_module=next_layer,
                         layer_idx=layer_idx + hyper_params["slide_step"],
                         attention_mask=ctx.attention_mask,
-                        position_embeddings=ctx.position_ids,
+                        position_embeddings=ctx.position_embeddings,
                     )
                     layer.cpu()
                     next_layer.cpu()

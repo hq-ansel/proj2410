@@ -1,3 +1,4 @@
+# core/pipeline/base.py
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -38,7 +39,7 @@ class PipelineContext:
     config: PipelineConfig
     state: Dict[str, Any] = field(default_factory=dict)
     data: Any = None
-
+    extras: Dict[str, Any] = field(default_factory=dict)  # ✅ 改成 dict 而不是 None
 
 @dataclass
 class PipelineHooks:
@@ -65,12 +66,14 @@ class PipelineRunner:
         self.config = config
         self.hooks = hooks
 
-    def run(self) -> PipelineContext:
-        ctx = PipelineContext(config=self.config)
+    def run(self, ctx: Optional[PipelineContext] = None) -> PipelineContext:
+        # 如果调用方没有提供，就用默认的 PipelineContext
+        if ctx is None:
+            ctx = PipelineContext(config=self.config, extras=self.config.extra)
 
         self._call(self.hooks.setup, ctx)
-        ctx.data = self._call(self.hooks.prepare_data, ctx)
-
+        ctx = self._call(self.hooks.prepare_data, ctx)
+        assert ctx.extras["train_dataset"] is not None ,f"ctx:{ctx}"
         schedule = list(self._iter_schedule(ctx))
         for stage in schedule:
             ctx.state["current_stage"] = stage

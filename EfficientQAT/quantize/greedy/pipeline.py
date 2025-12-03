@@ -1,3 +1,4 @@
+# quantizer/greedy/pipeline.py
 """Greedy block-wise quantization pipeline that plugs into the shared runner."""
 
 from __future__ import annotations
@@ -182,14 +183,14 @@ class GreedyBlockPipeline(BlockPipeline):
                 train_dataset.position_embeddings[1].to(train_params["dev"]),
             )
             ctx.attention_mask = attention_mask
-            ctx.position_ids = position_embeddings
+            ctx.position_embeddings = position_embeddings
         else:
             train_inputs = [batch[0] for batch in trainloader]
             val_inputs = [batch[0] for batch in valloader]
             train_dataset = CommonInputDataset(train_inputs)
             val_dataset = CommonInputDataset(val_inputs)
             ctx.attention_mask = None
-            ctx.position_ids = None
+            ctx.position_embeddings = None
             target_model = copy.deepcopy(self.model)
             target_model.to(train_params["dev"])
         ctx.extras["target_model"] = target_model
@@ -200,6 +201,8 @@ class GreedyBlockPipeline(BlockPipeline):
         self.trainloader = None
         self.valloader = None
         gc.collect()
+        if self.loss_recorder_factory is not None and ctx.loss_recorder is None:
+            ctx.loss_recorder = self.loss_recorder_factory()
         return ctx
 
     def _export(self, ctx):
@@ -218,7 +221,7 @@ class GreedyBlockPipeline(BlockPipeline):
         if self._schedule_cache is None:
             window = max(1, self.hyper_params.get("crossblock_window_size", 1))
             step = max(1, self.hyper_params.get("slide_step", 1))
-            stages = list(build_block_schedule(len(ctx.layers), window_size=window, step=step))
+            stages = list(build_block_schedule(len(self.layers), window_size=window, step=step))
             if self.train_params.get("train_shedule_type") == "end2start":
                 stages = list(reversed(stages))
             self._schedule_cache = stages

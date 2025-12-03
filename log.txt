@@ -1,0 +1,1617 @@
+/home/ubuntu/data/exp/proj2410/EfficientQAT/.venv/lib/python3.12/site-packages/torch/cuda/__init__.py:63: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+W1203 21:19:37.731000 3684114 torch/distributed/run.py:803] 
+W1203 21:19:37.731000 3684114 torch/distributed/run.py:803] *****************************************
+W1203 21:19:37.731000 3684114 torch/distributed/run.py:803] Setting OMP_NUM_THREADS environment variable for each process to be 1 in default, to avoid your system being overloaded, please further tune the variable for optimal performance in your application as needed. 
+W1203 21:19:37.731000 3684114 torch/distributed/run.py:803] *****************************************
+/home/ubuntu/data/exp/proj2410/EfficientQAT/.venv/lib/python3.12/site-packages/torch/cuda/__init__.py:63: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+/home/ubuntu/data/exp/proj2410/EfficientQAT/.venv/lib/python3.12/site-packages/torch/cuda/__init__.py:63: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+[INFO][veomni:30] 12/03/2025 21:19:41 >> ❌ veomni_patch is not available
+[INFO][veomni.models.transformers.flux.modeling_flux:769] 12/03/2025 21:19:49 >> Apply liger kernel to Flux.
+[INFO][veomni.models.transformers.llama.modeling_llama:890] 12/03/2025 21:19:50 >> Apply liger kernel to Llama.
+[INFO][veomni.models.transformers.wan.modeling_wan:652] 12/03/2025 21:19:50 >> Apply liger kernel to Wan.
+[INFO][veomni.models.transformers.wan.modeling_wan:658] 12/03/2025 21:19:50 >> Apply fused interleaved rope to Wan.
+[INFO][veomni.models.transformers.deepseek_v3.modeling_deepseek:1445] 12/03/2025 21:19:50 >> Apply liger kernel to Deepseek-V3.
+[INFO][veomni.models.transformers.qwen2.modeling_qwen2:915] 12/03/2025 21:19:50 >> Apply liger kernel to Qwen2.
+[INFO][veomni.models.transformers.qwen2_vl.modeling_qwen2_vl:1979] 12/03/2025 21:19:50 >> Apply liger kernel to Qwen2-VL.
+[INFO][veomni.models.transformers.qwen3.modeling_qwen3:878] 12/03/2025 21:19:50 >> Apply liger kernel to Qwen3.
+[INFO][veomni.models.transformers.qwen3_moe.modeling_qwen3_moe:1508] 12/03/2025 21:19:50 >> Apply liger kernel to Qwen3_moe.
+[INFO][veomni.models.transformers.seed_oss.modeling_seed_oss:532] 12/03/2025 21:19:50 >> Apply liger kernel to seed-oss.
+[W1203 21:19:50.539253025 ProcessGroupNCCL.cpp:924] Warning: TORCH_NCCL_AVOID_RECORD_STREAMS is the default now, this environment variable is thus deprecated. (function operator())
+[WARNING][veomni.utils.arguments:584] 12/03/2025 21:19:50 >> `enable_rank0_init` will be deprecated in the future, please use `init_device=cpu` instead.
+[INFO][veomni.utils.arguments:610] 12/03/2025 21:19:50 >> Set gradient accumulation to 2.
+12/03/2025 21:19:50 - INFO - __main__ - Process rank: 0, world size: 2
+12/03/2025 21:19:50 - INFO - __main__ - {
+  "model": {
+    "config_path": "/home/ubuntu/data/exp/proj2410/model/Llama2-7b",
+    "model_path": "/home/ubuntu/data/exp/proj2410/model/Llama2-7b",
+    "tokenizer_path": "/home/ubuntu/data/exp/proj2410/model/Llama2-7b",
+    "foundation": {},
+    "encoders": {},
+    "decoders": {},
+    "input_encoder": "encoder",
+    "output_encoder": "decoder",
+    "encode_target": false,
+    "attn_implementation": "flash_attention_2",
+    "moe_implementation": null,
+    "basic_modules": [],
+    "force_use_huggingface": false
+  },
+  "data": {
+    "train_path": "/home/ubuntu/data/exp/proj2410/hf_home/rp_text_caches/redpajama_text_ns1024_sl4096_seed42_train/data-00000-of-00001.arrow",
+    "train_size": 10000000,
+    "data_type": "plaintext",
+    "dataloader_type": "native",
+    "datasets_type": "mapping",
+    "enable_multisource": false,
+    "source_name": null,
+    "data_tag": "default",
+    "drop_resume_buffer": false,
+    "text_keys": "text",
+    "image_keys": "images",
+    "chat_template": "default",
+    "max_seq_len": 4096,
+    "num_workers": 2,
+    "prefetch_factor": 2,
+    "drop_last": true,
+    "pin_memory": true,
+    "shuffle_shard_nums": 1,
+    "split_nums": 1,
+    "predownload_factor": 0.5,
+    "silent_exception": false
+  },
+  "train": {
+    "output_dir": "/home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/EfficientQAT/test",
+    "lr": 0.0003,
+    "lr_min": 1e-07,
+    "lr_start": 0.0,
+    "weight_decay": 0.01,
+    "no_decay_modules": [],
+    "no_decay_params": [],
+    "optimizer": "adamw",
+    "max_grad_norm": 1.0,
+    "micro_batch_size": 1,
+    "global_batch_size": 2,
+    "num_train_epochs": 2,
+    "rmpad": false,
+    "rmpad_with_pos_ids": true,
+    "dyn_bsz": true,
+    "dyn_bsz_margin": 0,
+    "dyn_bsz_runtime": "worker",
+    "dyn_bsz_buffer_size": 200,
+    "bsz_warmup_ratio": 0.007,
+    "bsz_warmup_init_mbtoken": 200,
+    "lr_warmup_ratio": 0.007,
+    "lr_decay_style": "constant",
+    "lr_decay_ratio": 1.0,
+    "enable_mixed_precision": true,
+    "enable_gradient_checkpointing": true,
+    "enable_reentrant": false,
+    "enable_full_shard": true,
+    "enable_forward_prefetch": true,
+    "enable_fsdp_offload": false,
+    "enable_activation_offload": false,
+    "activation_gpu_limit": 40.0,
+    "enable_rank0_init": false,
+    "init_device": "meta",
+    "broadcast_model_weights_from_rank0": true,
+    "enable_full_determinism": false,
+    "allow_cuda_launch_blocking": false,
+    "empty_cache_steps": 500,
+    "gc_steps": 500,
+    "data_parallel_mode": "fsdp2",
+    "data_parallel_replicate_size": 1,
+    "data_parallel_shard_size": 1,
+    "tensor_parallel_size": 1,
+    "expert_parallel_size": 1,
+    "ep_outside": false,
+    "pipeline_parallel_size": 1,
+    "ulysses_parallel_size": 2,
+    "context_parallel_size": 1,
+    "ckpt_manager": "dcp",
+    "save_async": false,
+    "load_checkpoint_path": "",
+    "save_steps": 100,
+    "save_epochs": 1,
+    "save_hf_weights": true,
+    "seed": 42,
+    "enable_compile": false,
+    "use_wandb": true,
+    "wandb_project": "Meta-Llama-2-7B",
+    "wandb_name": "Meta-Llama-2-7B-TEST",
+    "enable_profiling": false,
+    "profile_start_step": 1,
+    "profile_end_step": 2,
+    "profile_trace_dir": "./trace",
+    "profile_record_shapes": true,
+    "profile_profile_memory": true,
+    "profile_with_stack": true,
+    "profile_rank0_only": true,
+    "max_steps": null
+  }
+}
+[WARNING][veomni.utils.arguments:330] 12/03/2025 21:19:51 >> Recommend to use hdfs path or hdfs_fuse path as the output path.
+[INFO][veomni.distributed.parallel_state:461] 12/03/2025 21:19:51 >> Initializing parallel state... dp_size 1, dp_replicate_size 1, dp_shard_size 1,tp_size 1, pp_size 1, ep_size 1, cp_size 1, ulysses_size 2
+[INFO][veomni.distributed.parallel_state:532] 12/03/2025 21:19:51 >> Device mesh: DeviceMesh((dp_shard=1, ulysses=2), device: 'cuda', stride: (2, 1))
+[INFO][veomni.distributed.parallel_state:533] 12/03/2025 21:19:51 >> EP FSDP device mesh: None
+12/03/2025 21:19:51 - INFO - __main__ - Prepare data
+[INFO|tokenization_utils_base.py:2096] 2025-12-03 21:19:51,405 >> loading file tokenizer.model
+[INFO|tokenization_utils_base.py:2096] 2025-12-03 21:19:51,406 >> loading file tokenizer.json
+[W1203 21:19:51.997543231 ProcessGroupNCCL.cpp:924] Warning: TORCH_NCCL_AVOID_RECORD_STREAMS is the default now, this environment variable is thus deprecated. (function operator())
+[INFO|tokenization_utils_base.py:2096] 2025-12-03 21:19:51,406 >> loading file added_tokens.json
+[INFO|tokenization_utils_base.py:2096] 2025-12-03 21:19:51,406 >> loading file special_tokens_map.json
+[INFO|tokenization_utils_base.py:2096] 2025-12-03 21:19:51,406 >> loading file tokenizer_config.json
+[INFO|tokenization_utils_base.py:2096] 2025-12-03 21:19:51,406 >> loading file chat_template.jinja
+12/03/2025 21:19:51 - INFO - __main__ - Process rank: 1, world size: 2
+12/03/2025 21:19:51 - INFO - __main__ - Start building mapping dataset
+/home/ubuntu/data/exp/proj2410/EfficientQAT/.venv/lib/python3.12/site-packages/torch/distributed/distributed_c10d.py:4876: UserWarning: barrier(): using the device under current context. You can specify `device_id` in `init_process_group` to mute this warning.
+  warnings.warn(  # warn only once
+[rank0]:[W1203 21:19:52.221336549 ProcessGroupNCCL.cpp:5068] Guessing device ID based on global rank. This can cause a hang if rank to GPU mapping is heterogeneous. You can specify device_id in init_process_group()
+[INFO][veomni.data.data_loader:82] 12/03/2025 21:19:53 >> train_steps: 1225, max_seq_len: 4096, use_rmpad: True, bsz_warmup_steps: 8, bsz_warmup_init_mbtoken: 200, token_micro_bsz: 4096, num_micro_batch: 2, micro_batch_size: 1, global_batch_size: 2, dp_size: 1, sp_size: 2.
+12/03/2025 21:19:53 - INFO - __main__ - Prepare model
+[INFO|configuration_utils.py:766] 2025-12-03 21:19:53,158 >> loading configuration file /home/ubuntu/data/exp/proj2410/model/Llama2-7b/config.json
+[INFO|configuration_utils.py:842] 2025-12-03 21:19:53,163 >> Model config LlamaConfig {
+  "architectures": [
+    "LlamaForCausalLM"
+  ],
+  "attention_bias": false,
+  "attention_dropout": 0.0,
+  "bos_token_id": 1,
+  "dtype": "bfloat16",
+  "eos_token_id": 2,
+  "head_dim": 128,
+  "hidden_act": "silu",
+  "hidden_size": 4096,
+  "initializer_range": 0.02,
+  "intermediate_size": 11008,
+  "max_position_embeddings": 2048,
+  "mlp_bias": false,
+  "model_type": "llama",
+  "num_attention_heads": 32,
+  "num_hidden_layers": 32,
+  "num_key_value_heads": 32,
+  "pretraining_tp": 1,
+  "rms_norm_eps": 1e-05,
+  "rope_scaling": null,
+  "rope_theta": 10000.0,
+  "tie_word_embeddings": false,
+  "transformers_version": "4.57.1",
+  "use_cache": true,
+  "vocab_size": 32000
+}
+
+[INFO][veomni.models.loader:149] 12/03/2025 21:19:53 >> Loading model from customized modeling: LlamaForCausalLM ModelRegistry.supported_models dict_keys(['DeepseekV3ForCausalLM', 'FluxModel', 'Janus', 'LlamaForCausalLM', 'Qwen2ForCausalLM', 'Qwen2_5OmniForConditionalGeneration', 'Qwen2_5_VLForConditionalGeneration', 'Qwen2VLForConditionalGeneration', 'Qwen3ForCausalLM', 'Qwen3MoeForCausalLM', 'Qwen3VLForConditionalGeneration', 'Qwen3VLMoeForConditionalGeneration', 'SeedOssForCausalLM', 'WanModel'])
+[INFO][veomni.models.loader:104] 12/03/2025 21:19:53 >> Loading model from customized modeling.
+init_device: meta
+empty_init: True
+weights_path: /home/ubuntu/data/exp/proj2410/model/Llama2-7b
+[WARNING|logging.py:330] 2025-12-03 21:19:53,170 >> `torch_dtype` is deprecated! Use `dtype` instead!
+[INFO|modeling_utils.py:2344] 2025-12-03 21:19:53,170 >> Instantiating LlamaForCausalLM model under default dtype torch.float32.
+[INFO|configuration_utils.py:988] 2025-12-03 21:19:53,192 >> Generate config GenerationConfig {
+  "bos_token_id": 1,
+  "eos_token_id": 2
+}
+
+[INFO][veomni.utils.helper:454] 12/03/2025 21:19:53 >> VRAM usage after building model: cur 0.00GB, max 0.00GB.
+[INFO][veomni.distributed.torch_parallelize:437] 12/03/2025 21:19:53 >> Enable gradient checkpointing.
+[INFO][veomni.distributed.torch_parallelize:457] 12/03/2025 21:19:53 >> Apply data parallel to the model: fsdp2.
+[INFO][veomni.distributed.torch_parallelize:252] 12/03/2025 21:19:53 >> target classes to shard: {'LlamaDecoderLayer'}
+[INFO][veomni.distributed.torch_parallelize:292] 12/03/2025 21:19:53 >> layer pairs: [('model.layers.0', LlamaDecoderLayer(
+  (self_attn): LlamaAttention(
+    (q_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (k_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (v_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (o_proj): Linear(in_features=4096, out_features=4096, bias=False)
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (up_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (down_proj): Linear(in_features=11008, out_features=4096, bias=False)
+  )
+  (input_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+), None), ('model.layers.1', LlamaDecoderLayer(
+  (self_attn): LlamaAttention(
+    (q_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (k_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (v_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (o_proj): Linear(in_features=4096, out_features=4096, bias=False)
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (up_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (down_proj): Linear(in_features=11008, out_features=4096, bias=False)
+  )
+  (input_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+), None), ('model.layers.2', LlamaDecoderLayer(
+  (self_attn): LlamaAttention(
+    (q_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (k_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (v_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (o_proj): Linear(in_features=4096, out_features=4096, bias=False)
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (up_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (down_proj): Linear(in_features=11008, out_features=4096, bias=False)
+  )
+  (input_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+), None), ('model.layers.3', LlamaDecoderLayer(
+  (self_attn): LlamaAttention(
+    (q_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (k_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (v_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (o_proj): Linear(in_features=4096, out_features=4096, bias=False)
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (up_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (down_proj): Linear(in_features=11008, out_features=4096, bias=False)
+  )
+  (input_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+), None), ('model.layers.4', LlamaDecoderLayer(
+  (self_attn): LlamaAttention(
+    (q_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (k_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (v_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (o_proj): Linear(in_features=4096, out_features=4096, bias=False)
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (up_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (down_proj): Linear(in_features=11008, out_features=4096, bias=False)
+  )
+  (input_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+), None), ('model.layers.5', LlamaDecoderLayer(
+  (self_attn): LlamaAttention(
+    (q_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (k_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (v_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (o_proj): Linear(in_features=4096, out_features=4096, bias=False)
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (up_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (down_proj): Linear(in_features=11008, out_features=4096, bias=False)
+  )
+  (input_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+), None), ('model.layers.6', LlamaDecoderLayer(
+  (self_attn): LlamaAttention(
+    (q_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (k_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (v_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (o_proj): Linear(in_features=4096, out_features=4096, bias=False)
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (up_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (down_proj): Linear(in_features=11008, out_features=4096, bias=False)
+  )
+  (input_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+), None), ('model.layers.7', LlamaDecoderLayer(
+  (self_attn): LlamaAttention(
+    (q_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (k_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (v_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (o_proj): Linear(in_features=4096, out_features=4096, bias=False)
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (up_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (down_proj): Linear(in_features=11008, out_features=4096, bias=False)
+  )
+  (input_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+), None), ('model.layers.8', LlamaDecoderLayer(
+  (self_attn): LlamaAttention(
+    (q_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (k_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (v_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (o_proj): Linear(in_features=4096, out_features=4096, bias=False)
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (up_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (down_proj): Linear(in_features=11008, out_features=4096, bias=False)
+  )
+  (input_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+), None), ('model.layers.9', LlamaDecoderLayer(
+  (self_attn): LlamaAttention(
+    (q_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (k_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (v_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (o_proj): Linear(in_features=4096, out_features=4096, bias=False)
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (up_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (down_proj): Linear(in_features=11008, out_features=4096, bias=False)
+  )
+  (input_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+), None), ('model.layers.10', LlamaDecoderLayer(
+  (self_attn): LlamaAttention(
+    (q_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (k_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (v_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (o_proj): Linear(in_features=4096, out_features=4096, bias=False)
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (up_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (down_proj): Linear(in_features=11008, out_features=4096, bias=False)
+  )
+  (input_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+), None), ('model.layers.11', LlamaDecoderLayer(
+  (self_attn): LlamaAttention(
+    (q_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (k_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (v_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (o_proj): Linear(in_features=4096, out_features=4096, bias=False)
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (up_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (down_proj): Linear(in_features=11008, out_features=4096, bias=False)
+  )
+  (input_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+), None), ('model.layers.12', LlamaDecoderLayer(
+  (self_attn): LlamaAttention(
+    (q_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (k_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (v_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (o_proj): Linear(in_features=4096, out_features=4096, bias=False)
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (up_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (down_proj): Linear(in_features=11008, out_features=4096, bias=False)
+  )
+  (input_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+), None), ('model.layers.13', LlamaDecoderLayer(
+  (self_attn): LlamaAttention(
+    (q_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (k_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (v_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (o_proj): Linear(in_features=4096, out_features=4096, bias=False)
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (up_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (down_proj): Linear(in_features=11008, out_features=4096, bias=False)
+  )
+  (input_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+), None), ('model.layers.14', LlamaDecoderLayer(
+  (self_attn): LlamaAttention(
+    (q_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (k_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (v_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (o_proj): Linear(in_features=4096, out_features=4096, bias=False)
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (up_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (down_proj): Linear(in_features=11008, out_features=4096, bias=False)
+  )
+  (input_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+), None), ('model.layers.15', LlamaDecoderLayer(
+  (self_attn): LlamaAttention(
+    (q_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (k_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (v_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (o_proj): Linear(in_features=4096, out_features=4096, bias=False)
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (up_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (down_proj): Linear(in_features=11008, out_features=4096, bias=False)
+  )
+  (input_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+), None), ('model.layers.16', LlamaDecoderLayer(
+  (self_attn): LlamaAttention(
+    (q_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (k_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (v_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (o_proj): Linear(in_features=4096, out_features=4096, bias=False)
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (up_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (down_proj): Linear(in_features=11008, out_features=4096, bias=False)
+  )
+  (input_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+), None), ('model.layers.17', LlamaDecoderLayer(
+  (self_attn): LlamaAttention(
+    (q_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (k_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (v_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (o_proj): Linear(in_features=4096, out_features=4096, bias=False)
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (up_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (down_proj): Linear(in_features=11008, out_features=4096, bias=False)
+  )
+  (input_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+), None), ('model.layers.18', LlamaDecoderLayer(
+  (self_attn): LlamaAttention(
+    (q_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (k_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (v_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (o_proj): Linear(in_features=4096, out_features=4096, bias=False)
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (up_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (down_proj): Linear(in_features=11008, out_features=4096, bias=False)
+  )
+  (input_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+), None), ('model.layers.19', LlamaDecoderLayer(
+  (self_attn): LlamaAttention(
+    (q_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (k_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (v_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (o_proj): Linear(in_features=4096, out_features=4096, bias=False)
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (up_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (down_proj): Linear(in_features=11008, out_features=4096, bias=False)
+  )
+  (input_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+), None), ('model.layers.20', LlamaDecoderLayer(
+  (self_attn): LlamaAttention(
+    (q_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (k_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (v_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (o_proj): Linear(in_features=4096, out_features=4096, bias=False)
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (up_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (down_proj): Linear(in_features=11008, out_features=4096, bias=False)
+  )
+  (input_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+), None), ('model.layers.21', LlamaDecoderLayer(
+  (self_attn): LlamaAttention(
+    (q_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (k_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (v_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (o_proj): Linear(in_features=4096, out_features=4096, bias=False)
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (up_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (down_proj): Linear(in_features=11008, out_features=4096, bias=False)
+  )
+  (input_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+), None), ('model.layers.22', LlamaDecoderLayer(
+  (self_attn): LlamaAttention(
+    (q_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (k_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (v_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (o_proj): Linear(in_features=4096, out_features=4096, bias=False)
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (up_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (down_proj): Linear(in_features=11008, out_features=4096, bias=False)
+  )
+  (input_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+), None), ('model.layers.23', LlamaDecoderLayer(
+  (self_attn): LlamaAttention(
+    (q_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (k_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (v_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (o_proj): Linear(in_features=4096, out_features=4096, bias=False)
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (up_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (down_proj): Linear(in_features=11008, out_features=4096, bias=False)
+  )
+  (input_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+), None), ('model.layers.24', LlamaDecoderLayer(
+  (self_attn): LlamaAttention(
+    (q_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (k_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (v_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (o_proj): Linear(in_features=4096, out_features=4096, bias=False)
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (up_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (down_proj): Linear(in_features=11008, out_features=4096, bias=False)
+  )
+  (input_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+), None), ('model.layers.25', LlamaDecoderLayer(
+  (self_attn): LlamaAttention(
+    (q_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (k_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (v_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (o_proj): Linear(in_features=4096, out_features=4096, bias=False)
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (up_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (down_proj): Linear(in_features=11008, out_features=4096, bias=False)
+  )
+  (input_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+), None), ('model.layers.26', LlamaDecoderLayer(
+  (self_attn): LlamaAttention(
+    (q_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (k_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (v_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (o_proj): Linear(in_features=4096, out_features=4096, bias=False)
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (up_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (down_proj): Linear(in_features=11008, out_features=4096, bias=False)
+  )
+  (input_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+), None), ('model.layers.27', LlamaDecoderLayer(
+  (self_attn): LlamaAttention(
+    (q_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (k_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (v_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (o_proj): Linear(in_features=4096, out_features=4096, bias=False)
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (up_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (down_proj): Linear(in_features=11008, out_features=4096, bias=False)
+  )
+  (input_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+), None), ('model.layers.28', LlamaDecoderLayer(
+  (self_attn): LlamaAttention(
+    (q_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (k_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (v_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (o_proj): Linear(in_features=4096, out_features=4096, bias=False)
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (up_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (down_proj): Linear(in_features=11008, out_features=4096, bias=False)
+  )
+  (input_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+), None), ('model.layers.29', LlamaDecoderLayer(
+  (self_attn): LlamaAttention(
+    (q_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (k_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (v_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (o_proj): Linear(in_features=4096, out_features=4096, bias=False)
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (up_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (down_proj): Linear(in_features=11008, out_features=4096, bias=False)
+  )
+  (input_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+), None), ('model.layers.30', LlamaDecoderLayer(
+  (self_attn): LlamaAttention(
+    (q_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (k_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (v_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (o_proj): Linear(in_features=4096, out_features=4096, bias=False)
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (up_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (down_proj): Linear(in_features=11008, out_features=4096, bias=False)
+  )
+  (input_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+), None), ('model.layers.31', LlamaDecoderLayer(
+  (self_attn): LlamaAttention(
+    (q_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (k_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (v_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (o_proj): Linear(in_features=4096, out_features=4096, bias=False)
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (up_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (down_proj): Linear(in_features=11008, out_features=4096, bias=False)
+  )
+  (input_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+), None)]
+[INFO][veomni.distributed.torch_parallelize:362] 12/03/2025 21:19:53 >> layer_fqn='model.layers.0', layer_mod._fsdp_modules=[FSDPLlamaDecoderLayer(
+  (self_attn): LlamaAttention(
+    (q_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (k_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (v_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (o_proj): Linear(in_features=4096, out_features=4096, bias=False)
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (up_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (down_proj): Linear(in_features=11008, out_features=4096, bias=False)
+  )
+  (input_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+)]
+[INFO][veomni.distributed.torch_parallelize:362] 12/03/2025 21:19:53 >> layer_fqn='model.layers.1', layer_mod._fsdp_modules=[FSDPLlamaDecoderLayer(
+  (self_attn): LlamaAttention(
+    (q_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (k_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (v_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (o_proj): Linear(in_features=4096, out_features=4096, bias=False)
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (up_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (down_proj): Linear(in_features=11008, out_features=4096, bias=False)
+  )
+  (input_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+)]
+[INFO][veomni.distributed.torch_parallelize:362] 12/03/2025 21:19:53 >> layer_fqn='model.layers.2', layer_mod._fsdp_modules=[FSDPLlamaDecoderLayer(
+  (self_attn): LlamaAttention(
+    (q_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (k_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (v_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (o_proj): Linear(in_features=4096, out_features=4096, bias=False)
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (up_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (down_proj): Linear(in_features=11008, out_features=4096, bias=False)
+  )
+  (input_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+)]
+[INFO][veomni.distributed.torch_parallelize:362] 12/03/2025 21:19:53 >> layer_fqn='model.layers.3', layer_mod._fsdp_modules=[FSDPLlamaDecoderLayer(
+  (self_attn): LlamaAttention(
+    (q_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (k_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (v_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (o_proj): Linear(in_features=4096, out_features=4096, bias=False)
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (up_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (down_proj): Linear(in_features=11008, out_features=4096, bias=False)
+  )
+  (input_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+)]
+[INFO][veomni.distributed.torch_parallelize:362] 12/03/2025 21:19:53 >> layer_fqn='model.layers.4', layer_mod._fsdp_modules=[FSDPLlamaDecoderLayer(
+  (self_attn): LlamaAttention(
+    (q_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (k_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (v_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (o_proj): Linear(in_features=4096, out_features=4096, bias=False)
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (up_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (down_proj): Linear(in_features=11008, out_features=4096, bias=False)
+  )
+  (input_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+)]
+[INFO][veomni.distributed.torch_parallelize:362] 12/03/2025 21:19:53 >> layer_fqn='model.layers.5', layer_mod._fsdp_modules=[FSDPLlamaDecoderLayer(
+  (self_attn): LlamaAttention(
+    (q_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (k_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (v_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (o_proj): Linear(in_features=4096, out_features=4096, bias=False)
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (up_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (down_proj): Linear(in_features=11008, out_features=4096, bias=False)
+  )
+  (input_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+)]
+[INFO][veomni.distributed.torch_parallelize:362] 12/03/2025 21:19:53 >> layer_fqn='model.layers.6', layer_mod._fsdp_modules=[FSDPLlamaDecoderLayer(
+  (self_attn): LlamaAttention(
+    (q_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (k_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (v_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (o_proj): Linear(in_features=4096, out_features=4096, bias=False)
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (up_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (down_proj): Linear(in_features=11008, out_features=4096, bias=False)
+  )
+  (input_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+)]
+[INFO][veomni.distributed.torch_parallelize:362] 12/03/2025 21:19:53 >> layer_fqn='model.layers.7', layer_mod._fsdp_modules=[FSDPLlamaDecoderLayer(
+  (self_attn): LlamaAttention(
+    (q_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (k_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (v_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (o_proj): Linear(in_features=4096, out_features=4096, bias=False)
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (up_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (down_proj): Linear(in_features=11008, out_features=4096, bias=False)
+  )
+  (input_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+)]
+[INFO][veomni.distributed.torch_parallelize:362] 12/03/2025 21:19:53 >> layer_fqn='model.layers.8', layer_mod._fsdp_modules=[FSDPLlamaDecoderLayer(
+  (self_attn): LlamaAttention(
+    (q_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (k_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (v_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (o_proj): Linear(in_features=4096, out_features=4096, bias=False)
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (up_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (down_proj): Linear(in_features=11008, out_features=4096, bias=False)
+  )
+  (input_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+)]
+[INFO][veomni.distributed.torch_parallelize:362] 12/03/2025 21:19:53 >> layer_fqn='model.layers.9', layer_mod._fsdp_modules=[FSDPLlamaDecoderLayer(
+  (self_attn): LlamaAttention(
+    (q_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (k_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (v_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (o_proj): Linear(in_features=4096, out_features=4096, bias=False)
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (up_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (down_proj): Linear(in_features=11008, out_features=4096, bias=False)
+  )
+  (input_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+)]
+[INFO][veomni.distributed.torch_parallelize:362] 12/03/2025 21:19:53 >> layer_fqn='model.layers.10', layer_mod._fsdp_modules=[FSDPLlamaDecoderLayer(
+  (self_attn): LlamaAttention(
+    (q_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (k_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (v_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (o_proj): Linear(in_features=4096, out_features=4096, bias=False)
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (up_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (down_proj): Linear(in_features=11008, out_features=4096, bias=False)
+  )
+  (input_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+)]
+[INFO][veomni.distributed.torch_parallelize:362] 12/03/2025 21:19:53 >> layer_fqn='model.layers.11', layer_mod._fsdp_modules=[FSDPLlamaDecoderLayer(
+  (self_attn): LlamaAttention(
+    (q_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (k_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (v_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (o_proj): Linear(in_features=4096, out_features=4096, bias=False)
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (up_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (down_proj): Linear(in_features=11008, out_features=4096, bias=False)
+  )
+  (input_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+)]
+[INFO][veomni.distributed.torch_parallelize:362] 12/03/2025 21:19:53 >> layer_fqn='model.layers.12', layer_mod._fsdp_modules=[FSDPLlamaDecoderLayer(
+  (self_attn): LlamaAttention(
+    (q_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (k_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (v_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (o_proj): Linear(in_features=4096, out_features=4096, bias=False)
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (up_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (down_proj): Linear(in_features=11008, out_features=4096, bias=False)
+  )
+  (input_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+)]
+[INFO][veomni.distributed.torch_parallelize:362] 12/03/2025 21:19:53 >> layer_fqn='model.layers.13', layer_mod._fsdp_modules=[FSDPLlamaDecoderLayer(
+  (self_attn): LlamaAttention(
+    (q_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (k_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (v_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (o_proj): Linear(in_features=4096, out_features=4096, bias=False)
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (up_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (down_proj): Linear(in_features=11008, out_features=4096, bias=False)
+  )
+  (input_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+)]
+[INFO][veomni.distributed.torch_parallelize:362] 12/03/2025 21:19:53 >> layer_fqn='model.layers.14', layer_mod._fsdp_modules=[FSDPLlamaDecoderLayer(
+  (self_attn): LlamaAttention(
+    (q_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (k_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (v_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (o_proj): Linear(in_features=4096, out_features=4096, bias=False)
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (up_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (down_proj): Linear(in_features=11008, out_features=4096, bias=False)
+  )
+  (input_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+)]
+[INFO][veomni.distributed.torch_parallelize:362] 12/03/2025 21:19:53 >> layer_fqn='model.layers.15', layer_mod._fsdp_modules=[FSDPLlamaDecoderLayer(
+  (self_attn): LlamaAttention(
+    (q_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (k_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (v_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (o_proj): Linear(in_features=4096, out_features=4096, bias=False)
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (up_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (down_proj): Linear(in_features=11008, out_features=4096, bias=False)
+  )
+  (input_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+)]
+[INFO][veomni.distributed.torch_parallelize:362] 12/03/2025 21:19:53 >> layer_fqn='model.layers.16', layer_mod._fsdp_modules=[FSDPLlamaDecoderLayer(
+  (self_attn): LlamaAttention(
+    (q_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (k_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (v_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (o_proj): Linear(in_features=4096, out_features=4096, bias=False)
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (up_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (down_proj): Linear(in_features=11008, out_features=4096, bias=False)
+  )
+  (input_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+)]
+[INFO][veomni.distributed.torch_parallelize:362] 12/03/2025 21:19:53 >> layer_fqn='model.layers.17', layer_mod._fsdp_modules=[FSDPLlamaDecoderLayer(
+  (self_attn): LlamaAttention(
+    (q_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (k_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (v_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (o_proj): Linear(in_features=4096, out_features=4096, bias=False)
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (up_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (down_proj): Linear(in_features=11008, out_features=4096, bias=False)
+  )
+  (input_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+)]
+[INFO][veomni.distributed.torch_parallelize:362] 12/03/2025 21:19:53 >> layer_fqn='model.layers.18', layer_mod._fsdp_modules=[FSDPLlamaDecoderLayer(
+  (self_attn): LlamaAttention(
+    (q_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (k_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (v_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (o_proj): Linear(in_features=4096, out_features=4096, bias=False)
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (up_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (down_proj): Linear(in_features=11008, out_features=4096, bias=False)
+  )
+  (input_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+)]
+[INFO][veomni.distributed.torch_parallelize:362] 12/03/2025 21:19:53 >> layer_fqn='model.layers.19', layer_mod._fsdp_modules=[FSDPLlamaDecoderLayer(
+  (self_attn): LlamaAttention(
+    (q_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (k_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (v_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (o_proj): Linear(in_features=4096, out_features=4096, bias=False)
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (up_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (down_proj): Linear(in_features=11008, out_features=4096, bias=False)
+  )
+  (input_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+)]
+[INFO][veomni.distributed.torch_parallelize:362] 12/03/2025 21:19:53 >> layer_fqn='model.layers.20', layer_mod._fsdp_modules=[FSDPLlamaDecoderLayer(
+  (self_attn): LlamaAttention(
+    (q_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (k_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (v_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (o_proj): Linear(in_features=4096, out_features=4096, bias=False)
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (up_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (down_proj): Linear(in_features=11008, out_features=4096, bias=False)
+  )
+  (input_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+)]
+[INFO][veomni.distributed.torch_parallelize:362] 12/03/2025 21:19:53 >> layer_fqn='model.layers.21', layer_mod._fsdp_modules=[FSDPLlamaDecoderLayer(
+  (self_attn): LlamaAttention(
+    (q_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (k_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (v_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (o_proj): Linear(in_features=4096, out_features=4096, bias=False)
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (up_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (down_proj): Linear(in_features=11008, out_features=4096, bias=False)
+  )
+  (input_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+)]
+[INFO][veomni.distributed.torch_parallelize:362] 12/03/2025 21:19:53 >> layer_fqn='model.layers.22', layer_mod._fsdp_modules=[FSDPLlamaDecoderLayer(
+  (self_attn): LlamaAttention(
+    (q_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (k_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (v_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (o_proj): Linear(in_features=4096, out_features=4096, bias=False)
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (up_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (down_proj): Linear(in_features=11008, out_features=4096, bias=False)
+  )
+  (input_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+)]
+[INFO][veomni.distributed.torch_parallelize:362] 12/03/2025 21:19:53 >> layer_fqn='model.layers.23', layer_mod._fsdp_modules=[FSDPLlamaDecoderLayer(
+  (self_attn): LlamaAttention(
+    (q_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (k_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (v_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (o_proj): Linear(in_features=4096, out_features=4096, bias=False)
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (up_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (down_proj): Linear(in_features=11008, out_features=4096, bias=False)
+  )
+  (input_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+)]
+[INFO][veomni.distributed.torch_parallelize:362] 12/03/2025 21:19:53 >> layer_fqn='model.layers.24', layer_mod._fsdp_modules=[FSDPLlamaDecoderLayer(
+  (self_attn): LlamaAttention(
+    (q_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (k_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (v_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (o_proj): Linear(in_features=4096, out_features=4096, bias=False)
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (up_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (down_proj): Linear(in_features=11008, out_features=4096, bias=False)
+  )
+  (input_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+)]
+[INFO][veomni.distributed.torch_parallelize:362] 12/03/2025 21:19:53 >> layer_fqn='model.layers.25', layer_mod._fsdp_modules=[FSDPLlamaDecoderLayer(
+  (self_attn): LlamaAttention(
+    (q_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (k_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (v_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (o_proj): Linear(in_features=4096, out_features=4096, bias=False)
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (up_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (down_proj): Linear(in_features=11008, out_features=4096, bias=False)
+  )
+  (input_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+)]
+[INFO][veomni.distributed.torch_parallelize:362] 12/03/2025 21:19:53 >> layer_fqn='model.layers.26', layer_mod._fsdp_modules=[FSDPLlamaDecoderLayer(
+  (self_attn): LlamaAttention(
+    (q_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (k_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (v_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (o_proj): Linear(in_features=4096, out_features=4096, bias=False)
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (up_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (down_proj): Linear(in_features=11008, out_features=4096, bias=False)
+  )
+  (input_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+)]
+[INFO][veomni.distributed.torch_parallelize:362] 12/03/2025 21:19:53 >> layer_fqn='model.layers.27', layer_mod._fsdp_modules=[FSDPLlamaDecoderLayer(
+  (self_attn): LlamaAttention(
+    (q_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (k_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (v_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (o_proj): Linear(in_features=4096, out_features=4096, bias=False)
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (up_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (down_proj): Linear(in_features=11008, out_features=4096, bias=False)
+  )
+  (input_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+)]
+[INFO][veomni.distributed.torch_parallelize:362] 12/03/2025 21:19:53 >> layer_fqn='model.layers.28', layer_mod._fsdp_modules=[FSDPLlamaDecoderLayer(
+  (self_attn): LlamaAttention(
+    (q_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (k_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (v_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (o_proj): Linear(in_features=4096, out_features=4096, bias=False)
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (up_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (down_proj): Linear(in_features=11008, out_features=4096, bias=False)
+  )
+  (input_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+)]
+[INFO][veomni.distributed.torch_parallelize:362] 12/03/2025 21:19:53 >> layer_fqn='model.layers.29', layer_mod._fsdp_modules=[FSDPLlamaDecoderLayer(
+  (self_attn): LlamaAttention(
+    (q_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (k_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (v_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (o_proj): Linear(in_features=4096, out_features=4096, bias=False)
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (up_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (down_proj): Linear(in_features=11008, out_features=4096, bias=False)
+  )
+  (input_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+)]
+[INFO][veomni.distributed.torch_parallelize:362] 12/03/2025 21:19:53 >> layer_fqn='model.layers.30', layer_mod._fsdp_modules=[FSDPLlamaDecoderLayer(
+  (self_attn): LlamaAttention(
+    (q_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (k_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (v_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (o_proj): Linear(in_features=4096, out_features=4096, bias=False)
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (up_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (down_proj): Linear(in_features=11008, out_features=4096, bias=False)
+  )
+  (input_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+)]
+[INFO][veomni.distributed.torch_parallelize:362] 12/03/2025 21:19:53 >> layer_fqn='model.layers.31', layer_mod._fsdp_modules=[FSDPLlamaDecoderLayer(
+  (self_attn): LlamaAttention(
+    (q_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (k_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (v_proj): Linear(in_features=4096, out_features=4096, bias=False)
+    (o_proj): Linear(in_features=4096, out_features=4096, bias=False)
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (up_proj): Linear(in_features=4096, out_features=11008, bias=False)
+    (down_proj): Linear(in_features=11008, out_features=4096, bias=False)
+  )
+  (input_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((4096,), eps=1e-05, offset=0.0, in_place=True, row_mode=None)
+)]
+[INFO][veomni.distributed.torch_parallelize:395] 12/03/2025 21:19:53 >> starting to load model weights...
+[INFO][veomni.distributed.torch_parallelize:400] 12/03/2025 21:19:53 >> Every rank would read weights from disk and expect this to be slow!
+Loading checkpoint shards:   0%|          | 0/3 [00:00<?, ?it/s]`torch_dtype` is deprecated! Use `dtype` instead!
+Loading checkpoint shards:  33%|███▎      | 1/3 [00:10<00:21, 10.73s/it]Loading checkpoint shards:  67%|██████▋   | 2/3 [00:20<00:10, 10.35s/it]Loading checkpoint shards: 100%|██████████| 3/3 [00:28<00:00,  9.02s/it]Loading checkpoint shards: 100%|██████████| 3/3 [00:28<00:00,  9.42s/it]
+12/03/2025 21:20:22 - INFO - __main__ - rank1 Start training, train_steps: 1225, epochs: 2
+wandb: Currently logged in as: heqi2019001 (heqi001) to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
+[INFO][veomni.utils.helper:538] 12/03/2025 21:20:24 >> [rank 1]: attention_mask's shape: torch.Size([1, 1474]), device: cpu, tensor([[1, 1, 1,  ..., 1, 1, 1]])
+[INFO][veomni.utils.helper:538] 12/03/2025 21:20:24 >> [rank 1]: position_ids's shape: torch.Size([1, 1474]), device: cpu, tensor([[   0,    1,    2,  ..., 1471, 1472, 1473]])
+[INFO][veomni.utils.helper:538] 12/03/2025 21:20:24 >> [rank 1]: input_ids's shape: torch.Size([1, 737]), device: cpu, tensor([[29889,    13, 26521,  2086,  5962,  1030,  5086,  9559,   297,   590,
+         18873,   310,   278, 25013,   541,   393, 29915, 29879,   920,   372,
+         29915, 29879,  7424,   304,   367,   373,   263,  1472,  4723,   355,
+          7952,  9252, 29889,    13,  5618, 29915, 29879,   263,  1472,  4723,
+           355,   472,  3271,  1728,   263,  6282,   310, 13360,   310,   596,
+         15381,   568, 26935,   447,   348,  1372, 29973, 23748,   411,   263,
+          1400,   330,   962,   394,  8315,  8182, 19505,   322, 19309,  1460,
+          2117,   363, 26044,   373, 24211, 29889,    13, 29943,  2952,   287,
+           701,   491,   263,   454,   275,   545,   368,  2125, 21694,  1156,
+           590,  2381,   326, 22600, 29889,    13,  2951, 16340, 29892,  7561,
+         29881,  1358,  5886, 29954,   322,   306,  6287, 29881,   278,  3171,
+         29879,   310,   278,  1708,  8442,   472,  1749,  1887,  3122,  2671,
+         29889,    13,  2887,   540,   521,   290,  9795,   373,   438,   637,
+         29877,   521, 21475, 10076,   567,   322,   521,  4512,   313,  5372,
+           650,  2649,   592,   393,   896, 29915,   276,   263,  9045,   631,
+          2984,  1135,  4326,  9398, 29897, 12335, 29892,   306,  8126,   278,
+         10929,   310, 12384,   515,   278,  1708,  1760,   276,  2675,   411,
+           445, 26935,   515,   678,   542,   324,  1008,   423,  3087,   678,
+           332,   307, 29889,    13, 29923,  1218,   714,   411,   263,   304,
+          1289,  1358,   756,   967, 25486, 29889, 13041,   873,   263,  2846,
+          7375,   521,  4512,   304,   748,   411,   596,  4497,   328,   515,
+          6991, 29877,  3956,   328, 29889,    13, 11760,   372,   471, 11480,
+           278, 10676,  5381,   310,  9138,  7561, 29881,  1358,  5886, 29954,
+           777, 17394,   267,   304,   748,   304,   278, 11565,   411, 29889,
+         28706,  3282, 29915, 29873,   748,   408, 20458,   472,   278,  8764,
+          2395,  3787, 29889,  3824,   368, 29892,  1641,  5492,   515,   670,
+           544,   314,   471,   599,   278, 17385,   362,   540,  4312,   304,
+          8175,   592,   304,   278, 19546,  1432,   931,   306,  1925,  1075,
+          1623, 29889,  1987,   591,  1476,   714,   393,   896, 29915, 29881,
+          1065,   714,   310,   670,  2159, 29889,    13, 29902,   281,  3368,
+           701,   491,   278,   931,   591,  3512,   304, 26783,   880,  1551,
+           476,  4841, 29889,  2973,  7561, 29881,  1358,  5886, 29954,  9226,
+           368,  5312,  2986,   964,   670,   544,   314, 29892,   306,  8745,
+           304,  1284,   777,   274, 20756,   297,   670,  2159,   408,  1532,
+           408,   263,  7303,   310,  1472, 12844, 29872,  1490,   304,   567,
+           304,  1371,   592,  5401,   445, 10555,   411,   278,   443, 27711,
+           519, 11801, 14826, 11412,   310,  5136,  1218,  7375,   322, 11220,
+          3841,   591, 29915,   276,  2675,  1549,  1492,  1286, 29889,    13,
+          8439,   471,   697,  1833,  5040,  1434, 28435,  3271, 29889,   476,
+           347,  4415, 29915, 29879,   756,   925,  5492,   777,   716,  3573,
+          4531,   550,   414,  3255, 29941, 29900,   639, 18046,   280, 29897,
+           297,   263,  9377,  3464,   310,  5227,   629,  2925, 29889,   306,
+          5360,   278,   274,  1682,  2807,  1873,   607,   306,  1348,   756,
+          1286,  1063,   766,  1285,   262,  6742, 29889,   306, 29915, 29885,
+          3063,  6375,   304,  1811,   278,   383,  3781, 14008,  4559,   306,
+           471,  2183, 29889,  7561, 29881,  1358,  5886, 29954,  9007, 29915,
+         29873,   975,  6914,   287, 29892, 10075,  1363,   310,   278,  1153,
+          3522,   540,   471,  3907,   297,  3787, 29889,  1334,   505,   263,
+          4559,   310,   405,  4227,  3864, 26835,   315,  1633,  3255, 29906,
+         29947, 29897,   304,  1018, 29889,   960,   540, 29915,   645,  4808,
+          1603,  1472,  3307,   363,   592,   304, 21699,   734,   279,  1722,
+           278,   269,   496,   300,   322,   269,   802, 29872,   911,   714,
+           777,  3234,  1434,   540,  2646,  5824,   278, 18203,  1283,   592,
+         29889,    13,  5328,   471,   596,  1472,  4723,   355, 29973,  3575,
+         13133,   373,   278,  1632,  4850,   952, 29892,   278,  4673,   470,
+          1749,  8314,  8373,  4207,  2470, 23957, 10070, 29973,    13, 29902,
+          5360,   920,  6374,   366,   526, 11211,   931, 10643,   448,  1641,
+           263,  1985,   286,   398, 29892,   366,  1827,   376, 29902,   505,
+          3307,   931, 29908,  3265,  1135,   376, 29902,   626,   925,   577,
+          3634, 29877, 19587,  1642,    13, 29902,   674,   505,   304,  2125,
+           366,   304,   590,   394,  8315,  8182, 19505,  5376,   261,   746,
+           366,   679,  1623,   304,  9232, 17418,  2446, 29889,    13, 29902,
+           626,   577, 10932,  2718,  4465,  2113,   278,  4028,  4673, 29892,
+           322, 18012,   902, 12032, 29889,  1105, 19981,  4362, 29889, 29849,
+          1063,  3876,   292,   363,   902, 29991,    13, 25120,   271,  1400,
+         29991,   306,  2337,  5360,  5183,   825,   366,   679,   701,   304,
+         29889,   306, 29915,   645,   505,   304,   679,   975,   304,   476,
+           354,  2719, 29892, 10849, 11492,  3573,  4531,   550,   261, 10083,
+         12355,   873, 29889,    13, 29902, 29915, 29885, 13312,  1468, 24455,
+           393, 11783,  7197,   267,   756,  1063, 15074,  9870,   310,   278,
+          8905, 29889,   319, 19781, 24717, 23957,   993, 29991,    13,  3206,
+         18639,   263,  7303,   310, 24717,   281, 16697,   411, 11783,  7197,
+           267,   322,  2718,  4465, 29889,  2439,  7726,   471,   330,  3890,
+           681, 29892,  5360,   393,  7826, 29889,     2]])
+[INFO][veomni.utils.helper:538] 12/03/2025 21:20:24 >> [rank 1]: labels's shape: torch.Size([1, 737]), device: cpu, tensor([[   13, 26521,  2086,  5962,  1030,  5086,  9559,   297,   590, 18873,
+           310,   278, 25013,   541,   393, 29915, 29879,   920,   372, 29915,
+         29879,  7424,   304,   367,   373,   263,  1472,  4723,   355,  7952,
+          9252, 29889,    13,  5618, 29915, 29879,   263,  1472,  4723,   355,
+           472,  3271,  1728,   263,  6282,   310, 13360,   310,   596, 15381,
+           568, 26935,   447,   348,  1372, 29973, 23748,   411,   263,  1400,
+           330,   962,   394,  8315,  8182, 19505,   322, 19309,  1460,  2117,
+           363, 26044,   373, 24211, 29889,    13, 29943,  2952,   287,   701,
+           491,   263,   454,   275,   545,   368,  2125, 21694,  1156,   590,
+          2381,   326, 22600, 29889,    13,  2951, 16340, 29892,  7561, 29881,
+          1358,  5886, 29954,   322,   306,  6287, 29881,   278,  3171, 29879,
+           310,   278,  1708,  8442,   472,  1749,  1887,  3122,  2671, 29889,
+            13,  2887,   540,   521,   290,  9795,   373,   438,   637, 29877,
+           521, 21475, 10076,   567,   322,   521,  4512,   313,  5372,   650,
+          2649,   592,   393,   896, 29915,   276,   263,  9045,   631,  2984,
+          1135,  4326,  9398, 29897, 12335, 29892,   306,  8126,   278, 10929,
+           310, 12384,   515,   278,  1708,  1760,   276,  2675,   411,   445,
+         26935,   515,   678,   542,   324,  1008,   423,  3087,   678,   332,
+           307, 29889,    13, 29923,  1218,   714,   411,   263,   304,  1289,
+          1358,   756,   967, 25486, 29889, 13041,   873,   263,  2846,  7375,
+           521,  4512,   304,   748,   411,   596,  4497,   328,   515,  6991,
+         29877,  3956,   328, 29889,    13, 11760,   372,   471, 11480,   278,
+         10676,  5381,   310,  9138,  7561, 29881,  1358,  5886, 29954,   777,
+         17394,   267,   304,   748,   304,   278, 11565,   411, 29889, 28706,
+          3282, 29915, 29873,   748,   408, 20458,   472,   278,  8764,  2395,
+          3787, 29889,  3824,   368, 29892,  1641,  5492,   515,   670,   544,
+           314,   471,   599,   278, 17385,   362,   540,  4312,   304,  8175,
+           592,   304,   278, 19546,  1432,   931,   306,  1925,  1075,  1623,
+         29889,  1987,   591,  1476,   714,   393,   896, 29915, 29881,  1065,
+           714,   310,   670,  2159, 29889,    13, 29902,   281,  3368,   701,
+           491,   278,   931,   591,  3512,   304, 26783,   880,  1551,   476,
+          4841, 29889,  2973,  7561, 29881,  1358,  5886, 29954,  9226,   368,
+          5312,  2986,   964,   670,   544,   314, 29892,   306,  8745,   304,
+          1284,   777,   274, 20756,   297,   670,  2159,   408,  1532,   408,
+           263,  7303,   310,  1472, 12844, 29872,  1490,   304,   567,   304,
+          1371,   592,  5401,   445, 10555,   411,   278,   443, 27711,   519,
+         11801, 14826, 11412,   310,  5136,  1218,  7375,   322, 11220,  3841,
+           591, 29915,   276,  2675,  1549,  1492,  1286, 29889,    13,  8439,
+           471,   697,  1833,  5040,  1434, 28435,  3271, 29889,   476,   347,
+          4415, 29915, 29879,   756,   925,  5492,   777,   716,  3573,  4531,
+           550,   414,  3255, 29941, 29900,   639, 18046,   280, 29897,   297,
+           263,  9377,  3464,   310,  5227,   629,  2925, 29889,   306,  5360,
+           278,   274,  1682,  2807,  1873,   607,   306,  1348,   756,  1286,
+          1063,   766,  1285,   262,  6742, 29889,   306, 29915, 29885,  3063,
+          6375,   304,  1811,   278,   383,  3781, 14008,  4559,   306,   471,
+          2183, 29889,  7561, 29881,  1358,  5886, 29954,  9007, 29915, 29873,
+           975,  6914,   287, 29892, 10075,  1363,   310,   278,  1153,  3522,
+           540,   471,  3907,   297,  3787, 29889,  1334,   505,   263,  4559,
+           310,   405,  4227,  3864, 26835,   315,  1633,  3255, 29906, 29947,
+         29897,   304,  1018, 29889,   960,   540, 29915,   645,  4808,  1603,
+          1472,  3307,   363,   592,   304, 21699,   734,   279,  1722,   278,
+           269,   496,   300,   322,   269,   802, 29872,   911,   714,   777,
+          3234,  1434,   540,  2646,  5824,   278, 18203,  1283,   592, 29889,
+            13,  5328,   471,   596,  1472,  4723,   355, 29973,  3575, 13133,
+           373,   278,  1632,  4850,   952, 29892,   278,  4673,   470,  1749,
+          8314,  8373,  4207,  2470, 23957, 10070, 29973,    13, 29902,  5360,
+           920,  6374,   366,   526, 11211,   931, 10643,   448,  1641,   263,
+          1985,   286,   398, 29892,   366,  1827,   376, 29902,   505,  3307,
+           931, 29908,  3265,  1135,   376, 29902,   626,   925,   577,  3634,
+         29877, 19587,  1642,    13, 29902,   674,   505,   304,  2125,   366,
+           304,   590,   394,  8315,  8182, 19505,  5376,   261,   746,   366,
+           679,  1623,   304,  9232, 17418,  2446, 29889,    13, 29902,   626,
+           577, 10932,  2718,  4465,  2113,   278,  4028,  4673, 29892,   322,
+         18012,   902, 12032, 29889,  1105, 19981,  4362, 29889, 29849,  1063,
+          3876,   292,   363,   902, 29991,    13, 25120,   271,  1400, 29991,
+           306,  2337,  5360,  5183,   825,   366,   679,   701,   304, 29889,
+           306, 29915,   645,   505,   304,   679,   975,   304,   476,   354,
+          2719, 29892, 10849, 11492,  3573,  4531,   550,   261, 10083, 12355,
+           873, 29889,    13, 29902, 29915, 29885, 13312,  1468, 24455,   393,
+         11783,  7197,   267,   756,  1063, 15074,  9870,   310,   278,  8905,
+         29889,   319, 19781, 24717, 23957,   993, 29991,    13,  3206, 18639,
+           263,  7303,   310, 24717,   281, 16697,   411, 11783,  7197,   267,
+           322,  2718,  4465, 29889,  2439,  7726,   471,   330,  3890,   681,
+         29892,  5360,   393,  7826, 29889,     2,  -100]])
+[INFO][veomni.utils.helper:538] 12/03/2025 21:20:24 >> [rank 1]: cu_seq_lens_q's shape: torch.Size([2]), device: cpu, tensor([   0, 1474], dtype=torch.int32)
+[INFO][veomni.utils.helper:538] 12/03/2025 21:20:24 >> [rank 1]: cu_seq_lens_k's shape: torch.Size([2]), device: cpu, tensor([   0, 1474], dtype=torch.int32)
+[INFO][veomni.utils.helper:542] 12/03/2025 21:20:24 >> [rank 1]: max_length_q's value: 1474
+[INFO][veomni.utils.helper:542] 12/03/2025 21:20:24 >> [rank 1]: max_length_k's value: 1474
+wandb: setting up run beq3yv9b
+wandb: Tracking run with wandb version 0.23.1
+wandb: Run data is saved locally in /home/ubuntu/data/exp/proj2410/wandb/run-20251203_212023-beq3yv9b
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run Meta-Llama-2-7B-TEST
+wandb: ⭐️ View project at https://wandb.ai/heqi001/Meta-Llama-2-7B
+wandb: 🚀 View run at https://wandb.ai/heqi001/Meta-Llama-2-7B/runs/beq3yv9b
+[INFO|configuration_utils.py:494] 2025-12-03 21:20:25,136 >> Configuration saved in /home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/EfficientQAT/test/model_assets/config.json
+[INFO|tokenization_utils_base.py:2593] 2025-12-03 21:20:25,137 >> tokenizer config file saved in /home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/EfficientQAT/test/model_assets/tokenizer_config.json
+[INFO|tokenization_utils_base.py:2602] 2025-12-03 21:20:25,138 >> Special tokens file saved in /home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B/EfficientQAT/test/model_assets/special_tokens_map.json
+12/03/2025 21:20:25 - INFO - __main__ - rank0 Start training, train_steps: 1225, epochs: 2
+Epoch 1/2:   0%|          | 0/1225 [00:00<?, ?it/s][INFO][veomni.utils.helper:538] 12/03/2025 21:20:27 >> [rank 0]: attention_mask's shape: torch.Size([1, 1474]), device: cpu, tensor([[1, 1, 1,  ..., 1, 1, 1]])
+[INFO][veomni.utils.helper:538] 12/03/2025 21:20:27 >> [rank 0]: position_ids's shape: torch.Size([1, 1474]), device: cpu, tensor([[   0,    1,    2,  ..., 1471, 1472, 1473]])
+[INFO][veomni.utils.helper:538] 12/03/2025 21:20:27 >> [rank 0]: input_ids's shape: torch.Size([1, 737]), device: cpu, tensor([[16198,  1383,   459, 18620, 29901,   450,  8314,  8373,  6242, 15511,
+           355,   512,   315,  2696, 12712, 29889,    13, 11284, 29892,   393,
+           471,   263, 12355,   873,  1472,  4723,   355, 29892,  9007, 29915,
+         29873,   372, 29973,  3834,  3525, 29892,  8314,  8373,  4723,  1975,
+          9455, 29915, 29873,   408, 22884,  1319,   304,  3814,   363,   408,
+           278,   916,   525, 21355, 29915, 10894,   800,   373,   278,  1208,
+          1581, 29889,   887,   437,  1207, 13900,   304,   679,   714,   322,
+          1048,   322,   577,   373,   541,   372, 29915, 29879,   451,   411,
+           278,  1021,   525,  5349,   304,   367, 13312,  4922, 29915,  4060,
+           310,  5065, 14703,   408,  1827, 17661,   470,  1570,  8905, 29889,
+           319,  2586,  4266,   541,   263,  3353,  3287,   310, 12341,  1250,
+         29892,   393, 29915, 29879,   920,   306,  4459,  1048,  1749,  4797,
+          2462, 29889,    13, 29950,  5555,  1497,   393, 29892,   372,   471,
+           263, 19587,  4723,   355,   363,   592, 29889,   306,   750,   263,
+          3353,  1051,   310,  4589,  4167,   322,  2217, 17643,   304, 22002,
+           280,   322,   727,   471,   925,  3307,   931,   975,   278,  2211,
+          3841,   304,   679,   963,   599, 16892,   287,  1283, 29889,    13,
+          4178,   278,  9451,   367, 10412, 29889,  1724,  1683,   304,   437,
+          1550, 10534,   363,   278,  2022,   297,  4565,   310,   366,  5969,
+          2039,  4655,  1559,  1083,   397,  7807,  1135,   263,  4036,  1583,
+           347, 29973,   379,   598,  1516,   448, 23478,  2401, 17243, 29892,
+           350,  6793,   275,   322, 21193, 16344,   350,  1036, 13405, 29889,
+            13, 29902,  4689,   411,   263,   577,   495,   292,  6493,   304,
+           278,  9451,   367, 10412,   363,   263, 14978,   363, 28728, 29915,
+         29879, 11192,  4353,   412, 29889,  6379, 29889,   739, 29915, 29879,
+         11630,   263,  1206,   363,  1663, 18541, 29889,   887,  1073,   920,
+           372,   338,   411, 18647, 29892,   366,  1016, 29915, 29873,   925,
+          5191,   278,  2586,   393,  8379,  1283,   448,   727, 29915, 29879,
+          2337,   777,  4655,  2586,   310,  9451,   367,  1218,  9701, 29889,
+            13, 11760,   727,   892,   599,  1438,   302,   335, 16808,  2217,
+          2712,   393,   306,   674, 23888,   366,   411,  1363,   306, 29915,
+         29885,   577, 10932,   306,  7146,  2355,  2820,   304,  2599,   963,
+           599, 29889,   306,  1925,  1623, 14051,   495,  1891,   286,  1446,
+           297,   278,  1559,   304,  5557,   592,   515,  4697,  3460, 26532,
+           964,   278,  1559, 10963,   411,   590, 17394,   267, 29889,   319,
+          2919, 19548,   310,  2030, 22095,  3512,   304,   624,   478,  2559,
+           583, 29889,   450,   867,   449,   297,   278,  1510,   261,  2355,
+           263, 14877, 20657, 14387,   431, 29889, 16992,  9978,   373,   590,
+          3104, 18577,  2355, 17151,  2168, 29889,   306,  5702,   287,  1623,
+           553,  1052,   261,  1650,   363,   590, 18242, 29875, 14657, 29875,
+          4933, 29889,   306, 29915,   345,  3447,   304,  2869,   437,   278,
+          5153,   744,   541,   306, 29915, 29885,  7960,   363,   746,   278,
+          5065,   479,   564,  4637, 29889,    13,  3112,  9007, 29915, 29873,
+          2745,  5683,   373, 16340,   393,   306,  2355,   304,  7845,  1623,
+           411,   263, 18002,   310, 23429,   304,  1303,   278,  8314,  8373,
+         12203,   310,   278,  5650, 29889,  6005,  3605,  8250, 29892, 11783,
+          7197,   267,   373,  1641, 14831,   408,  9870,   310,   278,  8905,
+           363, 29871, 29906, 29900, 29896, 29946, 29889,    13, 29902,  1073,
+          2305,   679,   263,  2586,   565, 29888, 29891,   746,  7980,   292,
+         10819,   679, 15074,   525,   643,  2738, 29915, 24441,   541,   306,
+          1348, 11783,   338,   263, 24717, 23957,   993,   363,   577,  1784,
+          9590, 29889,  1094,   680,   515,   670,   664,   297, 29263,  3773,
+          8326,   404,   310, 21849, 21448,   322,   670,   373, 17696,  2181,
+           375,  1943,  2750, 11021,  1608, 29892,   540, 29915, 29879,   263,
+         10712,  7962,   322,  3390,   287,  1342,   310,   825,   263,   767,
+           411,   263,  1899,   292,  9128, 10122,   322,  9324,   881,   367,
+         29889,   530, 17622,  2810,   322,  5100,  2105,   373,   278,  1746,
+           322,   263, 27189,  5199,  1641,  1283,   372, 29889,   319,   767,
+          1058,  1838, 29915, 29873,   671,   670,  9128, 10122,   304, 21282,
+           538,   282,  3322,   278, 21458,   296,  5377,   310,   278,  7980,
+           292,   564,  2386, 29889,    13, 29902,  3282, 29915, 29873,  1101,
+           278,  9870,  4673,   445,  1629,   313,   262, 12515,   411, 11399,
+         29897,   541,  1584,   306,   750,   304,  5386,  2718,  4465, 29915,
+         29879, 15613, 12032, 29889,  2296,   322,   349,   682,   526,  1023,
+          5866,  1058,   306,  2337,  1348,   310,   408, 10657,   653,  4648,
+          5834, 29889,  2688,   526,  1716,  2337,   297,  2691,   883, 10940,
+           896, 29915,   276,  1244,   304,   752,  2650,   470,  2189, 29889,
+            13, 10649,  5086,   310,   349,   682, 29892,  1183,  1055,  2356,
+           372,   472,   278,  1632,  4850,   952,   411,   385,  4527,   657,
+           293,  1274, 13716,  2454,  5665,   297,   902,   731, 29889,    13,
+          2831,   592, 29892,   278,   916,  4802,  3256,   310,   278,  1632,
+          4850,   952,   471,   746, 26432, 29892, 10470,  7053,   361,   801,
+           322, 21343,  2409,   487,  3614,   304,   278,  7408,   304, 10894,
+           403, 17193,   297,  5360,   363,   502,   599]])
+[INFO][veomni.utils.helper:538] 12/03/2025 21:20:27 >> [rank 0]: labels's shape: torch.Size([1, 737]), device: cpu, tensor([[ 1383,   459, 18620, 29901,   450,  8314,  8373,  6242, 15511,   355,
+           512,   315,  2696, 12712, 29889,    13, 11284, 29892,   393,   471,
+           263, 12355,   873,  1472,  4723,   355, 29892,  9007, 29915, 29873,
+           372, 29973,  3834,  3525, 29892,  8314,  8373,  4723,  1975,  9455,
+         29915, 29873,   408, 22884,  1319,   304,  3814,   363,   408,   278,
+           916,   525, 21355, 29915, 10894,   800,   373,   278,  1208,  1581,
+         29889,   887,   437,  1207, 13900,   304,   679,   714,   322,  1048,
+           322,   577,   373,   541,   372, 29915, 29879,   451,   411,   278,
+          1021,   525,  5349,   304,   367, 13312,  4922, 29915,  4060,   310,
+          5065, 14703,   408,  1827, 17661,   470,  1570,  8905, 29889,   319,
+          2586,  4266,   541,   263,  3353,  3287,   310, 12341,  1250, 29892,
+           393, 29915, 29879,   920,   306,  4459,  1048,  1749,  4797,  2462,
+         29889,    13, 29950,  5555,  1497,   393, 29892,   372,   471,   263,
+         19587,  4723,   355,   363,   592, 29889,   306,   750,   263,  3353,
+          1051,   310,  4589,  4167,   322,  2217, 17643,   304, 22002,   280,
+           322,   727,   471,   925,  3307,   931,   975,   278,  2211,  3841,
+           304,   679,   963,   599, 16892,   287,  1283, 29889,    13,  4178,
+           278,  9451,   367, 10412, 29889,  1724,  1683,   304,   437,  1550,
+         10534,   363,   278,  2022,   297,  4565,   310,   366,  5969,  2039,
+          4655,  1559,  1083,   397,  7807,  1135,   263,  4036,  1583,   347,
+         29973,   379,   598,  1516,   448, 23478,  2401, 17243, 29892,   350,
+          6793,   275,   322, 21193, 16344,   350,  1036, 13405, 29889,    13,
+         29902,  4689,   411,   263,   577,   495,   292,  6493,   304,   278,
+          9451,   367, 10412,   363,   263, 14978,   363, 28728, 29915, 29879,
+         11192,  4353,   412, 29889,  6379, 29889,   739, 29915, 29879, 11630,
+           263,  1206,   363,  1663, 18541, 29889,   887,  1073,   920,   372,
+           338,   411, 18647, 29892,   366,  1016, 29915, 29873,   925,  5191,
+           278,  2586,   393,  8379,  1283,   448,   727, 29915, 29879,  2337,
+           777,  4655,  2586,   310,  9451,   367,  1218,  9701, 29889,    13,
+         11760,   727,   892,   599,  1438,   302,   335, 16808,  2217,  2712,
+           393,   306,   674, 23888,   366,   411,  1363,   306, 29915, 29885,
+           577, 10932,   306,  7146,  2355,  2820,   304,  2599,   963,   599,
+         29889,   306,  1925,  1623, 14051,   495,  1891,   286,  1446,   297,
+           278,  1559,   304,  5557,   592,   515,  4697,  3460, 26532,   964,
+           278,  1559, 10963,   411,   590, 17394,   267, 29889,   319,  2919,
+         19548,   310,  2030, 22095,  3512,   304,   624,   478,  2559,   583,
+         29889,   450,   867,   449,   297,   278,  1510,   261,  2355,   263,
+         14877, 20657, 14387,   431, 29889, 16992,  9978,   373,   590,  3104,
+         18577,  2355, 17151,  2168, 29889,   306,  5702,   287,  1623,   553,
+          1052,   261,  1650,   363,   590, 18242, 29875, 14657, 29875,  4933,
+         29889,   306, 29915,   345,  3447,   304,  2869,   437,   278,  5153,
+           744,   541,   306, 29915, 29885,  7960,   363,   746,   278,  5065,
+           479,   564,  4637, 29889,    13,  3112,  9007, 29915, 29873,  2745,
+          5683,   373, 16340,   393,   306,  2355,   304,  7845,  1623,   411,
+           263, 18002,   310, 23429,   304,  1303,   278,  8314,  8373, 12203,
+           310,   278,  5650, 29889,  6005,  3605,  8250, 29892, 11783,  7197,
+           267,   373,  1641, 14831,   408,  9870,   310,   278,  8905,   363,
+         29871, 29906, 29900, 29896, 29946, 29889,    13, 29902,  1073,  2305,
+           679,   263,  2586,   565, 29888, 29891,   746,  7980,   292, 10819,
+           679, 15074,   525,   643,  2738, 29915, 24441,   541,   306,  1348,
+         11783,   338,   263, 24717, 23957,   993,   363,   577,  1784,  9590,
+         29889,  1094,   680,   515,   670,   664,   297, 29263,  3773,  8326,
+           404,   310, 21849, 21448,   322,   670,   373, 17696,  2181,   375,
+          1943,  2750, 11021,  1608, 29892,   540, 29915, 29879,   263, 10712,
+          7962,   322,  3390,   287,  1342,   310,   825,   263,   767,   411,
+           263,  1899,   292,  9128, 10122,   322,  9324,   881,   367, 29889,
+           530, 17622,  2810,   322,  5100,  2105,   373,   278,  1746,   322,
+           263, 27189,  5199,  1641,  1283,   372, 29889,   319,   767,  1058,
+          1838, 29915, 29873,   671,   670,  9128, 10122,   304, 21282,   538,
+           282,  3322,   278, 21458,   296,  5377,   310,   278,  7980,   292,
+           564,  2386, 29889,    13, 29902,  3282, 29915, 29873,  1101,   278,
+          9870,  4673,   445,  1629,   313,   262, 12515,   411, 11399, 29897,
+           541,  1584,   306,   750,   304,  5386,  2718,  4465, 29915, 29879,
+         15613, 12032, 29889,  2296,   322,   349,   682,   526,  1023,  5866,
+          1058,   306,  2337,  1348,   310,   408, 10657,   653,  4648,  5834,
+         29889,  2688,   526,  1716,  2337,   297,  2691,   883, 10940,   896,
+         29915,   276,  1244,   304,   752,  2650,   470,  2189, 29889,    13,
+         10649,  5086,   310,   349,   682, 29892,  1183,  1055,  2356,   372,
+           472,   278,  1632,  4850,   952,   411,   385,  4527,   657,   293,
+          1274, 13716,  2454,  5665,   297,   902,   731, 29889,    13,  2831,
+           592, 29892,   278,   916,  4802,  3256,   310,   278,  1632,  4850,
+           952,   471,   746, 26432, 29892, 10470,  7053,   361,   801,   322,
+         21343,  2409,   487,  3614,   304,   278,  7408,   304, 10894,   403,
+         17193,   297,  5360,   363,   502,   599, 29889]])
+[INFO][veomni.utils.helper:538] 12/03/2025 21:20:27 >> [rank 0]: cu_seq_lens_q's shape: torch.Size([2]), device: cpu, tensor([   0, 1474], dtype=torch.int32)
+[INFO][veomni.utils.helper:538] 12/03/2025 21:20:27 >> [rank 0]: cu_seq_lens_k's shape: torch.Size([2]), device: cpu, tensor([   0, 1474], dtype=torch.int32)
+[INFO][veomni.utils.helper:542] 12/03/2025 21:20:27 >> [rank 0]: max_length_q's value: 1474
+[INFO][veomni.utils.helper:542] 12/03/2025 21:20:27 >> [rank 0]: max_length_k's value: 1474
+/home/ubuntu/data/exp/proj2410/VeOmni/veomni/distributed/sequence_parallel/data.py:86: UserWarning: Using a non-tuple sequence for multidimensional indexing is deprecated and will be changed in pytorch 2.9; use x[tuple(seq)] instead of x[seq]. In pytorch 2.9 this will be interpreted as tensor index, x[torch.tensor(seq)], which will result either in an error or a different result (Triggered internally at /pytorch/torch/csrc/autograd/python_variable_indexing.cpp:345.)
+  return x[slc].contiguous()
+/home/ubuntu/data/exp/proj2410/VeOmni/veomni/distributed/sequence_parallel/data.py:86: UserWarning: Using a non-tuple sequence for multidimensional indexing is deprecated and will be changed in pytorch 2.9; use x[tuple(seq)] instead of x[seq]. In pytorch 2.9 this will be interpreted as tensor index, x[torch.tensor(seq)], which will result either in an error or a different result (Triggered internally at /pytorch/torch/csrc/autograd/python_variable_indexing.cpp:345.)
+  return x[slc].contiguous()
+/home/ubuntu/data/exp/proj2410/VeOmni/veomni/distributed/sequence_parallel/data.py:86: UserWarning: Using a non-tuple sequence for multidimensional indexing is deprecated and will be changed in pytorch 2.9; use x[tuple(seq)] instead of x[seq]. In pytorch 2.9 this will be interpreted as tensor index, x[torch.tensor(seq)], which will result either in an error or a different result (Triggered internally at /pytorch/torch/csrc/autograd/python_variable_indexing.cpp:345.)
+  return x[slc].contiguous()
+/home/ubuntu/data/exp/proj2410/VeOmni/veomni/distributed/sequence_parallel/data.py:86: UserWarning: Using a non-tuple sequence for multidimensional indexing is deprecated and will be changed in pytorch 2.9; use x[tuple(seq)] instead of x[seq]. In pytorch 2.9 this will be interpreted as tensor index, x[torch.tensor(seq)], which will result either in an error or a different result (Triggered internally at /pytorch/torch/csrc/autograd/python_variable_indexing.cpp:345.)
+  return x[slc].contiguous()
+Traceback (most recent call last):
+  File "/home/ubuntu/data/exp/proj2410/./VeOmni/tasks/quantize/train.py", line 405, in <module>
+    main()
+  File "/home/ubuntu/data/exp/proj2410/./VeOmni/tasks/quantize/train.py", line 317, in main
+    optimizer.step()
+  File "/home/ubuntu/data/exp/proj2410/EfficientQAT/.venv/lib/python3.12/site-packages/torch/optim/lr_scheduler.py", line 133, in wrapper
+    return func.__get__(opt, opt.__class__)(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/data/exp/proj2410/EfficientQAT/.venv/lib/python3.12/site-packages/torch/optim/optimizer.py", line 517, in wrapper
+    out = func(*args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/data/exp/proj2410/EfficientQAT/.venv/lib/python3.12/site-packages/torch/optim/optimizer.py", line 82, in _use_grad
+    ret = func(*args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/data/exp/proj2410/EfficientQAT/.venv/lib/python3.12/site-packages/torch/optim/adam.py", line 237, in step
+    has_complex = self._init_group(
+                  ^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/data/exp/proj2410/EfficientQAT/.venv/lib/python3.12/site-packages/torch/_dynamo/eval_frame.py", line 1044, in _fn
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/data/exp/proj2410/EfficientQAT/.venv/lib/python3.12/site-packages/torch/optim/adam.py", line 181, in _init_group
+    state["exp_avg_sq"] = torch.zeros_like(
+                          ^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/data/exp/proj2410/EfficientQAT/.venv/lib/python3.12/site-packages/torch/_compile.py", line 53, in inner
+    return disable_fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/data/exp/proj2410/EfficientQAT/.venv/lib/python3.12/site-packages/torch/_dynamo/eval_frame.py", line 1044, in _fn
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/data/exp/proj2410/EfficientQAT/.venv/lib/python3.12/site-packages/torch/distributed/tensor/_api.py", line 349, in __torch_dispatch__
+    return DTensor._op_dispatcher.dispatch(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/data/exp/proj2410/EfficientQAT/.venv/lib/python3.12/site-packages/torch/distributed/tensor/_dispatch.py", line 233, in dispatch
+    local_results = op_call(*local_tensor_args, **op_info.local_kwargs)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/data/exp/proj2410/EfficientQAT/.venv/lib/python3.12/site-packages/torch/_ops.py", line 841, in __call__
+    return self._op(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 32.00 MiB. GPU 0 has a total capacity of 47.41 GiB of which 28.94 MiB is free. Including non-PyTorch memory, this process has 42.98 GiB memory in use. Of the allocated memory 42.35 GiB is allocated by PyTorch, and 133.95 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+[rank0]: Traceback (most recent call last):
+[rank0]:   File "/home/ubuntu/data/exp/proj2410/./VeOmni/tasks/quantize/train.py", line 405, in <module>
+[rank0]:     main()
+[rank0]:   File "/home/ubuntu/data/exp/proj2410/./VeOmni/tasks/quantize/train.py", line 317, in main
+[rank0]:     optimizer.step()
+[rank0]:   File "/home/ubuntu/data/exp/proj2410/EfficientQAT/.venv/lib/python3.12/site-packages/torch/optim/lr_scheduler.py", line 133, in wrapper
+[rank0]:     return func.__get__(opt, opt.__class__)(*args, **kwargs)
+[rank0]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/home/ubuntu/data/exp/proj2410/EfficientQAT/.venv/lib/python3.12/site-packages/torch/optim/optimizer.py", line 517, in wrapper
+[rank0]:     out = func(*args, **kwargs)
+[rank0]:           ^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/home/ubuntu/data/exp/proj2410/EfficientQAT/.venv/lib/python3.12/site-packages/torch/optim/optimizer.py", line 82, in _use_grad
+[rank0]:     ret = func(*args, **kwargs)
+[rank0]:           ^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/home/ubuntu/data/exp/proj2410/EfficientQAT/.venv/lib/python3.12/site-packages/torch/optim/adam.py", line 237, in step
+[rank0]:     has_complex = self._init_group(
+[rank0]:                   ^^^^^^^^^^^^^^^^^
+[rank0]:   File "/home/ubuntu/data/exp/proj2410/EfficientQAT/.venv/lib/python3.12/site-packages/torch/_dynamo/eval_frame.py", line 1044, in _fn
+[rank0]:     return fn(*args, **kwargs)
+[rank0]:            ^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/home/ubuntu/data/exp/proj2410/EfficientQAT/.venv/lib/python3.12/site-packages/torch/optim/adam.py", line 181, in _init_group
+[rank0]:     state["exp_avg_sq"] = torch.zeros_like(
+[rank0]:                           ^^^^^^^^^^^^^^^^^
+[rank0]:   File "/home/ubuntu/data/exp/proj2410/EfficientQAT/.venv/lib/python3.12/site-packages/torch/_compile.py", line 53, in inner
+[rank0]:     return disable_fn(*args, **kwargs)
+[rank0]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/home/ubuntu/data/exp/proj2410/EfficientQAT/.venv/lib/python3.12/site-packages/torch/_dynamo/eval_frame.py", line 1044, in _fn
+[rank0]:     return fn(*args, **kwargs)
+[rank0]:            ^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/home/ubuntu/data/exp/proj2410/EfficientQAT/.venv/lib/python3.12/site-packages/torch/distributed/tensor/_api.py", line 349, in __torch_dispatch__
+[rank0]:     return DTensor._op_dispatcher.dispatch(
+[rank0]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/home/ubuntu/data/exp/proj2410/EfficientQAT/.venv/lib/python3.12/site-packages/torch/distributed/tensor/_dispatch.py", line 233, in dispatch
+[rank0]:     local_results = op_call(*local_tensor_args, **op_info.local_kwargs)
+[rank0]:                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/home/ubuntu/data/exp/proj2410/EfficientQAT/.venv/lib/python3.12/site-packages/torch/_ops.py", line 841, in __call__
+[rank0]:     return self._op(*args, **kwargs)
+[rank0]:            ^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]: torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 32.00 MiB. GPU 0 has a total capacity of 47.41 GiB of which 28.94 MiB is free. Including non-PyTorch memory, this process has 42.98 GiB memory in use. Of the allocated memory 42.35 GiB is allocated by PyTorch, and 133.95 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+[rank1]: Traceback (most recent call last):
+[rank1]:   File "/home/ubuntu/data/exp/proj2410/./VeOmni/tasks/quantize/train.py", line 405, in <module>
+[rank1]:     main()
+[rank1]:   File "/home/ubuntu/data/exp/proj2410/./VeOmni/tasks/quantize/train.py", line 317, in main
+[rank1]:     optimizer.step()
+[rank1]:   File "/home/ubuntu/data/exp/proj2410/EfficientQAT/.venv/lib/python3.12/site-packages/torch/optim/lr_scheduler.py", line 133, in wrapper
+[rank1]:     return func.__get__(opt, opt.__class__)(*args, **kwargs)
+[rank1]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/home/ubuntu/data/exp/proj2410/EfficientQAT/.venv/lib/python3.12/site-packages/torch/optim/optimizer.py", line 517, in wrapper
+[rank1]:     out = func(*args, **kwargs)
+[rank1]:           ^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/home/ubuntu/data/exp/proj2410/EfficientQAT/.venv/lib/python3.12/site-packages/torch/optim/optimizer.py", line 82, in _use_grad
+[rank1]:     ret = func(*args, **kwargs)
+[rank1]:           ^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/home/ubuntu/data/exp/proj2410/EfficientQAT/.venv/lib/python3.12/site-packages/torch/optim/adam.py", line 237, in step
+[rank1]:     has_complex = self._init_group(
+[rank1]:                   ^^^^^^^^^^^^^^^^^
+[rank1]:   File "/home/ubuntu/data/exp/proj2410/EfficientQAT/.venv/lib/python3.12/site-packages/torch/_dynamo/eval_frame.py", line 1044, in _fn
+[rank1]:     return fn(*args, **kwargs)
+[rank1]:            ^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/home/ubuntu/data/exp/proj2410/EfficientQAT/.venv/lib/python3.12/site-packages/torch/optim/adam.py", line 181, in _init_group
+[rank1]:     state["exp_avg_sq"] = torch.zeros_like(
+[rank1]:                           ^^^^^^^^^^^^^^^^^
+[rank1]:   File "/home/ubuntu/data/exp/proj2410/EfficientQAT/.venv/lib/python3.12/site-packages/torch/_compile.py", line 53, in inner
+[rank1]:     return disable_fn(*args, **kwargs)
+[rank1]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/home/ubuntu/data/exp/proj2410/EfficientQAT/.venv/lib/python3.12/site-packages/torch/_dynamo/eval_frame.py", line 1044, in _fn
+[rank1]:     return fn(*args, **kwargs)
+[rank1]:            ^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/home/ubuntu/data/exp/proj2410/EfficientQAT/.venv/lib/python3.12/site-packages/torch/distributed/tensor/_api.py", line 349, in __torch_dispatch__
+[rank1]:     return DTensor._op_dispatcher.dispatch(
+[rank1]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/home/ubuntu/data/exp/proj2410/EfficientQAT/.venv/lib/python3.12/site-packages/torch/distributed/tensor/_dispatch.py", line 233, in dispatch
+[rank1]:     local_results = op_call(*local_tensor_args, **op_info.local_kwargs)
+[rank1]:                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/home/ubuntu/data/exp/proj2410/EfficientQAT/.venv/lib/python3.12/site-packages/torch/_ops.py", line 841, in __call__
+[rank1]:     return self._op(*args, **kwargs)
+[rank1]:            ^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]: torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 32.00 MiB. GPU 1 has a total capacity of 47.41 GiB of which 26.25 MiB is free. Including non-PyTorch memory, this process has 47.38 GiB memory in use. Of the allocated memory 46.75 GiB is allocated by PyTorch, and 133.73 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+[rank1]:[W1203 21:20:39.849952631 ProcessGroupNCCL.cpp:1524] Warning: WARNING: destroy_process_group() was not called before program exit, which can leak resources. For more info, please see https://pytorch.org/docs/stable/distributed.html#shutdown (function operator())
+[1;34mwandb[0m: 
+[1;34mwandb[0m: 🚀 View run [33mMeta-Llama-2-7B-TEST[0m at: [34m[0m
+[1;34mwandb[0m: Find logs at: [1;35mwandb/run-20251203_212023-beq3yv9b/logs[0m
+W1203 21:20:40.602000 3684114 torch/distributed/elastic/multiprocessing/api.py:908] Sending process 3684210 closing signal SIGTERM
+E1203 21:20:41.020000 3684114 torch/distributed/elastic/multiprocessing/api.py:882] failed (exitcode: 1) local_rank: 1 (pid: 3684211) of binary: /home/ubuntu/data/exp/proj2410/EfficientQAT/.venv/bin/python3
+Traceback (most recent call last):
+  File "/home/ubuntu/data/exp/proj2410/EfficientQAT/.venv/bin/torchrun", line 10, in <module>
+    sys.exit(main())
+             ^^^^^^
+  File "/home/ubuntu/data/exp/proj2410/EfficientQAT/.venv/lib/python3.12/site-packages/torch/distributed/elastic/multiprocessing/errors/__init__.py", line 357, in wrapper
+    return f(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/data/exp/proj2410/EfficientQAT/.venv/lib/python3.12/site-packages/torch/distributed/run.py", line 936, in main
+    run(args)
+  File "/home/ubuntu/data/exp/proj2410/EfficientQAT/.venv/lib/python3.12/site-packages/torch/distributed/run.py", line 927, in run
+    elastic_launch(
+  File "/home/ubuntu/data/exp/proj2410/EfficientQAT/.venv/lib/python3.12/site-packages/torch/distributed/launcher/api.py", line 156, in __call__
+    return launch_agent(self._config, self._entrypoint, list(args))
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/data/exp/proj2410/EfficientQAT/.venv/lib/python3.12/site-packages/torch/distributed/launcher/api.py", line 293, in launch_agent
+    raise ChildFailedError(
+torch.distributed.elastic.multiprocessing.errors.ChildFailedError: 
+============================================================
+./VeOmni/tasks/quantize/train.py FAILED
+------------------------------------------------------------
+Failures:
+  <NO_OTHER_FAILURES>
+------------------------------------------------------------
+Root Cause (first observed failure):
+[0]:
+  time      : 2025-12-03_21:20:40
+  host      : heqi
+  rank      : 1 (local_rank: 1)
+  exitcode  : 1 (pid: 3684211)
+  error_file: <N/A>
+  traceback : To enable traceback see: https://pytorch.org/docs/stable/elastic/errors.html
+============================================================

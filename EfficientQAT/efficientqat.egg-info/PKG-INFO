@@ -1,0 +1,61 @@
+Metadata-Version: 2.4
+Name: efficientqat
+Version: 0.1.0
+Summary: Efficient Quantization Aware Training for Large Language Models
+Author-email: EfficientQAT Team <team@efficientqat.com>
+License: MIT
+Classifier: Development Status :: 3 - Alpha
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+Provides-Extra: dev
+
+# 准备模型
+从huggingface/modelscope中下载模型，然后更改下面文件中的指定部分
+EfficientQAT/yaml/model/Llama2-7b.yaml
+
+```
+# 传入的模型名字 用于标识具体模型id，作用于后续的模型具体推理
+net: Llama2-7b
+# 模型文件的地址
+model: /home/ubuntu/data/exp/proj2410/model/Llama2-7b
+# 压缩模型的保存位置
+save_parent_dir: /home/ubuntu/data/exp/proj2410/quant_model/Llama2-7B
+```
+
+# 配置批量训练模板
+
+## 超参数
+
+例子见下面的文件
+
+EfficientQAT/yaml/hyperparam/w2g128.yaml
+
+实际参数硬编码于 /home/ubuntu/data/exp/proj2410/EfficientQAT/quantize/greedy_trainer.py 中
+
+## 基础训练参数
+
+训练参数见EfficientQAT/yaml/train/base.yaml
+
+EfficientQAT/yaml/train-param/base-param.yaml
+
+## 特定gpu配置
+
+由于实验室的卡太杂了，而且大家采用贡献的方式进行训练，想要跑实验往往会碰见占用卡不一样的情况，这里简单选择给每个服务器配置一下gpu id，后期看看能不能用ray改一改自动化这个过程。
+
+# 自动参数模板生成
+自动生成可批量训练参数模板
+`python script/yaml_generate.py`
+
+# 批量训练
+
+目前的卡执行训练如果是48gb还是可以同时跑多个的，不过由于激活值都卸载在cpu了，可能效率相对较低。所以采用一次性批量运行多个实验的方式。
+
+批次数目可以通过修改script/batch_run.py的方式处理。
+`python script/batch_run.py`

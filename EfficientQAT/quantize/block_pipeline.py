@@ -1,3 +1,4 @@
+# quantizer/block_pipeline.py
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -17,6 +18,7 @@ from .. import utils
 from ..datautils_block import BlockTrainDataset
 from EfficientQAT.core.pipeline import (
     PipelineConfig,
+    PipelineContext,
     PipelineHooks,
     PipelineRunner,
     PipelineStage,
@@ -37,9 +39,8 @@ __all__ = [
 class BlockExecutor(Protocol):
     def __call__(self, ctx: "BlockContext", stage: PipelineStage) -> None: ...
 
-
-@dataclass
-class BlockContext:
+@dataclass(kw_only=True)
+class BlockContext(PipelineContext):
     model: nn.Module
     args: Any
     logger: logging.Logger
@@ -129,6 +130,10 @@ class BlockPipeline:
         )
         self.schedule_builder = schedule_builder
         self.ctx = BlockContext(
+            config=PipelineConfig(enable_eval=False, extra=args),
+            state={},
+            data=None,
+            extras={},          # 或者先塞一些东西
             model=model,
             args=args,
             logger=self.logger,
@@ -147,7 +152,11 @@ class BlockPipeline:
             export=self._export,
             teardown=self._teardown,
         )
-        PipelineRunner(PipelineConfig(enable_eval=False), hooks).run()
+        runner = PipelineRunner(
+            PipelineConfig(enable_eval=False, extra=self.args),
+            hooks,
+        )
+        runner.run(self.ctx)   # <-- 直接把 BlockContext 传进去
         return self.model
 
     # ------------------------------------------------------------------ Hooks
@@ -296,11 +305,11 @@ class BlockPipeline:
 
     def _build_schedule(self, pipeline_ctx) -> Iterable[PipelineStage]:
         if self.schedule_builder is not None:
-            return list(self.schedule_builder(self.ctx))
+            return list(self.schedule_builder(pipeline_ctx))
         return list(build_block_schedule(len(self.layers)))
 
     def _train_stage(self, pipeline_ctx, stage: PipelineStage) -> None:
-        self.executor(self.ctx, stage)
+        self.executor(pipeline_ctx, stage)
 
     def _after_stage(self, pipeline_ctx, stage: PipelineStage) -> None:
         if self.ctx.loss_recorder is not None:

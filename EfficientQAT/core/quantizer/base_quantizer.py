@@ -4,25 +4,31 @@ import torch.nn as nn
 from typing import Optional, Tuple
 
 from .ops import round_ste, clamp_ste, clamp_mad
+from .config import QuantConfig
 
 class BaseQuantizer(nn.Module):
     def __init__(self,
-                  n_bits: int = 8,
-                  group_size: Optional[int] = None,
-                  enable: bool = True,
-                  clamp_method: str = "STE",
-                  **kwargs):
+                config: QuantConfig,
+                n_bits: int = 8,
+                group_size: Optional[int] = None,
+                enable: bool = True,
+                clamp_method: str = "STE",
+                **kwargs):
         super().__init__()
-        assert 2 <= n_bits <= 16
-        if group_size is None:
-            raise ValueError("group_size must not be None")
-
-        self.n_bits = n_bits
+        # 使用默认配置或用户提供的配置
+        config = config or QuantConfig()
+        
+        # 使用直接参数覆盖配置对象中的值（如果提供了）
+        self.n_bits = n_bits if n_bits is not None else config.n_bits
         self.qmin = 0
-        self.qmax = (1 << n_bits) - 1
-        self.group_size = group_size
-        self.enable = enable
-        self.clamp_method = clamp_method
+        self.qmax = (1 << self.n_bits) - 1
+        self.group_size = group_size if group_size is not None else config.group_size
+        self.enable = enable if enable is not None else config.enable
+        self.clamp_method = clamp_method if clamp_method is not None else config.clamp_method
+        
+        assert 2 <= self.n_bits <= 16
+        if self.group_size is None:
+            raise ValueError("group_size must not be None")
 
     def change_n_bits(self, n_bits: int) -> None:
         self.n_bits = n_bits

@@ -1,0 +1,292 @@
+[
+  {
+    "module": "model.layers.0.self_attn.q_proj.weight_quantizer",
+    "kind": "output",
+    "tensor": "output",
+    "shape": [
+      896,
+      896
+    ],
+    "dtype": "torch.bfloat16",
+    "non_finite": 128,
+    "nan": 128,
+    "inf": 0,
+    "module_type": "UniformAffineQuantizer",
+    "tensor_stats": {
+      "shape": [
+        896,
+        896
+      ],
+      "dtype": "torch.bfloat16",
+      "device": "cuda:0",
+      "numel": 802816,
+      "non_finite": 128,
+      "nan": 128,
+      "inf": 0,
+      "min": -1.25,
+      "max": 1.203125,
+      "mean": -6.341934204101562e-05,
+      "std": 0.06396484375,
+      "non_finite_indices": [
+        [
+          468,
+          384
+        ],
+        [
+          468,
+          385
+        ],
+        [
+          468,
+          386
+        ],
+        [
+          468,
+          387
+        ]
+      ],
+      "non_finite_values": [
+        NaN,
+        NaN,
+        NaN,
+        NaN
+      ]
+    },
+    "weight_stats": [
+      {
+        "path": "weight",
+        "stats": {
+          "shape": [
+            896,
+            896
+          ],
+          "dtype": "torch.bfloat16",
+          "device": "cuda:0",
+          "numel": 802816,
+          "non_finite": 0,
+          "nan": 0,
+          "inf": 0,
+          "min": -1.25,
+          "max": 1.203125,
+          "mean": -7.271766662597656e-06,
+          "std": 0.068359375
+        }
+      }
+    ],
+    "quantizer_debug": {
+      "type": "UniformAffineQuantizer",
+      "n_bits": 8,
+      "group_size": 128,
+      "enable": true,
+      "clamp_method": "STE",
+      "input_name": "weight",
+      "steps": {
+        "weight": {
+          "shape": [
+            896,
+            896
+          ],
+          "dtype": "torch.bfloat16",
+          "device": "cuda:0",
+          "numel": 802816,
+          "non_finite": 0,
+          "nan": 0,
+          "inf": 0,
+          "min": -1.25,
+          "max": 1.203125,
+          "mean": -7.271766662597656e-06,
+          "std": 0.068359375
+        },
+        "scale_param": {
+          "shape": [
+            6272,
+            1
+          ],
+          "dtype": "torch.bfloat16",
+          "device": "cuda:0",
+          "numel": 6272,
+          "non_finite": 0,
+          "nan": 0,
+          "inf": 0,
+          "min": -0.03125,
+          "max": 0.019287109375,
+          "mean": 0.0027618408203125,
+          "std": 0.00396728515625
+        },
+        "zero_point_param": {
+          "shape": [
+            6272,
+            1
+          ],
+          "dtype": "torch.bfloat16",
+          "device": "cuda:0",
+          "numel": 6272,
+          "non_finite": 0,
+          "nan": 0,
+          "inf": 0,
+          "min": 48.0,
+          "max": 213.0,
+          "mean": 128.0,
+          "std": 21.25
+        },
+        "scale_q": {
+          "shape": [
+            6272,
+            1
+          ],
+          "dtype": "torch.bfloat16",
+          "device": "cuda:0",
+          "numel": 6272,
+          "non_finite": 0,
+          "nan": 0,
+          "inf": 0,
+          "min": 0.0,
+          "max": 0.019287109375,
+          "mean": 0.003326416015625,
+          "std": 0.0025787353515625
+        },
+        "zero_point_q": {
+          "shape": [
+            6272,
+            1
+          ],
+          "dtype": "torch.bfloat16",
+          "device": "cuda:0",
+          "numel": 6272,
+          "non_finite": 0,
+          "nan": 0,
+          "inf": 0,
+          "min": 48.0,
+          "max": 213.0,
+          "mean": 128.0,
+          "std": 21.25
+        },
+        "w_scaled": {
+          "shape": [
+            6272,
+            128
+          ],
+          "dtype": "torch.bfloat16",
+          "device": "cuda:0",
+          "numel": 802816,
+          "non_finite": 128,
+          "nan": 0,
+          "inf": 128,
+          "min": -11456.0,
+          "max": 10624.0,
+          "mean": 0.48046875,
+          "std": 210.0,
+          "non_finite_indices": [
+            [
+              3279,
+              0
+            ],
+            [
+              3279,
+              1
+            ],
+            [
+              3279,
+              2
+            ],
+            [
+              3279,
+              3
+            ]
+          ],
+          "non_finite_values": [
+            -Infinity,
+            -Infinity,
+            Infinity,
+            Infinity
+          ]
+        },
+        "w_int": {
+          "shape": [
+            6272,
+            128
+          ],
+          "dtype": "torch.bfloat16",
+          "device": "cuda:0",
+          "numel": 802816,
+          "non_finite": 128,
+          "nan": 128,
+          "inf": 0,
+          "min": 0.0,
+          "max": 255.0,
+          "mean": 128.0,
+          "std": 49.5,
+          "non_finite_indices": [
+            [
+              3279,
+              0
+            ],
+            [
+              3279,
+              1
+            ],
+            [
+              3279,
+              2
+            ],
+            [
+              3279,
+              3
+            ]
+          ],
+          "non_finite_values": [
+            NaN,
+            NaN,
+            NaN,
+            NaN
+          ]
+        },
+        "w_dequant": {
+          "shape": [
+            6272,
+            128
+          ],
+          "dtype": "torch.bfloat16",
+          "device": "cuda:0",
+          "numel": 802816,
+          "non_finite": 128,
+          "nan": 128,
+          "inf": 0,
+          "min": -1.25,
+          "max": 1.203125,
+          "mean": -6.341934204101562e-05,
+          "std": 0.06396484375,
+          "non_finite_indices": [
+            [
+              3279,
+              0
+            ],
+            [
+              3279,
+              1
+            ],
+            [
+              3279,
+              2
+            ],
+            [
+              3279,
+              3
+            ]
+          ],
+          "non_finite_values": [
+            NaN,
+            NaN,
+            NaN,
+            NaN
+          ]
+        }
+      },
+      "non_finite_steps": [
+        "w_scaled",
+        "w_int",
+        "w_dequant"
+      ]
+    }
+  }
+]

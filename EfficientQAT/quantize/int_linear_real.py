@@ -577,7 +577,7 @@ def load_quantized_model(model_path, wbits, group_size):
     tokenizer = AutoTokenizer.from_pretrained(model_path)
     config = AutoConfig.from_pretrained(model_path)
     with init_empty_weights():
-        model = AutoModelForCausalLM.from_config(config=config,torch_dtype=torch.float16, trust_remote_code=True)
+        model = AutoModelForCausalLM.from_config(config=config,torch_dtype=torch.float16, trust_remote_code=True, attn_implementation="flash_attention_2")
     layers = model.model.layers
     for i in tqdm(range(len(layers))):
         layer = layers[i]

@@ -63,28 +63,29 @@ class TritonV2QuantLinear(PackableQuantLinear, TritonModuleMixin):
 
     def post_init(self):
         super().post_init()
+    
+    # deprecated now forward is in PackableQuantLinear
+    # def forward(self, x):
+    #     out_shape = x.shape[:-1] + (self.out_features,)
 
-    def forward(self, x):
-        out_shape = x.shape[:-1] + (self.out_features,)
+    #     out = QuantLinearFunction.apply(
+    #         x.reshape(-1, x.shape[-1]),
+    #         self.qweight,
+    #         self.scales,
+    #         self.qzeros,
+    #         self.g_idx,
+    #         self.bits,
+    #         self.pack_dtype_bits,
+    #         self.maxq,
+    #     ).reshape(out_shape)
 
-        out = QuantLinearFunction.apply(
-            x.reshape(-1, x.shape[-1]),
-            self.qweight,
-            self.scales,
-            self.qzeros,
-            self.g_idx,
-            self.bits,
-            self.pack_dtype_bits,
-            self.maxq,
-        ).reshape(out_shape)
+    #     if self.bias is not None:
+    #         out.add_(self.bias)
 
-        if self.bias is not None:
-            out.add_(self.bias)
+    #     if self.adapter:
+    #         out = self.adapter.apply(x=x, out=out)
 
-        if self.adapter:
-            out = self.adapter.apply(x=x, out=out)
-
-        return out.to(dtype=x.dtype)
+    #     return out.to(dtype=x.dtype)
 
 
 __all__ = ["TritonV2QuantLinear"]

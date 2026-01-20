@@ -37,7 +37,7 @@ def main():
     
     # Model paths and loading
     model_path = "/home/ubuntu/data/exp/proj2410/model/Llama2-7b"
-    llm_model = AutoModelForCausalLM.from_pretrained(model_path, device_map="auto", torch_dtype=torch.float16)
+    llm_model = AutoModelForCausalLM.from_pretrained(model_path, device_map="auto", torch_dtype=torch.float16, attn_implementation="flash_attention_2")
     abs_test_dict = []
 
     # Argument setup

@@ -45,7 +45,7 @@ def download_transformers_models(model_list, save_dir):
         print(f"[Transformers] 正在下载 {path} ...")
         try:
             tokenizer = AutoTokenizer.from_pretrained(path)
-            model = AutoModelForCausalLM.from_pretrained(path)
+            model = AutoModelForCausalLM.from_pretrained(path, attn_implementation="flash_attention_2")
             print(f"[Transformers] 保存到 {save_path}")
             model.save_pretrained(save_path)
             tokenizer.save_pretrained(save_path)

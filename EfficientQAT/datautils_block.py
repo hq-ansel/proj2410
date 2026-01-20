@@ -3,14 +3,16 @@
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 import gc
+import glob
 import os
 import pdb
 import random
 from typing import Any, Callable, Dict, List, Tuple, Union
 
-from datasets import load_dataset
+from datasets import DownloadConfig, load_dataset
 import numpy as np
 import torch
+import torch.distributed as dist
 import torch.nn as nn
 from torch.utils.data import Dataset
 from tqdm import tqdm
@@ -644,38 +646,104 @@ def get_c4(
             Either the validation tensor if test_only is True, or a tuple containing two lists for train and validation data.
     """
     print("get_c4")
-    
-    # Attempt to load dataset from local path for faster loading
-    # try:
-    #     traindata = load_dataset(
-    #         "arrow",
-    #         data_files={
-    #             "train": "/path/to/local/train.arrow",
-    #             "validation": "/path/to/local/validation.arrow",
-    #         },
-    #         split='train'
-    #     )
-    #     valdata = load_dataset(
-    #         "arrow",
-    #         data_files={"validation": "/path/to/local/validation.arrow"},
-    #         split='validation'
-    #     )
-    # except:
-    # Fallback to remote dataset
-    traindata = load_dataset(
-        "allenai/c4",
-        "default",
-        data_files={"train": "en/c4-train.00000-of-01024.json.gz"},
-        split="train",
-        revision="607bd4c8450a42878aa9ddc051a65a055450ef87",
-    )
-    valdata = load_dataset(
-        "allenai/c4",
-        "default",
-        data_files={"validation": "en/c4-validation.00000-of-00008.json.gz"},
-        split="validation",
-        revision="607bd4c8450a42878aa9ddc051a65a055450ef87",
-    )
+
+    cache_dir = os.environ.get("HF_DATASETS_CACHE")
+    if not cache_dir:
+        hf_home = os.environ.get("HF_HOME")
+        if hf_home:
+            cache_dir = os.path.join(hf_home, "datasets")
+
+    def _resolve_cache_config_dir(config_override: str, split: str):
+        if not cache_dir:
+            return None
+        if config_override:
+            if os.path.isabs(config_override) and os.path.isdir(config_override):
+                return config_override
+            candidate = os.path.join(cache_dir, "allenai___c4", config_override)
+            if os.path.isdir(candidate):
+                return candidate
+            return None
+        base = os.path.join(cache_dir, "allenai___c4")
+        if not os.path.isdir(base):
+            return None
+        candidates = []
+        for name in os.listdir(base):
+            path = os.path.join(base, name)
+            if not os.path.isdir(path):
+                continue
+            if glob.glob(os.path.join(path, "*", "*", f"*{split}*.arrow")):
+                candidates.append(path)
+        if not candidates:
+            return None
+        candidates.sort(key=lambda p: os.path.getmtime(p), reverse=True)
+        return candidates[0]
+
+    def _load_c4_from_cache(split: str, config_override: str):
+        config_dir = _resolve_cache_config_dir(config_override, split)
+        if not config_dir:
+            return None
+        arrow_files = sorted(glob.glob(os.path.join(config_dir, "*", "*", f"*{split}*.arrow")))
+        if not arrow_files:
+            return None
+        return load_dataset("arrow", data_files={split: arrow_files}, split=split)
+
+    def _load_c4_remote(split: str, local_only: bool):
+        download_config = DownloadConfig(cache_dir=cache_dir, local_files_only=local_only)
+        common_kwargs = {
+            "cache_dir": cache_dir,
+            "download_config": download_config,
+            "download_mode": "reuse_cache_if_exists",
+            "revision": "607bd4c8450a42878aa9ddc051a65a055450ef87",
+        }
+        if split == "train":
+            return load_dataset(
+                "allenai/c4",
+                "default",
+                data_files={"train": "en/c4-train.00000-of-01024.json.gz"},
+                split="train",
+                **common_kwargs,
+            )
+        return load_dataset(
+            "allenai/c4",
+            "default",
+            data_files={"validation": "en/c4-validation.00000-of-00008.json.gz"},
+            split="validation",
+            **common_kwargs,
+        )
+
+    train_config = os.environ.get("C4_CACHE_CONFIG_TRAIN", "")
+    val_config = os.environ.get("C4_CACHE_CONFIG_VALID", "")
+
+    if test_only:
+        valdata = _load_c4_from_cache("validation", val_config)
+        if valdata is None:
+            try:
+                print("Loading C4 validation from local cache only...")
+                valdata = _load_c4_remote("validation", local_only=True)
+            except Exception as e:
+                print(f"Local C4 cache miss: {e}")
+                print("Falling back to remote cache/download...")
+                valdata = _load_c4_remote("validation", local_only=False)
+        traindata = None
+    else:
+        traindata = _load_c4_from_cache("train", train_config)
+        valdata = _load_c4_from_cache("validation", val_config)
+        if traindata is None:
+            try:
+                print("Loading C4 train from local cache only...")
+                traindata = _load_c4_remote("train", local_only=True)
+            except Exception as e:
+                print(f"Local C4 cache miss: {e}")
+                print("Falling back to remote cache/download...")
+                traindata = _load_c4_remote("train", local_only=False)
+        if valdata is None:
+            try:
+                print("Loading C4 validation from local cache only...")
+                valdata = _load_c4_remote("validation", local_only=True)
+            except Exception as e:
+                print(f"Local C4 cache miss: {e}")
+                print("Falling back to remote cache/download...")
+                valdata = _load_c4_remote("validation", local_only=False)
     # traindata = load_dataset('allenai/c4', data_files={'train': 'en/c4-train.00000-of-01024.json.gz'},download_mode="force_redownload", split='train')
     # valdata = load_dataset('allenai/c4', data_files={'validation': 'en/c4-validation.00000-of-00008.json.gz'},download_mode="force_redownload", split='validation')
 
@@ -859,6 +927,7 @@ def test_ppl(
         tokenizer: The tokenizer for encoding the datasets.
         datasets (List[str]): List of dataset names to test on.
         ppl_seqlen (int): Sequence length for perplexity calculation.
+        batch_size (int): Batch size for perplexity calculation.
 
     Returns:
         Dict[str, float]: A dictionary mapping dataset names to their calculated perplexity.

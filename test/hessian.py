@@ -51,7 +51,7 @@ model = AutoModelForCausalLM.from_pretrained(
     args.model,
     config=config,
     device_map='cpu',
-    attn_implementation="eager",
+    attn_implementation="flash_attention_2",
     torch_dtype=torch.float32
 )
 tokenizer = AutoTokenizer.from_pretrained(args.model, use_fast=False, legacy=False)

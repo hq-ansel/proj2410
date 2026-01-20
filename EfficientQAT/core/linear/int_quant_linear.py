@@ -81,6 +81,8 @@ class IntQuantLinear(nn.Linear):
             # Keep a copy of full numel before sharding (FSDP/DTensor may change local numel later).
             if hasattr(self.weight_quantizer, "_num_elements"):
                 self.weight_quantizer._num_elements_full = self.weight.numel()
+        self.debug_int_weight = False
+        self.int_weight_debug = None
 
     def forward(self, input: torch.Tensor) -> torch.Tensor:
         """前向传播：根据配置决定是否进行假量化
@@ -95,7 +97,84 @@ class IntQuantLinear(nn.Linear):
             weight = self.weight_quantizer(self.weight)
         else:
             weight = self.weight
+        # weight:[out_features, in_features]
+        # input@weight.T +bias
         return F.linear(input, weight, self.bias)
+
+    def get_int_weight(
+        self,
+        force_full_quant: bool = True,
+        store_debug: bool | None = None,
+    ) -> torch.Tensor:
+        """Return integer weight tensor for debugging/verification."""
+        if self.weight_quantizer is None:
+            raise RuntimeError("IntQuantLinear is missing weight_quantizer")
+
+        quantizer = self.weight_quantizer
+        restore = None
+        if force_full_quant and hasattr(quantizer, "quantization_position_ratio"):
+            restore = (
+                quantizer.quantization_position_ratio,
+                quantizer.group_mask,
+                quantizer.interpolate_ratio,
+            )
+            quantizer.quantization_position_ratio = 1.0
+            quantizer.group_mask = None
+            quantizer.interpolate_ratio = 0.0
+
+        try:
+            scale, round_zero_point = quantizer.cal_qparams(quantizer.scale, quantizer.zero_point)
+            weight = self.weight
+            
+            w_int = quantizer._quantize(
+                weight.reshape(-1, quantizer.group_size),
+                scale,
+                round_zero_point,
+            )
+            w_int = w_int.to(torch.int32).reshape(weight.shape)
+            
+            # if True:  # Enable debug
+            #     print(f"[DEBUG get_int_weight] w_int range: [{w_int.min()}, {w_int.max()}]")
+        finally:
+            if restore is not None:
+                quantizer.quantization_position_ratio = restore[0]
+                quantizer.group_mask = restore[1]
+                quantizer.interpolate_ratio = restore[2]
+
+        if store_debug is None:
+            store_debug = bool(self.debug_int_weight)
+        if store_debug:
+            self.int_weight_debug = w_int.detach().cpu()
+        return w_int
+
+    def weight_l2_stats(self) -> tuple[torch.Tensor, int] | None:
+        """Return sum of squared error and numel for aggregation."""
+        if self.weight_quantizer is None:
+            return None
+        q_weight = self.weight_quantizer(self.weight)
+        diff = (q_weight - self.weight).float()
+        return diff.pow(2).sum(), int(diff.numel())
+
+    def weight_l2_loss(self, reduction: str = "mean") -> torch.Tensor | None:
+        """L2 loss between quantized and float weights.
+
+        Args:
+            reduction: mean | sum | norm
+
+        Returns:
+            Scalar tensor or None if quantizer is missing.
+        """
+        stats = self.weight_l2_stats()
+        if stats is None:
+            return None
+        sse, numel = stats
+        if reduction == "mean":
+            return sse / max(numel, 1)
+        if reduction == "sum":
+            return sse
+        if reduction == "norm":
+            return sse.sqrt()
+        raise ValueError(f"Unsupported reduction: {reduction}")
 
     @classmethod
     def from_float(
@@ -162,6 +241,7 @@ def set_weight_parameters(model: nn.Module, requires_grad: bool) -> List[nn.Para
     for n, m in model.named_parameters():
         if n.find('weight') > -1 and not (n.find('scale') > -1 or n.find('zero_point') > -1):
             m.requires_grad = requires_grad
+            params.append(m)
     return params
 
 
@@ -195,6 +275,7 @@ def set_quant_parameters(model: nn.Module, requires_grad: bool) -> List[nn.Param
     for n, m in model.named_parameters():
         if n.find('scale') > -1 or n.find('zero_point') > -1:
             m.requires_grad = requires_grad
+            params.append(m)
     return params
 
 

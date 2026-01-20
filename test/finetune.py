@@ -318,6 +318,7 @@ def train():
         )
         if training_args.use_lora and lora_args.q_lora
         else None,
+        attn_implementation="flash_attention_2",
         **model_load_kwargs,
     )
     tokenizer = transformers.AutoTokenizer.from_pretrained(

@@ -61,6 +61,7 @@ def load_model(model_name, device="cuda"):
         model_name,
         trust_remote_code=True,
         torch_dtype="auto",
+        attn_implementation="flash_attention_2",
     ).to(device)
 
 
@@ -91,6 +92,7 @@ def load_model_dispach(model_name, device="cuda"):
         AutoModelForCausalLM.from_pretrained(model_name, 
                                               trust_remote_code=True, 
                                               torch_dtype="auto", 
+                                              attn_implementation="flash_attention_2",
                                               ).to(device)
     elif "bitblas":
         from gptqmodel import GPTQModel, QuantizeConfig, get_backend

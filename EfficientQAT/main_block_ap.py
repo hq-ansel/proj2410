@@ -122,7 +122,7 @@ def main() -> None:
         #     require_logits=True)
         model = AutoModelForCausalLM.from_pretrained(
             config['model_settings']['model'],
-            attn_implementation="eager",
+            attn_implementation="flash_attention_2",
             config=model_config,
             device_map='cpu',
             torch_dtype=torch.float16 

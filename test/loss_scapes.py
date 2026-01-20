@@ -190,7 +190,7 @@ def main():
     criterion = nn.MSELoss()
     model_handler = ModelHandler(quant_model)
     align_model_path = "/home/ubuntu/data/exp/proj2410/model/Qwen-2.5-0.5B"
-    align_model = AutoModelForCausalLM.from_pretrained(align_model_path,torch_dtype=torch.float16)
+    align_model = AutoModelForCausalLM.from_pretrained(align_model_path,torch_dtype=torch.float16, attn_implementation="flash_attention_2")
     align_model.to(device)
     align_model.eval()
     loss_calculator = LossSurfaceCalculator(model_handler,align_model,criterion)

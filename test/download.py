@@ -16,7 +16,7 @@ save_dir = "/home/ubuntu/data/exp/proj2410/model"
 
 for path in path_list:
     tokenizer = AutoTokenizer.from_pretrained(path)
-    model = AutoModelForCausalLM.from_pretrained(path)
+    model = AutoModelForCausalLM.from_pretrained(path, attn_implementation="flash_attention_2")
     save_path = os.path.join(save_dir, path.split("/")[-1])
     print(f"Saving model to {save_path}")
     model.save_pretrained(save_path)

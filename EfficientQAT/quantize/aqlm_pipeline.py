@@ -23,7 +23,7 @@ LLAMA_LIKE = ("llama", "Yi", "mistral", "mixtral", "gemma", "cohere", "qwen2")
 
 def load_awq_model_tokenizer(model_path,
                              ):
-    model = AutoModelForCausalLM.from_pretrained(model_path)
+    model = AutoModelForCausalLM.from_pretrained(model_path, attn_implementation="flash_attention_2")
     tokenizer = AutoTokenizer.from_pretrained(model_path)
     return model, tokenizer
 

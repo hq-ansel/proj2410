@@ -122,7 +122,7 @@ def get_model_and_tokenizer(model_path:str) -> Tuple[AutoModelForCausalLM,AutoTo
                                                     wbits=wbits,
                                                     group_size=group_size)
     else:
-        model = AutoModelForCausalLM.from_pretrained(model_path)
+        model = AutoModelForCausalLM.from_pretrained(model_path, attn_implementation="flash_attention_2")
         tokenizer = AutoTokenizer.from_pretrained(model_path)
     return model,tokenizer,quantized
 

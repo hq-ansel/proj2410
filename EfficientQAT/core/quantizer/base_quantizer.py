@@ -12,7 +12,6 @@ class BaseQuantizer(nn.Module):
 
     def __init__(self,
                 config: Optional[QuantConfig] = None,
-                n_bits: int = 8,
                 group_size: Optional[int] = None,
                 enable: bool = True,
                 clamp_method: str = "STE"):
@@ -30,7 +29,8 @@ class BaseQuantizer(nn.Module):
         config = config or QuantConfig()
 
         # 使用直接参数覆盖配置对象中的值（如果提供了）
-        self.n_bits = n_bits if n_bits is not None else config.n_bits
+        self.n_bits = config.n_bits
+        # 当前的配置模式是非对称量化
         self.qmin = 0
         self.qmax = (1 << self.n_bits) - 1
         self.group_size = group_size if group_size is not None else config.group_size
@@ -60,14 +60,14 @@ class BaseQuantizer(nn.Module):
         """根据权重初始化 scale 和 zero_point
 
         Args:
-            weight: 权重张量
+            weight: 权重张量, shape: [out_features, in_features]
             n_bits: 量化位数
             group_size: 分组大小
             clamp_method: 截断方法
 
         Returns:
-            scale: 缩放因子
-            zero_point: 零点偏移
+            scale: 缩放因子, shape: [num_groups, 1]
+            zero_point: 零点偏移, shape: [num_groups, 1]
         """
         if weight is None:
             print("weight is None")
@@ -75,15 +75,21 @@ class BaseQuantizer(nn.Module):
         if group_size is None:
             raise ValueError("group_size must not be None")
         with torch.no_grad():
+            # weight: [out_features, in_features] -> x: [num_groups, group_size]
             x = weight.reshape(-1,group_size)
+            # xmin, xmax: [num_groups, 1]
             xmin = x.amin([-1], keepdim=True)
             xmax =  x.amax([-1], keepdim=True)
+            # x_range, scale: [num_groups, 1]
             x_range = xmax - xmin
+            # scale shape [num_groups, 1]
+            #  or [out_features*in_features/group_size, 1]
             scale = x_range / (2**n_bits-1)
             if clamp_method == "STE":
                 scale = clamp_ste(scale, 1e-4, 1e4)
             elif clamp_method == "MAD":
                 scale = clamp_mad(scale, 1e-4, 1e4)
+            # zero_point: [num_groups, 1]
             zero_point = -(xmin/scale).clamp(min=-1e4, max=1e4)
             return scale, zero_point.round()
 
@@ -94,12 +100,12 @@ class BaseQuantizer(nn.Module):
         """计算量化参数（scale 和 zero_point）并应用截断
 
         Args:
-            scale: 缩放因子
-            zero_point: 零点偏移
+            scale: 缩放因子, shape: [num_groups, 1]
+            zero_point: 零点偏移, shape: [num_groups, 1]
 
         Returns:
-            scale: 截断后的缩放因子
-            round_zero_point: 截断并舍入后的零点
+            scale: 截断后的缩放因子, shape: [num_groups, 1]
+            round_zero_point: 截断并舍入后的零点, shape: [num_groups, 1]
         """
         min_scale = 1e-5
         max_scale = 1e4
@@ -112,8 +118,26 @@ class BaseQuantizer(nn.Module):
             sign = torch.where(scale >= 0, torch.ones_like(scale), -torch.ones_like(scale))
             scale = clamp_mad(scale.abs(), min_scale, max_scale) * sign
             round_zero_point = clamp_mad(round_ste(zero_point), self.qmin, self.qmax)
+        # # 检查 round_zero_point 是否超出范围
+        # if (round_zero_point < self.qmin).any() or (round_zero_point > self.qmax).any():
+        #     # 找出越界的位置和值
+        #     invalid_mask = (round_zero_point < self.qmin) | (round_zero_point > self.qmax)
+        #     invalid_indices = torch.where(invalid_mask)[0]
+        #     invalid_values = round_zero_point[invalid_mask]
+            
+        #     # 收集统计信息
+        #     actual_min = round_zero_point.min().item()
+        #     actual_max = round_zero_point.max().item()
+            
+        #     raise AssertionError(
+        #         f"zero_point 超出范围 [{self.qmin}, {self.qmax}]!\n"
+        #         f"允许的 min={self.qmin}, max={self.qmax}\n"
+        #         f"实际的 min={actual_min:.4f}, max={actual_max:.4f}\n"
+        #         f"越界位置 (前10个): {invalid_indices[:10].tolist()}\n"
+        #         f"越界值 (前10个): {invalid_values[:10].flatten().tolist()}\n"
+        #         f"越界总数: {len(invalid_indices)}"
+        #     )
         return scale, round_zero_point
-
     def _quantize(self,
                   x: torch.Tensor,
                   scale: torch.Tensor,
@@ -122,12 +146,12 @@ class BaseQuantizer(nn.Module):
         """量化输入张量
 
         Args:
-            x: 输入张量
-            scale: 缩放因子
-            round_zero_point: 舍入后的零点偏移
+            x: 输入张量, shape: [num_elements, group_size] (reshape后的)
+            scale: 缩放因子, shape: [num_groups, 1]
+            round_zero_point: 舍入后的零点偏移, shape: [num_groups, 1]
 
         Returns:
-            量化后的整数张量
+            量化后的整数张量, shape: [num_elements, group_size]
         """
         x_int = round_ste(x / scale)
         if round_zero_point is not None:
@@ -143,12 +167,12 @@ class BaseQuantizer(nn.Module):
         """反量化整数张量
 
         Args:
-            x_int: 量化后的整数张量
-            scale: 缩放因子
-            round_zero_point: 舍入后的零点偏移
+            x_int: 量化后的整数张量, shape: [num_elements, group_size]
+            scale: 缩放因子, shape: [num_groups, 1]
+            round_zero_point: 舍入后的零点偏移, shape: [num_groups, 1]
 
         Returns:
-            反量化后的浮点张量
+            反量化后的浮点张量, shape: [num_elements, group_size]
         """
         if round_zero_point is not None:
             x_int = x_int.sub(round_zero_point)
@@ -161,17 +185,23 @@ class BaseQuantizer(nn.Module):
         """假量化：量化后反量化，用于可微分量化训练
 
         Args:
-            x: 输入张量
+            x: 输入张量, shape: [batch_size, ..., in_features] (任意形状，最后一维可被 group_size 整除)
 
         Returns:
-            假量化后的张量
+            假量化后的张量, shape: [batch_size, ..., in_features] (与输入相同)
         """
+        # self.scale, self.zero_point: [num_groups, 1]
         scale, round_zero_point = self.cal_qparams(self.scale,
                                                    self.zero_point)
+        # ori_shape: 保存原始形状
         ori_shape = x.shape
+        # x: [batch_size, ..., in_features] -> [num_elements, group_size]
         x = x.reshape(-1, self.group_size)
+        # x_int: [num_elements, group_size]
         x_int = self._quantize(x, scale, round_zero_point)
+        # x_dequant: [num_elements, group_size]
         x_dequant = self._dequantize(x_int, scale, round_zero_point)
+        # 返回: [batch_size, ..., in_features]
         return x_dequant.reshape(ori_shape)
 
     def forward(self,
@@ -180,10 +210,10 @@ class BaseQuantizer(nn.Module):
         """前向传播：根据配置决定是否进行假量化
 
         Args:
-            x: 输入张量
+            x: 输入张量, shape: [batch_size, ..., in_features]
 
         Returns:
-            假量化后的张量或原张量
+            假量化后的张量或原张量, shape: [batch_size, ..., in_features]
         """
         if self.n_bits >= 16 or not self.enable:
             return x

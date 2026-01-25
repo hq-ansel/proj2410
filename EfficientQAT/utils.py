@@ -1,11 +1,52 @@
 import logging
 from math import inf
 import os
+from pathlib import Path
 import time
 
 import sys
 from termcolor import colored
 import torch
+
+
+def enable_local_mmlu_cache(task_list, repo_root=None):
+    if not task_list:
+        return False
+    normalized = [t.strip() for t in task_list if t and t.strip()]
+    if not normalized or not all(t.startswith("mmlu") for t in normalized):
+        return False
+    if os.environ.get("HF_DATASETS_OFFLINE") == "1" or os.environ.get("HF_HUB_OFFLINE") == "1":
+        return False
+
+    def _has_mmlu_cache(path):
+        if not path:
+            return False
+        return os.path.isdir(os.path.join(path, "cais___mmlu"))
+
+    cache_dir = os.environ.get("HF_DATASETS_CACHE")
+    if not _has_mmlu_cache(cache_dir):
+        hf_home = os.environ.get("HF_HOME")
+        if hf_home:
+            candidate = os.path.join(hf_home, "datasets")
+            if _has_mmlu_cache(candidate):
+                cache_dir = candidate
+
+    if not _has_mmlu_cache(cache_dir):
+        if repo_root is None:
+            repo_root = Path(__file__).resolve().parents[1]
+        candidate_home = Path(repo_root) / "hf_home"
+        candidate_cache = candidate_home / "datasets"
+        if candidate_cache.is_dir() and _has_mmlu_cache(str(candidate_cache)):
+            os.environ.setdefault("HF_HOME", str(candidate_home))
+            cache_dir = str(candidate_cache)
+
+    if not _has_mmlu_cache(cache_dir):
+        return False
+
+    os.environ.setdefault("HF_DATASETS_CACHE", cache_dir)
+    os.environ.setdefault("HF_DATASETS_OFFLINE", "1")
+    os.environ.setdefault("HF_HUB_OFFLINE", "1")
+    return True
 
 
 

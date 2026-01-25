@@ -1,1 +1,1319 @@
-./VeOmni/train.sh: line 21: torchrun: command not found
+W0121 17:05:14.212000 3682625 .venv/lib/python3.12/site-packages/torch/distributed/run.py:803] 
+W0121 17:05:14.212000 3682625 .venv/lib/python3.12/site-packages/torch/distributed/run.py:803] *****************************************
+W0121 17:05:14.212000 3682625 .venv/lib/python3.12/site-packages/torch/distributed/run.py:803] Setting OMP_NUM_THREADS environment variable for each process to be 1 in default, to avoid your system being overloaded, please further tune the variable for optimal performance in your application as needed. 
+W0121 17:05:14.212000 3682625 .venv/lib/python3.12/site-packages/torch/distributed/run.py:803] *****************************************
+[INFO][veomni:30] 01/21/2026 17:05:17 >> ❌ veomni_patch is not available
+[INFO][veomni.models.transformers.flux.modeling_flux:769] 01/21/2026 17:05:24 >> Apply liger kernel to Flux.
+/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/transformers/models/auto/image_processing_auto.py:604: FutureWarning: The image_processor_class argument is deprecated and will be removed in v4.42. Please use `slow_image_processor_class`, or `fast_image_processor_class` instead
+  warnings.warn(
+[INFO][veomni.models.transformers.llama.modeling_llama:890] 01/21/2026 17:05:25 >> Apply liger kernel to Llama.
+/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/transformers/models/auto/image_processing_auto.py:604: FutureWarning: The image_processor_class argument is deprecated and will be removed in v4.42. Please use `slow_image_processor_class`, or `fast_image_processor_class` instead
+  warnings.warn(
+[INFO][veomni.models.transformers.wan.modeling_wan:652] 01/21/2026 17:05:25 >> Apply liger kernel to Wan.
+[INFO][veomni.models.transformers.wan.modeling_wan:658] 01/21/2026 17:05:25 >> Apply fused interleaved rope to Wan.
+/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/transformers/models/auto/image_processing_auto.py:604: FutureWarning: The image_processor_class argument is deprecated and will be removed in v4.42. Please use `slow_image_processor_class`, or `fast_image_processor_class` instead
+  warnings.warn(
+[WARNING][veomni.models.registry:64] 01/21/2026 17:05:25 >> Ignore import error when loading veomni.models.transformers.deepseek_v3.modeling_deepseek. cannot import name 'TransformersKwargs' from 'transformers.utils' (/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/transformers/utils/__init__.py)
+/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/transformers/models/auto/image_processing_auto.py:604: FutureWarning: The image_processor_class argument is deprecated and will be removed in v4.42. Please use `slow_image_processor_class`, or `fast_image_processor_class` instead
+  warnings.warn(
+[WARNING][veomni.models.registry:64] 01/21/2026 17:05:25 >> Ignore import error when loading veomni.models.transformers.qwen3_vl.modeling_qwen3_vl. No module named 'transformers.masking_utils'
+[WARNING][veomni.models.registry:64] 01/21/2026 17:05:25 >> Ignore import error when loading veomni.models.transformers.qwen3_vl_moe.modeling_qwen3_vl_moe. No module named 'transformers.masking_utils'
+[WARNING][veomni.models.registry:64] 01/21/2026 17:05:25 >> Ignore import error when loading veomni.models.transformers.seed_oss.modeling_seed_oss. No module named 'transformers.masking_utils'
+[WARNING][veomni.models.registry:64] 01/21/2026 17:05:25 >> Ignore import error when loading veomni.models.transformers.deepseek_v3.modeling_deepseek. cannot import name 'TransformersKwargs' from 'transformers.utils' (/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/transformers/utils/__init__.py)
+[WARNING][veomni.models.registry:64] 01/21/2026 17:05:25 >> Ignore import error when loading veomni.models.transformers.deepseek_v3.modeling_deepseek. cannot import name 'TransformersKwargs' from 'transformers.utils' (/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/transformers/utils/__init__.py)
+[INFO][veomni.models.transformers.qwen2.modeling_qwen2:915] 01/21/2026 17:05:25 >> Apply liger kernel to Qwen2.
+[INFO][veomni.models.transformers.qwen2_vl.modeling_qwen2_vl:1979] 01/21/2026 17:05:25 >> Apply liger kernel to Qwen2-VL.
+[INFO][veomni.models.transformers.qwen3.modeling_qwen3:878] 01/21/2026 17:05:25 >> Apply liger kernel to Qwen3.
+[WARNING][veomni.models.registry:64] 01/21/2026 17:05:25 >> Ignore import error when loading veomni.models.transformers.qwen3_vl.modeling_qwen3_vl. No module named 'transformers.masking_utils'
+[INFO][veomni.models.transformers.qwen3_moe.modeling_qwen3_moe:1508] 01/21/2026 17:05:25 >> Apply liger kernel to Qwen3_moe.
+[WARNING][veomni.models.registry:64] 01/21/2026 17:05:25 >> Ignore import error when loading veomni.models.transformers.qwen3_vl_moe.modeling_qwen3_vl_moe. No module named 'transformers.masking_utils'
+[WARNING][veomni.models.registry:64] 01/21/2026 17:05:25 >> Ignore import error when loading veomni.models.transformers.qwen3_vl.modeling_qwen3_vl. No module named 'transformers.masking_utils'
+[WARNING][veomni.models.registry:64] 01/21/2026 17:05:25 >> Ignore import error when loading veomni.models.transformers.seed_oss.modeling_seed_oss. No module named 'transformers.masking_utils'
+[WARNING][veomni.models.registry:64] 01/21/2026 17:05:25 >> Ignore import error when loading veomni.models.transformers.qwen3_vl_moe.modeling_qwen3_vl_moe. No module named 'transformers.masking_utils'
+[WARNING][veomni.models.registry:64] 01/21/2026 17:05:25 >> Ignore import error when loading veomni.models.transformers.seed_oss.modeling_seed_oss. No module named 'transformers.masking_utils'
+[WARNING][veomni.models.registry:64] 01/21/2026 17:05:25 >> Ignore import error when loading veomni.models.transformers.deepseek_v3.modeling_deepseek. cannot import name 'TransformersKwargs' from 'transformers.utils' (/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/transformers/utils/__init__.py)
+[WARNING][veomni.models.registry:64] 01/21/2026 17:05:26 >> Ignore import error when loading veomni.models.transformers.qwen3_vl.modeling_qwen3_vl. No module named 'transformers.masking_utils'
+[WARNING][veomni.models.registry:64] 01/21/2026 17:05:26 >> Ignore import error when loading veomni.models.transformers.qwen3_vl_moe.modeling_qwen3_vl_moe. No module named 'transformers.masking_utils'
+[WARNING][veomni.models.registry:64] 01/21/2026 17:05:26 >> Ignore import error when loading veomni.models.transformers.seed_oss.modeling_seed_oss. No module named 'transformers.masking_utils'
+[W121 17:05:26.745801645 ProcessGroupNCCL.cpp:924] Warning: TORCH_NCCL_AVOID_RECORD_STREAMS is the default now, this environment variable is thus deprecated. (function operator())
+01/21/2026 17:05:26 - INFO - __main__ - Process rank: 2, world size: 4
+[W121 17:05:26.094886617 ProcessGroupNCCL.cpp:924] Warning: TORCH_NCCL_AVOID_RECORD_STREAMS is the default now, this environment variable is thus deprecated. (function operator())
+01/21/2026 17:05:26 - INFO - __main__ - Process rank: 1, world size: 4
+[W121 17:05:26.169125232 ProcessGroupNCCL.cpp:924] Warning: TORCH_NCCL_AVOID_RECORD_STREAMS is the default now, this environment variable is thus deprecated. (function operator())
+[WARNING][veomni.utils.arguments:584] 01/21/2026 17:05:26 >> `enable_rank0_init` will be deprecated in the future, please use `init_device=cpu` instead.
+[INFO][veomni.utils.arguments:610] 01/21/2026 17:05:26 >> Set gradient accumulation to 4.
+01/21/2026 17:05:26 - INFO - __main__ - Process rank: 0, world size: 4
+01/21/2026 17:05:26 - INFO - __main__ - {
+  "model": {
+    "config_path": "/home/ubuntu/data/exp/proj2410/model/Qwen2.5-0.5B",
+    "model_path": "/home/ubuntu/data/exp/proj2410/model/Qwen2.5-0.5B",
+    "tokenizer_path": "/home/ubuntu/data/exp/proj2410/model/Qwen2.5-0.5B",
+    "foundation": {},
+    "encoders": {},
+    "decoders": {},
+    "input_encoder": "encoder",
+    "output_encoder": "decoder",
+    "encode_target": false,
+    "attn_implementation": "flash_attention_2",
+    "moe_implementation": null,
+    "basic_modules": [],
+    "force_use_huggingface": false
+  },
+  "data": {
+    "train_path": "/home/ubuntu/data/exp/proj2410/hf_home/rp_text_caches/data-00000-of-00001.arrow",
+    "train_size": 10000000,
+    "data_type": "plaintext",
+    "dataloader_type": "native",
+    "datasets_type": "mapping",
+    "enable_multisource": false,
+    "source_name": null,
+    "data_tag": "default",
+    "drop_resume_buffer": false,
+    "text_keys": "text",
+    "image_keys": "images",
+    "chat_template": "default",
+    "max_seq_len": 4096,
+    "num_workers": 2,
+    "prefetch_factor": 2,
+    "drop_last": true,
+    "pin_memory": true,
+    "shuffle_shard_nums": 1,
+    "split_nums": 1,
+    "predownload_factor": 0.5,
+    "silent_exception": false
+  },
+  "train": {
+    "output_dir": "/home/ubuntu/data/exp/proj2410/quant_model/Qwen2.5-0.5B/EfficientQAT/w2g128-int2-infra",
+    "lr": 1e-05,
+    "lr_min": 1e-07,
+    "lr_start": 0.0,
+    "weight_decay": 0.01,
+    "no_decay_modules": [],
+    "no_decay_params": [],
+    "optimizer": "adamw",
+    "max_grad_norm": 1.0,
+    "micro_batch_size": 1,
+    "global_batch_size": 8,
+    "num_train_epochs": 2,
+    "rmpad": false,
+    "rmpad_with_pos_ids": true,
+    "dyn_bsz": true,
+    "dyn_bsz_margin": 0,
+    "dyn_bsz_runtime": "worker",
+    "dyn_bsz_buffer_size": 200,
+    "bsz_warmup_ratio": 0.007,
+    "bsz_warmup_init_mbtoken": 200,
+    "lr_warmup_ratio": 0.007,
+    "lr_decay_style": "constant",
+    "lr_decay_ratio": 1.0,
+    "enable_mixed_precision": true,
+    "enable_gradient_checkpointing": false,
+    "enable_reentrant": false,
+    "enable_full_shard": true,
+    "enable_forward_prefetch": true,
+    "enable_fsdp_offload": false,
+    "enable_activation_offload": true,
+    "activation_gpu_limit": 40.0,
+    "enable_rank0_init": false,
+    "init_device": "meta",
+    "broadcast_model_weights_from_rank0": true,
+    "enable_full_determinism": false,
+    "allow_cuda_launch_blocking": false,
+    "empty_cache_steps": 500,
+    "gc_steps": 500,
+    "data_parallel_mode": "fsdp2",
+    "data_parallel_replicate_size": 1,
+    "data_parallel_shard_size": 2,
+    "tensor_parallel_size": 1,
+    "expert_parallel_size": 1,
+    "ep_outside": false,
+    "pipeline_parallel_size": 1,
+    "ulysses_parallel_size": 2,
+    "context_parallel_size": 1,
+    "ckpt_manager": "dcp",
+    "save_async": false,
+    "load_checkpoint_path": "",
+    "save_steps": 1000,
+    "save_epochs": 1,
+    "save_hf_weights": true,
+    "seed": 42,
+    "enable_compile": false,
+    "use_wandb": true,
+    "wandb_project": "Qwen2-0.5B",
+    "wandb_name": "Qwen2-0.5B-int2-g64-infra",
+    "enable_profiling": false,
+    "profile_start_step": 1,
+    "profile_end_step": 2,
+    "profile_trace_dir": "./trace",
+    "profile_record_shapes": true,
+    "profile_profile_memory": true,
+    "profile_with_stack": true,
+    "profile_rank0_only": true,
+    "max_steps": null
+  },
+  "quantizer": {
+    "quant_type": "uniform_affine",
+    "n_bits": 2,
+    "group_size": 64,
+    "clamp_method": "STE",
+    "round_method": "ste",
+    "stat_quant": false,
+    "iterative_freezing": false,
+    "iterative_freezing_sheduler": "linear",
+    "is_tracking": false,
+    "freeze_momentum": 0.004,
+    "freeze_threshold": 0.0,
+    "interpolate": false,
+    "lora_rank": 0,
+    "decay_rate": 0.01,
+    "shrinking_ratio": 0.5,
+    "ramp_len": 0,
+    "ramp_mode": "linear",
+    "ramp_sigmoid_a": 10.0,
+    "quant_lr": 0.0001,
+    "quant_weight_decay": 0.0,
+    "enable_activation_quant": false,
+    "activation_n_bits": 8,
+    "activation_group_size": 128,
+    "activation_clamp_method": "STE",
+    "activation_round_method": "ste",
+    "enable_qweight_l2_reg": false,
+    "qweight_l2_reg_lambda": 0.0,
+    "enable_gradual_quant": false,
+    "qat_warmup_steps": 0,
+    "gradual_start_ratio": 1.0,
+    "gradual_end_ratio": 1.0,
+    "priority_type": "uniform",
+    "enable_infra": true
+  },
+  "profile": {
+    "profile_module_name": [
+      "model.layers.0"
+    ],
+    "loss_spike_k": 3.0,
+    "loss_spike_ema_decay": 0.98,
+    "forward_consistency_interval": 0,
+    "forward_consistency_history_size": 128,
+    "forward_consistency_logit_metrics": [
+      "kl",
+      "js"
+    ],
+    "forward_consistency_logit_temperature": 1.0,
+    "forward_consistency_logit_max_tokens": 128,
+    "quant_stat_interval": 0,
+    "quant_stat_module_name": [],
+    "quant_stat_percentiles": [
+      0.999
+    ],
+    "linear_grad_interval": 0,
+    "linear_grad_snapshot_interval": 0,
+    "linear_grad_snapshot_steps": [],
+    "linear_grad_snapshot_histogram": false,
+    "linear_grad_snapshot_histogram_bins": 64,
+    "linear_grad_snapshot_topk_bar": false,
+    "linear_grad_snapshot_histogram_group_by": "module",
+    "linear_grad_snapshot_histogram_sample": 0,
+    "linear_grad_snapshot_topk_aggregate": false,
+    "linear_grad_topk": 20,
+    "linear_grad_spectral_iters": 2,
+    "linear_grad_sign_flip_sample": 65536
+  },
+  "distill": {
+    "kd_mode": "none",
+    "teacher_model": null,
+    "kd_alpha": 0.5,
+    "kd_temperature": 1.0
+  }
+}
+[W121 17:05:26.310595758 ProcessGroupNCCL.cpp:924] Warning: TORCH_NCCL_AVOID_RECORD_STREAMS is the default now, this environment variable is thus deprecated. (function operator())
+01/21/2026 17:05:26 - INFO - __main__ - Process rank: 3, world size: 4
+[WARNING][veomni.utils.arguments:328] 01/21/2026 17:05:26 >> Recommend to use hdfs path or hdfs_fuse path as the output path.
+[INFO][veomni.distributed.parallel_state:461] 01/21/2026 17:05:26 >> Initializing parallel state... dp_size 2, dp_replicate_size 1, dp_shard_size 2,tp_size 1, pp_size 1, ep_size 1, cp_size 1, ulysses_size 2
+[INFO][veomni.distributed.parallel_state:532] 01/21/2026 17:05:26 >> Device mesh: DeviceMesh((dp_shard=2, ulysses=2), device: 'cuda', stride: (2, 1))
+[INFO][veomni.distributed.parallel_state:533] 01/21/2026 17:05:26 >> EP FSDP device mesh: None
+01/21/2026 17:05:26 - INFO - __main__ - Prepare data
+[INFO|tokenization_utils_base.py:2058] 2026-01-21 17:05:26,995 >> loading file vocab.json
+[INFO|tokenization_utils_base.py:2058] 2026-01-21 17:05:26,995 >> loading file merges.txt
+[INFO|tokenization_utils_base.py:2058] 2026-01-21 17:05:26,995 >> loading file tokenizer.json
+[INFO|tokenization_utils_base.py:2058] 2026-01-21 17:05:26,995 >> loading file added_tokens.json
+[INFO|tokenization_utils_base.py:2058] 2026-01-21 17:05:26,995 >> loading file special_tokens_map.json
+[INFO|tokenization_utils_base.py:2058] 2026-01-21 17:05:26,995 >> loading file tokenizer_config.json
+[INFO|tokenization_utils_base.py:2058] 2026-01-21 17:05:26,995 >> loading file chat_template.jinja
+[INFO|tokenization_utils_base.py:2323] 2026-01-21 17:05:27,505 >> Special tokens have been added in the vocabulary, make sure the associated word embeddings are fine-tuned or trained.
+01/21/2026 17:05:27 - INFO - __main__ - Start building mapping dataset
+/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/distributed/distributed_c10d.py:4876: UserWarning: barrier(): using the device under current context. You can specify `device_id` in `init_process_group` to mute this warning.
+  warnings.warn(  # warn only once
+[rank0]:[W121 17:05:38.078184624 ProcessGroupNCCL.cpp:5068] Guessing device ID based on global rank. This can cause a hang if rank to GPU mapping is heterogeneous. You can specify device_id in init_process_group()
+[INFO][veomni.data.data_loader:82] 01/21/2026 17:05:39 >> train_steps: 307, max_seq_len: 4096, use_rmpad: True, bsz_warmup_steps: 2, bsz_warmup_init_mbtoken: 200, token_micro_bsz: 4096, num_micro_batch: 4, micro_batch_size: 1, global_batch_size: 8, dp_size: 2, sp_size: 2.
+01/21/2026 17:05:39 - INFO - __main__ - Prepare model
+[INFO|configuration_utils.py:691] 2026-01-21 17:05:39,247 >> loading configuration file /home/ubuntu/data/exp/proj2410/model/Qwen2.5-0.5B/config.json
+[INFO|configuration_utils.py:765] 2026-01-21 17:05:39,248 >> Model config Qwen2Config {
+  "architectures": [
+    "Qwen2ForCausalLM"
+  ],
+  "attention_dropout": 0.0,
+  "bos_token_id": 151643,
+  "eos_token_id": 151643,
+  "hidden_act": "silu",
+  "hidden_size": 896,
+  "initializer_range": 0.02,
+  "intermediate_size": 4864,
+  "max_position_embeddings": 32768,
+  "max_window_layers": 24,
+  "model_type": "qwen2",
+  "num_attention_heads": 14,
+  "num_hidden_layers": 24,
+  "num_key_value_heads": 2,
+  "rms_norm_eps": 1e-06,
+  "rope_scaling": null,
+  "rope_theta": 1000000.0,
+  "sliding_window": 32768,
+  "tie_word_embeddings": true,
+  "torch_dtype": "float32",
+  "transformers_version": "4.51.3",
+  "use_cache": true,
+  "use_mrope": false,
+  "use_sliding_window": false,
+  "vocab_size": 151936
+}
+
+[INFO][veomni.models.loader:149] 01/21/2026 17:05:39 >> Loading model from customized modeling: Qwen2ForCausalLM ModelRegistry.supported_models dict_keys(['FluxModel', 'Janus', 'LlamaForCausalLM', 'Qwen2ForCausalLM', 'Qwen2_5OmniForConditionalGeneration', 'Qwen2_5_VLForConditionalGeneration', 'Qwen2VLForConditionalGeneration', 'Qwen3ForCausalLM', 'Qwen3MoeForCausalLM', 'WanModel'])
+[INFO][veomni.models.loader:104] 01/21/2026 17:05:39 >> Loading model from customized modeling.
+init_device: meta
+empty_init: True
+weights_path: /home/ubuntu/data/exp/proj2410/model/Qwen2.5-0.5B
+[INFO|modeling_utils.py:2167] 2026-01-21 17:05:39,250 >> Instantiating Qwen2ForCausalLM model under default dtype torch.bfloat16.
+[INFO|configuration_utils.py:1142] 2026-01-21 17:05:39,256 >> Generate config GenerationConfig {
+  "bos_token_id": 151643,
+  "eos_token_id": 151643
+}
+
+01/21/2026 17:05:41 - INFO - __main__ - Converting model to IntQuantLinearInfra mode.
+01/21/2026 17:05:42 - INFO - __main__ - Skip quantization and freeze modules: lm_head, model.embed_tokens
+01/21/2026 17:05:42 - INFO - __main__ - QAT layer conversion done: IntQuantLinear=0, remaining nn.Linear=1
+[INFO][veomni.utils.helper:454] 01/21/2026 17:05:42 >> VRAM usage after building model: cur 0.00GB, max 0.00GB.
+[INFO][veomni.distributed.torch_parallelize:457] 01/21/2026 17:05:42 >> Apply data parallel to the model: fsdp2.
+[INFO][veomni.distributed.torch_parallelize:252] 01/21/2026 17:05:42 >> target classes to shard: {'Qwen2DecoderLayer'}
+[INFO][veomni.distributed.torch_parallelize:292] 01/21/2026 17:05:42 >> layer pairs: [('model.layers.0', Qwen2DecoderLayer(
+  (self_attn): Qwen2Attention(
+    (q_proj): IntQuantLinearInfra()
+    (k_proj): IntQuantLinearInfra()
+    (v_proj): IntQuantLinearInfra()
+    (o_proj): IntQuantLinearInfra()
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): IntQuantLinearInfra()
+    (up_proj): IntQuantLinearInfra()
+    (down_proj): IntQuantLinearInfra()
+  )
+  (input_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+), None), ('model.layers.1', Qwen2DecoderLayer(
+  (self_attn): Qwen2Attention(
+    (q_proj): IntQuantLinearInfra()
+    (k_proj): IntQuantLinearInfra()
+    (v_proj): IntQuantLinearInfra()
+    (o_proj): IntQuantLinearInfra()
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): IntQuantLinearInfra()
+    (up_proj): IntQuantLinearInfra()
+    (down_proj): IntQuantLinearInfra()
+  )
+  (input_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+), None), ('model.layers.2', Qwen2DecoderLayer(
+  (self_attn): Qwen2Attention(
+    (q_proj): IntQuantLinearInfra()
+    (k_proj): IntQuantLinearInfra()
+    (v_proj): IntQuantLinearInfra()
+    (o_proj): IntQuantLinearInfra()
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): IntQuantLinearInfra()
+    (up_proj): IntQuantLinearInfra()
+    (down_proj): IntQuantLinearInfra()
+  )
+  (input_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+), None), ('model.layers.3', Qwen2DecoderLayer(
+  (self_attn): Qwen2Attention(
+    (q_proj): IntQuantLinearInfra()
+    (k_proj): IntQuantLinearInfra()
+    (v_proj): IntQuantLinearInfra()
+    (o_proj): IntQuantLinearInfra()
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): IntQuantLinearInfra()
+    (up_proj): IntQuantLinearInfra()
+    (down_proj): IntQuantLinearInfra()
+  )
+  (input_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+), None), ('model.layers.4', Qwen2DecoderLayer(
+  (self_attn): Qwen2Attention(
+    (q_proj): IntQuantLinearInfra()
+    (k_proj): IntQuantLinearInfra()
+    (v_proj): IntQuantLinearInfra()
+    (o_proj): IntQuantLinearInfra()
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): IntQuantLinearInfra()
+    (up_proj): IntQuantLinearInfra()
+    (down_proj): IntQuantLinearInfra()
+  )
+  (input_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+), None), ('model.layers.5', Qwen2DecoderLayer(
+  (self_attn): Qwen2Attention(
+    (q_proj): IntQuantLinearInfra()
+    (k_proj): IntQuantLinearInfra()
+    (v_proj): IntQuantLinearInfra()
+    (o_proj): IntQuantLinearInfra()
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): IntQuantLinearInfra()
+    (up_proj): IntQuantLinearInfra()
+    (down_proj): IntQuantLinearInfra()
+  )
+  (input_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+), None), ('model.layers.6', Qwen2DecoderLayer(
+  (self_attn): Qwen2Attention(
+    (q_proj): IntQuantLinearInfra()
+    (k_proj): IntQuantLinearInfra()
+    (v_proj): IntQuantLinearInfra()
+    (o_proj): IntQuantLinearInfra()
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): IntQuantLinearInfra()
+    (up_proj): IntQuantLinearInfra()
+    (down_proj): IntQuantLinearInfra()
+  )
+  (input_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+), None), ('model.layers.7', Qwen2DecoderLayer(
+  (self_attn): Qwen2Attention(
+    (q_proj): IntQuantLinearInfra()
+    (k_proj): IntQuantLinearInfra()
+    (v_proj): IntQuantLinearInfra()
+    (o_proj): IntQuantLinearInfra()
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): IntQuantLinearInfra()
+    (up_proj): IntQuantLinearInfra()
+    (down_proj): IntQuantLinearInfra()
+  )
+  (input_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+), None), ('model.layers.8', Qwen2DecoderLayer(
+  (self_attn): Qwen2Attention(
+    (q_proj): IntQuantLinearInfra()
+    (k_proj): IntQuantLinearInfra()
+    (v_proj): IntQuantLinearInfra()
+    (o_proj): IntQuantLinearInfra()
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): IntQuantLinearInfra()
+    (up_proj): IntQuantLinearInfra()
+    (down_proj): IntQuantLinearInfra()
+  )
+  (input_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+), None), ('model.layers.9', Qwen2DecoderLayer(
+  (self_attn): Qwen2Attention(
+    (q_proj): IntQuantLinearInfra()
+    (k_proj): IntQuantLinearInfra()
+    (v_proj): IntQuantLinearInfra()
+    (o_proj): IntQuantLinearInfra()
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): IntQuantLinearInfra()
+    (up_proj): IntQuantLinearInfra()
+    (down_proj): IntQuantLinearInfra()
+  )
+  (input_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+), None), ('model.layers.10', Qwen2DecoderLayer(
+  (self_attn): Qwen2Attention(
+    (q_proj): IntQuantLinearInfra()
+    (k_proj): IntQuantLinearInfra()
+    (v_proj): IntQuantLinearInfra()
+    (o_proj): IntQuantLinearInfra()
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): IntQuantLinearInfra()
+    (up_proj): IntQuantLinearInfra()
+    (down_proj): IntQuantLinearInfra()
+  )
+  (input_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+), None), ('model.layers.11', Qwen2DecoderLayer(
+  (self_attn): Qwen2Attention(
+    (q_proj): IntQuantLinearInfra()
+    (k_proj): IntQuantLinearInfra()
+    (v_proj): IntQuantLinearInfra()
+    (o_proj): IntQuantLinearInfra()
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): IntQuantLinearInfra()
+    (up_proj): IntQuantLinearInfra()
+    (down_proj): IntQuantLinearInfra()
+  )
+  (input_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+), None), ('model.layers.12', Qwen2DecoderLayer(
+  (self_attn): Qwen2Attention(
+    (q_proj): IntQuantLinearInfra()
+    (k_proj): IntQuantLinearInfra()
+    (v_proj): IntQuantLinearInfra()
+    (o_proj): IntQuantLinearInfra()
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): IntQuantLinearInfra()
+    (up_proj): IntQuantLinearInfra()
+    (down_proj): IntQuantLinearInfra()
+  )
+  (input_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+), None), ('model.layers.13', Qwen2DecoderLayer(
+  (self_attn): Qwen2Attention(
+    (q_proj): IntQuantLinearInfra()
+    (k_proj): IntQuantLinearInfra()
+    (v_proj): IntQuantLinearInfra()
+    (o_proj): IntQuantLinearInfra()
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): IntQuantLinearInfra()
+    (up_proj): IntQuantLinearInfra()
+    (down_proj): IntQuantLinearInfra()
+  )
+  (input_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+), None), ('model.layers.14', Qwen2DecoderLayer(
+  (self_attn): Qwen2Attention(
+    (q_proj): IntQuantLinearInfra()
+    (k_proj): IntQuantLinearInfra()
+    (v_proj): IntQuantLinearInfra()
+    (o_proj): IntQuantLinearInfra()
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): IntQuantLinearInfra()
+    (up_proj): IntQuantLinearInfra()
+    (down_proj): IntQuantLinearInfra()
+  )
+  (input_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+), None), ('model.layers.15', Qwen2DecoderLayer(
+  (self_attn): Qwen2Attention(
+    (q_proj): IntQuantLinearInfra()
+    (k_proj): IntQuantLinearInfra()
+    (v_proj): IntQuantLinearInfra()
+    (o_proj): IntQuantLinearInfra()
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): IntQuantLinearInfra()
+    (up_proj): IntQuantLinearInfra()
+    (down_proj): IntQuantLinearInfra()
+  )
+  (input_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+), None), ('model.layers.16', Qwen2DecoderLayer(
+  (self_attn): Qwen2Attention(
+    (q_proj): IntQuantLinearInfra()
+    (k_proj): IntQuantLinearInfra()
+    (v_proj): IntQuantLinearInfra()
+    (o_proj): IntQuantLinearInfra()
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): IntQuantLinearInfra()
+    (up_proj): IntQuantLinearInfra()
+    (down_proj): IntQuantLinearInfra()
+  )
+  (input_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+), None), ('model.layers.17', Qwen2DecoderLayer(
+  (self_attn): Qwen2Attention(
+    (q_proj): IntQuantLinearInfra()
+    (k_proj): IntQuantLinearInfra()
+    (v_proj): IntQuantLinearInfra()
+    (o_proj): IntQuantLinearInfra()
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): IntQuantLinearInfra()
+    (up_proj): IntQuantLinearInfra()
+    (down_proj): IntQuantLinearInfra()
+  )
+  (input_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+), None), ('model.layers.18', Qwen2DecoderLayer(
+  (self_attn): Qwen2Attention(
+    (q_proj): IntQuantLinearInfra()
+    (k_proj): IntQuantLinearInfra()
+    (v_proj): IntQuantLinearInfra()
+    (o_proj): IntQuantLinearInfra()
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): IntQuantLinearInfra()
+    (up_proj): IntQuantLinearInfra()
+    (down_proj): IntQuantLinearInfra()
+  )
+  (input_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+), None), ('model.layers.19', Qwen2DecoderLayer(
+  (self_attn): Qwen2Attention(
+    (q_proj): IntQuantLinearInfra()
+    (k_proj): IntQuantLinearInfra()
+    (v_proj): IntQuantLinearInfra()
+    (o_proj): IntQuantLinearInfra()
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): IntQuantLinearInfra()
+    (up_proj): IntQuantLinearInfra()
+    (down_proj): IntQuantLinearInfra()
+  )
+  (input_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+), None), ('model.layers.20', Qwen2DecoderLayer(
+  (self_attn): Qwen2Attention(
+    (q_proj): IntQuantLinearInfra()
+    (k_proj): IntQuantLinearInfra()
+    (v_proj): IntQuantLinearInfra()
+    (o_proj): IntQuantLinearInfra()
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): IntQuantLinearInfra()
+    (up_proj): IntQuantLinearInfra()
+    (down_proj): IntQuantLinearInfra()
+  )
+  (input_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+), None), ('model.layers.21', Qwen2DecoderLayer(
+  (self_attn): Qwen2Attention(
+    (q_proj): IntQuantLinearInfra()
+    (k_proj): IntQuantLinearInfra()
+    (v_proj): IntQuantLinearInfra()
+    (o_proj): IntQuantLinearInfra()
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): IntQuantLinearInfra()
+    (up_proj): IntQuantLinearInfra()
+    (down_proj): IntQuantLinearInfra()
+  )
+  (input_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+), None), ('model.layers.22', Qwen2DecoderLayer(
+  (self_attn): Qwen2Attention(
+    (q_proj): IntQuantLinearInfra()
+    (k_proj): IntQuantLinearInfra()
+    (v_proj): IntQuantLinearInfra()
+    (o_proj): IntQuantLinearInfra()
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): IntQuantLinearInfra()
+    (up_proj): IntQuantLinearInfra()
+    (down_proj): IntQuantLinearInfra()
+  )
+  (input_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+), None), ('model.layers.23', Qwen2DecoderLayer(
+  (self_attn): Qwen2Attention(
+    (q_proj): IntQuantLinearInfra()
+    (k_proj): IntQuantLinearInfra()
+    (v_proj): IntQuantLinearInfra()
+    (o_proj): IntQuantLinearInfra()
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): IntQuantLinearInfra()
+    (up_proj): IntQuantLinearInfra()
+    (down_proj): IntQuantLinearInfra()
+  )
+  (input_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+), None)]
+[INFO][veomni.distributed.torch_parallelize:362] 01/21/2026 17:05:42 >> layer_fqn='model.layers.0', layer_mod._fsdp_modules=[FSDPQwen2DecoderLayer(
+  (self_attn): Qwen2Attention(
+    (q_proj): IntQuantLinearInfra()
+    (k_proj): IntQuantLinearInfra()
+    (v_proj): IntQuantLinearInfra()
+    (o_proj): IntQuantLinearInfra()
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): IntQuantLinearInfra()
+    (up_proj): IntQuantLinearInfra()
+    (down_proj): IntQuantLinearInfra()
+  )
+  (input_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+)]
+[INFO][veomni.distributed.torch_parallelize:362] 01/21/2026 17:05:42 >> layer_fqn='model.layers.1', layer_mod._fsdp_modules=[FSDPQwen2DecoderLayer(
+  (self_attn): Qwen2Attention(
+    (q_proj): IntQuantLinearInfra()
+    (k_proj): IntQuantLinearInfra()
+    (v_proj): IntQuantLinearInfra()
+    (o_proj): IntQuantLinearInfra()
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): IntQuantLinearInfra()
+    (up_proj): IntQuantLinearInfra()
+    (down_proj): IntQuantLinearInfra()
+  )
+  (input_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+)]
+[INFO][veomni.distributed.torch_parallelize:362] 01/21/2026 17:05:42 >> layer_fqn='model.layers.2', layer_mod._fsdp_modules=[FSDPQwen2DecoderLayer(
+  (self_attn): Qwen2Attention(
+    (q_proj): IntQuantLinearInfra()
+    (k_proj): IntQuantLinearInfra()
+    (v_proj): IntQuantLinearInfra()
+    (o_proj): IntQuantLinearInfra()
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): IntQuantLinearInfra()
+    (up_proj): IntQuantLinearInfra()
+    (down_proj): IntQuantLinearInfra()
+  )
+  (input_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+)]
+[INFO][veomni.distributed.torch_parallelize:362] 01/21/2026 17:05:42 >> layer_fqn='model.layers.3', layer_mod._fsdp_modules=[FSDPQwen2DecoderLayer(
+  (self_attn): Qwen2Attention(
+    (q_proj): IntQuantLinearInfra()
+    (k_proj): IntQuantLinearInfra()
+    (v_proj): IntQuantLinearInfra()
+    (o_proj): IntQuantLinearInfra()
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): IntQuantLinearInfra()
+    (up_proj): IntQuantLinearInfra()
+    (down_proj): IntQuantLinearInfra()
+  )
+  (input_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+)]
+[INFO][veomni.distributed.torch_parallelize:362] 01/21/2026 17:05:42 >> layer_fqn='model.layers.4', layer_mod._fsdp_modules=[FSDPQwen2DecoderLayer(
+  (self_attn): Qwen2Attention(
+    (q_proj): IntQuantLinearInfra()
+    (k_proj): IntQuantLinearInfra()
+    (v_proj): IntQuantLinearInfra()
+    (o_proj): IntQuantLinearInfra()
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): IntQuantLinearInfra()
+    (up_proj): IntQuantLinearInfra()
+    (down_proj): IntQuantLinearInfra()
+  )
+  (input_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+)]
+[INFO][veomni.distributed.torch_parallelize:362] 01/21/2026 17:05:42 >> layer_fqn='model.layers.5', layer_mod._fsdp_modules=[FSDPQwen2DecoderLayer(
+  (self_attn): Qwen2Attention(
+    (q_proj): IntQuantLinearInfra()
+    (k_proj): IntQuantLinearInfra()
+    (v_proj): IntQuantLinearInfra()
+    (o_proj): IntQuantLinearInfra()
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): IntQuantLinearInfra()
+    (up_proj): IntQuantLinearInfra()
+    (down_proj): IntQuantLinearInfra()
+  )
+  (input_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+)]
+[INFO][veomni.distributed.torch_parallelize:362] 01/21/2026 17:05:42 >> layer_fqn='model.layers.6', layer_mod._fsdp_modules=[FSDPQwen2DecoderLayer(
+  (self_attn): Qwen2Attention(
+    (q_proj): IntQuantLinearInfra()
+    (k_proj): IntQuantLinearInfra()
+    (v_proj): IntQuantLinearInfra()
+    (o_proj): IntQuantLinearInfra()
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): IntQuantLinearInfra()
+    (up_proj): IntQuantLinearInfra()
+    (down_proj): IntQuantLinearInfra()
+  )
+  (input_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+)]
+[INFO][veomni.distributed.torch_parallelize:362] 01/21/2026 17:05:42 >> layer_fqn='model.layers.7', layer_mod._fsdp_modules=[FSDPQwen2DecoderLayer(
+  (self_attn): Qwen2Attention(
+    (q_proj): IntQuantLinearInfra()
+    (k_proj): IntQuantLinearInfra()
+    (v_proj): IntQuantLinearInfra()
+    (o_proj): IntQuantLinearInfra()
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): IntQuantLinearInfra()
+    (up_proj): IntQuantLinearInfra()
+    (down_proj): IntQuantLinearInfra()
+  )
+  (input_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+)]
+[INFO][veomni.distributed.torch_parallelize:362] 01/21/2026 17:05:42 >> layer_fqn='model.layers.8', layer_mod._fsdp_modules=[FSDPQwen2DecoderLayer(
+  (self_attn): Qwen2Attention(
+    (q_proj): IntQuantLinearInfra()
+    (k_proj): IntQuantLinearInfra()
+    (v_proj): IntQuantLinearInfra()
+    (o_proj): IntQuantLinearInfra()
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): IntQuantLinearInfra()
+    (up_proj): IntQuantLinearInfra()
+    (down_proj): IntQuantLinearInfra()
+  )
+  (input_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+)]
+[INFO][veomni.distributed.torch_parallelize:362] 01/21/2026 17:05:42 >> layer_fqn='model.layers.9', layer_mod._fsdp_modules=[FSDPQwen2DecoderLayer(
+  (self_attn): Qwen2Attention(
+    (q_proj): IntQuantLinearInfra()
+    (k_proj): IntQuantLinearInfra()
+    (v_proj): IntQuantLinearInfra()
+    (o_proj): IntQuantLinearInfra()
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): IntQuantLinearInfra()
+    (up_proj): IntQuantLinearInfra()
+    (down_proj): IntQuantLinearInfra()
+  )
+  (input_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+)]
+[INFO][veomni.distributed.torch_parallelize:362] 01/21/2026 17:05:42 >> layer_fqn='model.layers.10', layer_mod._fsdp_modules=[FSDPQwen2DecoderLayer(
+  (self_attn): Qwen2Attention(
+    (q_proj): IntQuantLinearInfra()
+    (k_proj): IntQuantLinearInfra()
+    (v_proj): IntQuantLinearInfra()
+    (o_proj): IntQuantLinearInfra()
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): IntQuantLinearInfra()
+    (up_proj): IntQuantLinearInfra()
+    (down_proj): IntQuantLinearInfra()
+  )
+  (input_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+)]
+[INFO][veomni.distributed.torch_parallelize:362] 01/21/2026 17:05:42 >> layer_fqn='model.layers.11', layer_mod._fsdp_modules=[FSDPQwen2DecoderLayer(
+  (self_attn): Qwen2Attention(
+    (q_proj): IntQuantLinearInfra()
+    (k_proj): IntQuantLinearInfra()
+    (v_proj): IntQuantLinearInfra()
+    (o_proj): IntQuantLinearInfra()
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): IntQuantLinearInfra()
+    (up_proj): IntQuantLinearInfra()
+    (down_proj): IntQuantLinearInfra()
+  )
+  (input_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+)]
+[INFO][veomni.distributed.torch_parallelize:362] 01/21/2026 17:05:42 >> layer_fqn='model.layers.12', layer_mod._fsdp_modules=[FSDPQwen2DecoderLayer(
+  (self_attn): Qwen2Attention(
+    (q_proj): IntQuantLinearInfra()
+    (k_proj): IntQuantLinearInfra()
+    (v_proj): IntQuantLinearInfra()
+    (o_proj): IntQuantLinearInfra()
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): IntQuantLinearInfra()
+    (up_proj): IntQuantLinearInfra()
+    (down_proj): IntQuantLinearInfra()
+  )
+  (input_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+)]
+[INFO][veomni.distributed.torch_parallelize:362] 01/21/2026 17:05:42 >> layer_fqn='model.layers.13', layer_mod._fsdp_modules=[FSDPQwen2DecoderLayer(
+  (self_attn): Qwen2Attention(
+    (q_proj): IntQuantLinearInfra()
+    (k_proj): IntQuantLinearInfra()
+    (v_proj): IntQuantLinearInfra()
+    (o_proj): IntQuantLinearInfra()
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): IntQuantLinearInfra()
+    (up_proj): IntQuantLinearInfra()
+    (down_proj): IntQuantLinearInfra()
+  )
+  (input_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+)]
+[INFO][veomni.distributed.torch_parallelize:362] 01/21/2026 17:05:42 >> layer_fqn='model.layers.14', layer_mod._fsdp_modules=[FSDPQwen2DecoderLayer(
+  (self_attn): Qwen2Attention(
+    (q_proj): IntQuantLinearInfra()
+    (k_proj): IntQuantLinearInfra()
+    (v_proj): IntQuantLinearInfra()
+    (o_proj): IntQuantLinearInfra()
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): IntQuantLinearInfra()
+    (up_proj): IntQuantLinearInfra()
+    (down_proj): IntQuantLinearInfra()
+  )
+  (input_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+)]
+[INFO][veomni.distributed.torch_parallelize:362] 01/21/2026 17:05:42 >> layer_fqn='model.layers.15', layer_mod._fsdp_modules=[FSDPQwen2DecoderLayer(
+  (self_attn): Qwen2Attention(
+    (q_proj): IntQuantLinearInfra()
+    (k_proj): IntQuantLinearInfra()
+    (v_proj): IntQuantLinearInfra()
+    (o_proj): IntQuantLinearInfra()
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): IntQuantLinearInfra()
+    (up_proj): IntQuantLinearInfra()
+    (down_proj): IntQuantLinearInfra()
+  )
+  (input_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+)]
+[INFO][veomni.distributed.torch_parallelize:362] 01/21/2026 17:05:42 >> layer_fqn='model.layers.16', layer_mod._fsdp_modules=[FSDPQwen2DecoderLayer(
+  (self_attn): Qwen2Attention(
+    (q_proj): IntQuantLinearInfra()
+    (k_proj): IntQuantLinearInfra()
+    (v_proj): IntQuantLinearInfra()
+    (o_proj): IntQuantLinearInfra()
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): IntQuantLinearInfra()
+    (up_proj): IntQuantLinearInfra()
+    (down_proj): IntQuantLinearInfra()
+  )
+  (input_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+)]
+[INFO][veomni.distributed.torch_parallelize:362] 01/21/2026 17:05:42 >> layer_fqn='model.layers.17', layer_mod._fsdp_modules=[FSDPQwen2DecoderLayer(
+  (self_attn): Qwen2Attention(
+    (q_proj): IntQuantLinearInfra()
+    (k_proj): IntQuantLinearInfra()
+    (v_proj): IntQuantLinearInfra()
+    (o_proj): IntQuantLinearInfra()
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): IntQuantLinearInfra()
+    (up_proj): IntQuantLinearInfra()
+    (down_proj): IntQuantLinearInfra()
+  )
+  (input_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+)]
+[INFO][veomni.distributed.torch_parallelize:362] 01/21/2026 17:05:42 >> layer_fqn='model.layers.18', layer_mod._fsdp_modules=[FSDPQwen2DecoderLayer(
+  (self_attn): Qwen2Attention(
+    (q_proj): IntQuantLinearInfra()
+    (k_proj): IntQuantLinearInfra()
+    (v_proj): IntQuantLinearInfra()
+    (o_proj): IntQuantLinearInfra()
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): IntQuantLinearInfra()
+    (up_proj): IntQuantLinearInfra()
+    (down_proj): IntQuantLinearInfra()
+  )
+  (input_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+)]
+[INFO][veomni.distributed.torch_parallelize:362] 01/21/2026 17:05:42 >> layer_fqn='model.layers.19', layer_mod._fsdp_modules=[FSDPQwen2DecoderLayer(
+  (self_attn): Qwen2Attention(
+    (q_proj): IntQuantLinearInfra()
+    (k_proj): IntQuantLinearInfra()
+    (v_proj): IntQuantLinearInfra()
+    (o_proj): IntQuantLinearInfra()
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): IntQuantLinearInfra()
+    (up_proj): IntQuantLinearInfra()
+    (down_proj): IntQuantLinearInfra()
+  )
+  (input_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+)]
+[INFO][veomni.distributed.torch_parallelize:362] 01/21/2026 17:05:42 >> layer_fqn='model.layers.20', layer_mod._fsdp_modules=[FSDPQwen2DecoderLayer(
+  (self_attn): Qwen2Attention(
+    (q_proj): IntQuantLinearInfra()
+    (k_proj): IntQuantLinearInfra()
+    (v_proj): IntQuantLinearInfra()
+    (o_proj): IntQuantLinearInfra()
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): IntQuantLinearInfra()
+    (up_proj): IntQuantLinearInfra()
+    (down_proj): IntQuantLinearInfra()
+  )
+  (input_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+)]
+[INFO][veomni.distributed.torch_parallelize:362] 01/21/2026 17:05:42 >> layer_fqn='model.layers.21', layer_mod._fsdp_modules=[FSDPQwen2DecoderLayer(
+  (self_attn): Qwen2Attention(
+    (q_proj): IntQuantLinearInfra()
+    (k_proj): IntQuantLinearInfra()
+    (v_proj): IntQuantLinearInfra()
+    (o_proj): IntQuantLinearInfra()
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): IntQuantLinearInfra()
+    (up_proj): IntQuantLinearInfra()
+    (down_proj): IntQuantLinearInfra()
+  )
+  (input_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+)]
+[INFO][veomni.distributed.torch_parallelize:362] 01/21/2026 17:05:42 >> layer_fqn='model.layers.22', layer_mod._fsdp_modules=[FSDPQwen2DecoderLayer(
+  (self_attn): Qwen2Attention(
+    (q_proj): IntQuantLinearInfra()
+    (k_proj): IntQuantLinearInfra()
+    (v_proj): IntQuantLinearInfra()
+    (o_proj): IntQuantLinearInfra()
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): IntQuantLinearInfra()
+    (up_proj): IntQuantLinearInfra()
+    (down_proj): IntQuantLinearInfra()
+  )
+  (input_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+)]
+[INFO][veomni.distributed.torch_parallelize:362] 01/21/2026 17:05:42 >> layer_fqn='model.layers.23', layer_mod._fsdp_modules=[FSDPQwen2DecoderLayer(
+  (self_attn): Qwen2Attention(
+    (q_proj): IntQuantLinearInfra()
+    (k_proj): IntQuantLinearInfra()
+    (v_proj): IntQuantLinearInfra()
+    (o_proj): IntQuantLinearInfra()
+  )
+  (mlp): LigerSwiGLUMLP(
+    (gate_proj): IntQuantLinearInfra()
+    (up_proj): IntQuantLinearInfra()
+    (down_proj): IntQuantLinearInfra()
+  )
+  (input_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+  (post_attention_layernorm): LigerRMSNorm((896,), eps=1e-06, offset=0.0, in_place=True, row_mode=None)
+)]
+[INFO][veomni.distributed.torch_parallelize:395] 01/21/2026 17:05:42 >> starting to load model weights...
+[INFO][veomni.distributed.torch_parallelize:400] 01/21/2026 17:05:42 >> Every rank would read weights from disk and expect this to be slow!
+Loading checkpoint shards:   0%|          | 0/1 [00:00<?, ?it/s]Loading checkpoint shards: 100%|██████████| 1/1 [00:14<00:00, 14.08s/it]Loading checkpoint shards: 100%|██████████| 1/1 [00:14<00:00, 14.08s/it]
+[INFO][veomni.models.module_utils:448] 01/21/2026 17:05:56 >> Find missing key(s) in state dict: {'model.layers.6.mlp.down_proj.scales', 'model.layers.13.mlp.down_proj.scales', 'model.layers.0.mlp.gate_proj.qzeros', 'model.layers.3.self_attn.k_proj.scales', 'model.layers.11.mlp.gate_proj.qzeros', 'model.layers.5.mlp.up_proj.qzeros', 'model.layers.14.self_attn.o_proj.scales', 'model.layers.12.self_attn.q_proj.qzeros', 'model.layers.7.self_attn.k_proj.qzeros', 'model.layers.23.self_attn.k_proj.scales', 'model.layers.21.self_attn.q_proj.scales', 'model.layers.15.self_attn.o_proj.scales', 'model.layers.2.self_attn.v_proj.qzeros', 'model.layers.19.self_attn.v_proj.scales', 'model.layers.2.self_attn.q_proj.qzeros', 'model.layers.11.mlp.up_proj.qzeros', 'model.layers.17.self_attn.k_proj.qzeros', 'model.layers.8.mlp.up_proj.qzeros', 'model.layers.16.self_attn.o_proj.scales', 'model.layers.15.mlp.up_proj.scales', 'model.layers.19.mlp.gate_proj.scales', 'model.layers.13.mlp.down_proj.qzeros', 'model.layers.13.self_attn.o_proj.scales', 'model.layers.12.self_attn.o_proj.qzeros', 'model.layers.8.self_attn.v_proj.qzeros', 'model.layers.13.self_attn.v_proj.qzeros', 'model.layers.21.self_attn.q_proj.qzeros', 'model.layers.22.self_attn.q_proj.qzeros', 'model.layers.7.self_attn.o_proj.scales', 'model.layers.6.self_attn.v_proj.qzeros', 'model.layers.5.self_attn.v_proj.qzeros', 'model.layers.17.mlp.down_proj.qzeros', 'model.layers.1.mlp.gate_proj.scales', 'model.layers.2.self_attn.v_proj.scales', 'model.layers.4.mlp.down_proj.qzeros', 'model.layers.0.self_attn.o_proj.qzeros', 'model.layers.0.mlp.gate_proj.scales', 'model.layers.10.mlp.gate_proj.qzeros', 'model.layers.6.mlp.gate_proj.qzeros', 'model.layers.23.mlp.down_proj.qzeros', 'model.layers.4.self_attn.k_proj.scales', 'model.layers.22.mlp.up_proj.scales', 'model.layers.4.mlp.up_proj.qzeros', 'model.layers.14.self_attn.q_proj.qzeros', 'model.layers.12.self_attn.v_proj.scales', 'model.layers.20.self_attn.q_proj.scales', 'model.layers.15.mlp.gate_proj.scales', 'model.layers.21.mlp.gate_proj.scales', 'model.layers.13.self_attn.k_proj.scales', 'model.layers.20.mlp.up_proj.scales', 'model.layers.15.self_attn.k_proj.scales', 'model.layers.14.mlp.gate_proj.scales', 'model.layers.14.self_attn.k_proj.qzeros', 'model.layers.8.self_attn.q_proj.scales', 'model.layers.9.self_attn.v_proj.qzeros', 'model.layers.0.self_attn.q_proj.qzeros', 'model.layers.16.mlp.down_proj.scales', 'model.layers.11.mlp.up_proj.scales', 'model.layers.19.self_attn.k_proj.scales', 'model.layers.3.mlp.down_proj.qzeros', 'model.layers.9.self_attn.q_proj.scales', 'model.layers.5.self_attn.k_proj.qzeros', 'model.layers.0.self_attn.q_proj.scales', 'model.layers.2.mlp.down_proj.qzeros', 'model.layers.0.self_attn.v_proj.scales', 'model.layers.18.self_attn.q_proj.qzeros', 'model.layers.6.self_attn.k_proj.scales', 'model.layers.18.mlp.up_proj.qzeros', 'model.layers.7.mlp.up_proj.qzeros', 'model.layers.3.self_attn.k_proj.qzeros', 'model.layers.1.self_attn.o_proj.qzeros', 'model.layers.3.self_attn.v_proj.qzeros', 'model.layers.2.mlp.gate_proj.scales', 'model.layers.15.self_attn.v_proj.qzeros', 'model.layers.16.self_attn.k_proj.qzeros', 'model.layers.12.mlp.up_proj.scales', 'model.layers.21.self_attn.v_proj.scales', 'model.layers.22.self_attn.o_proj.qzeros', 'model.layers.23.self_attn.k_proj.qzeros', 'model.layers.23.mlp.up_proj.qzeros', 'model.layers.5.self_attn.k_proj.scales', 'model.layers.10.self_attn.k_proj.scales', 'model.layers.16.mlp.down_proj.qzeros', 'model.layers.19.self_attn.k_proj.qzeros', 'model.layers.20.mlp.down_proj.qzeros', 'model.layers.4.mlp.up_proj.scales', 'model.layers.14.mlp.up_proj.scales', 'model.layers.18.self_attn.q_proj.scales', 'model.layers.21.mlp.up_proj.qzeros', 'model.layers.4.self_attn.v_proj.scales', 'model.layers.18.self_attn.o_proj.scales', 'model.layers.21.self_attn.v_proj.qzeros', 'model.layers.18.mlp.gate_proj.qzeros', 'model.layers.5.self_attn.q_proj.scales', 'model.layers.10.mlp.down_proj.scales', 'model.layers.18.mlp.gate_proj.scales', 'model.layers.6.self_attn.k_proj.qzeros', 'model.layers.17.self_attn.v_proj.scales', 'model.layers.12.mlp.down_proj.scales', 'model.layers.9.mlp.down_proj.scales', 'model.layers.11.self_attn.q_proj.scales', 'model.layers.6.self_attn.o_proj.qzeros', 'model.layers.11.mlp.gate_proj.scales', 'model.layers.16.self_attn.v_proj.scales', 'model.layers.6.self_attn.v_proj.scales', 'model.layers.11.self_attn.q_proj.qzeros', 'model.layers.16.self_attn.k_proj.scales', 'model.layers.10.self_attn.v_proj.qzeros', 'model.layers.1.mlp.up_proj.qzeros', 'model.layers.23.mlp.up_proj.scales', 'model.layers.10.mlp.up_proj.scales', 'model.layers.3.mlp.gate_proj.scales', 'model.layers.22.self_attn.k_proj.scales', 'model.layers.15.mlp.down_proj.qzeros', 'model.layers.16.self_attn.v_proj.qzeros', 'model.layers.5.mlp.gate_proj.scales', 'model.layers.23.self_attn.q_proj.scales', 'model.layers.16.mlp.up_proj.qzeros', 'model.layers.22.self_attn.k_proj.qzeros', 'model.layers.15.mlp.up_proj.qzeros', 'model.layers.8.self_attn.k_proj.scales', 'model.layers.23.self_attn.o_proj.qzeros', 'model.layers.20.self_attn.v_proj.qzeros', 'model.layers.14.mlp.down_proj.scales', 'model.layers.1.self_attn.q_proj.qzeros', 'model.layers.6.mlp.up_proj.qzeros', 'model.layers.7.mlp.gate_proj.scales', 'model.layers.0.mlp.down_proj.qzeros', 'model.layers.13.mlp.gate_proj.scales', 'model.layers.6.mlp.up_proj.scales', 'model.layers.1.self_attn.q_proj.scales', 'model.layers.17.self_attn.k_proj.scales', 'model.layers.11.self_attn.k_proj.scales', 'model.layers.12.self_attn.v_proj.qzeros', 'model.layers.1.self_attn.v_proj.qzeros', 'model.layers.1.self_attn.k_proj.scales', 'model.layers.11.mlp.down_proj.scales', 'model.layers.14.self_attn.q_proj.scales', 'model.layers.2.mlp.gate_proj.qzeros', 'model.layers.14.self_attn.v_proj.scales', 'model.layers.19.mlp.down_proj.scales', 'model.layers.16.mlp.gate_proj.scales', 'model.layers.7.mlp.up_proj.scales', 'model.layers.5.self_attn.o_proj.scales', 'model.layers.0.self_attn.k_proj.qzeros', 'model.layers.7.self_attn.o_proj.qzeros', 'model.layers.17.mlp.up_proj.scales', 'model.layers.0.mlp.down_proj.scales', 'model.layers.15.self_attn.o_proj.qzeros', 'model.layers.5.mlp.down_proj.scales', 'model.layers.6.self_attn.o_proj.scales', 'model.layers.10.mlp.down_proj.qzeros', 'model.layers.3.self_attn.q_proj.qzeros', 'model.layers.17.self_attn.q_proj.qzeros', 'model.layers.23.self_attn.o_proj.scales', 'model.layers.14.self_attn.k_proj.scales', 'model.layers.15.self_attn.q_proj.scales', 'model.layers.9.mlp.gate_proj.scales', 'model.layers.1.mlp.up_proj.scales', 'model.layers.19.self_attn.q_proj.scales', 'model.layers.13.mlp.gate_proj.qzeros', 'model.layers.0.mlp.up_proj.scales', 'model.layers.5.mlp.down_proj.qzeros', 'model.layers.21.mlp.down_proj.scales', 'model.layers.22.mlp.gate_proj.qzeros', 'model.layers.17.self_attn.v_proj.qzeros', 'model.layers.16.self_attn.o_proj.qzeros', 'model.layers.16.self_attn.q_proj.scales', 'model.layers.9.self_attn.q_proj.qzeros', 'model.layers.13.self_attn.q_proj.qzeros', 'model.layers.10.self_attn.q_proj.scales', 'model.layers.8.self_attn.q_proj.qzeros', 'model.layers.5.self_attn.v_proj.scales', 'model.layers.1.mlp.down_proj.scales', 'model.layers.3.mlp.up_proj.scales', 'model.layers.9.self_attn.k_proj.qzeros', 'model.layers.11.self_attn.v_proj.qzeros', 'model.layers.2.self_attn.q_proj.scales', 'model.layers.10.self_attn.k_proj.qzeros', 'model.layers.14.self_attn.v_proj.qzeros', 'model.layers.7.self_attn.q_proj.scales', 'model.layers.2.self_attn.k_proj.qzeros', 'model.layers.10.self_attn.o_proj.qzeros', 'model.layers.18.self_attn.v_proj.qzeros', 'model.layers.4.self_attn.v_proj.qzeros', 'model.layers.4.self_attn.o_proj.qzeros', 'model.layers.20.mlp.down_proj.scales', 'model.layers.13.self_attn.k_proj.qzeros', 'model.layers.18.self_attn.k_proj.scales', 'model.layers.2.mlp.up_proj.scales', 'model.layers.10.self_attn.v_proj.scales', 'model.layers.19.self_attn.o_proj.qzeros', 'model.layers.23.self_attn.q_proj.qzeros', 'model.layers.21.self_attn.k_proj.scales', 'model.layers.23.mlp.down_proj.scales', 'model.layers.4.self_attn.q_proj.qzeros', 'model.layers.22.mlp.up_proj.qzeros', 'model.layers.7.mlp.gate_proj.qzeros', 'model.layers.2.mlp.up_proj.qzeros', 'model.layers.11.self_attn.k_proj.qzeros', 'model.layers.18.mlp.down_proj.qzeros', 'model.layers.21.mlp.up_proj.scales', 'model.layers.10.self_attn.q_proj.qzeros', 'model.layers.9.self_attn.v_proj.scales', 'model.layers.12.mlp.gate_proj.scales', 'model.layers.19.mlp.gate_proj.qzeros', 'model.layers.0.self_attn.k_proj.scales', 'model.layers.12.mlp.up_proj.qzeros', 'model.layers.8.self_attn.o_proj.scales', 'model.layers.4.self_attn.o_proj.scales', 'model.layers.20.self_attn.v_proj.scales', 'model.layers.4.mlp.gate_proj.qzeros', 'model.layers.4.self_attn.k_proj.qzeros', 'model.layers.13.self_attn.v_proj.scales', 'model.layers.19.mlp.up_proj.scales', 'model.layers.7.self_attn.q_proj.qzeros', 'model.layers.20.mlp.gate_proj.qzeros', 'model.layers.23.self_attn.v_proj.scales', 'model.layers.9.self_attn.o_proj.scales', 'model.layers.20.self_attn.k_proj.qzeros', 'model.layers.13.self_attn.q_proj.scales', 'model.layers.0.self_attn.o_proj.scales', 'model.layers.1.mlp.gate_proj.qzeros', 'model.layers.17.mlp.down_proj.scales', 'model.layers.8.mlp.gate_proj.qzeros', 'model.layers.21.self_attn.o_proj.scales', 'model.layers.6.self_attn.q_proj.qzeros', 'model.layers.10.mlp.up_proj.qzeros', 'model.layers.12.self_attn.o_proj.scales', 'model.layers.12.mlp.down_proj.qzeros', 'model.layers.8.mlp.up_proj.scales', 'model.layers.19.mlp.down_proj.qzeros', 'model.layers.9.self_attn.k_proj.scales', 'model.layers.17.mlp.up_proj.qzeros', 'model.layers.19.mlp.up_proj.qzeros', 'model.layers.14.mlp.down_proj.qzeros', 'model.layers.22.self_attn.v_proj.qzeros', 'model.layers.18.self_attn.v_proj.scales', 'model.layers.20.mlp.gate_proj.scales', 'model.layers.0.self_attn.v_proj.qzeros', 'model.layers.15.self_attn.q_proj.qzeros', 'model.layers.22.self_attn.q_proj.scales', 'model.layers.16.self_attn.q_proj.qzeros', 'model.layers.23.mlp.gate_proj.qzeros', 'model.layers.3.self_attn.v_proj.scales', 'model.layers.3.self_attn.o_proj.qzeros', 'model.layers.22.mlp.down_proj.qzeros', 'model.layers.12.self_attn.k_proj.scales', 'model.layers.21.mlp.down_proj.qzeros', 'model.layers.8.mlp.down_proj.qzeros', 'model.layers.4.mlp.down_proj.scales', 'model.layers.17.self_attn.o_proj.scales', 'model.layers.7.self_attn.v_proj.qzeros', 'model.layers.9.mlp.down_proj.qzeros', 'model.layers.7.self_attn.v_proj.scales', 'model.layers.10.mlp.gate_proj.scales', 'model.layers.22.self_attn.o_proj.scales', 'model.layers.11.self_attn.v_proj.scales', 'model.layers.18.mlp.up_proj.scales', 'model.layers.6.mlp.down_proj.qzeros', 'model.layers.21.mlp.gate_proj.qzeros', 'model.layers.13.mlp.up_proj.scales', 'model.layers.8.self_attn.k_proj.qzeros', 'model.layers.7.mlp.down_proj.scales', 'model.layers.8.self_attn.v_proj.scales', 'model.layers.17.mlp.gate_proj.qzeros', 'model.layers.22.self_attn.v_proj.scales', 'model.layers.15.mlp.gate_proj.qzeros', 'model.layers.3.mlp.down_proj.scales', 'model.layers.4.self_attn.q_proj.scales', 'model.layers.12.mlp.gate_proj.qzeros', 'model.layers.2.mlp.down_proj.scales', 'model.layers.8.self_attn.o_proj.qzeros', 'model.layers.17.mlp.gate_proj.scales', 'model.layers.9.mlp.up_proj.qzeros', 'model.layers.2.self_attn.o_proj.scales', 'model.layers.20.self_attn.q_proj.qzeros', 'model.layers.5.self_attn.q_proj.qzeros', 'model.layers.8.mlp.down_proj.scales', 'model.layers.19.self_attn.v_proj.qzeros', 'model.layers.11.mlp.down_proj.qzeros', 'model.layers.15.self_attn.v_proj.scales', 'model.layers.9.self_attn.o_proj.qzeros', 'model.layers.2.self_attn.k_proj.scales', 'model.layers.5.mlp.gate_proj.qzeros', 'model.layers.2.self_attn.o_proj.qzeros', 'model.layers.20.self_attn.o_proj.qzeros', 'model.layers.11.self_attn.o_proj.scales', 'model.layers.13.mlp.up_proj.qzeros', 'model.layers.22.mlp.down_proj.scales', 'model.layers.17.self_attn.q_proj.scales', 'model.layers.3.mlp.gate_proj.qzeros', 'model.layers.16.mlp.gate_proj.qzeros', 'model.layers.21.self_attn.k_proj.qzeros', 'model.layers.0.mlp.up_proj.qzeros', 'model.layers.23.mlp.gate_proj.scales', 'model.layers.8.mlp.gate_proj.scales', 'model.layers.1.self_attn.v_proj.scales', 'model.layers.15.self_attn.k_proj.qzeros', 'model.layers.18.self_attn.o_proj.qzeros', 'model.layers.3.mlp.up_proj.qzeros', 'model.layers.6.mlp.gate_proj.scales', 'model.layers.20.self_attn.o_proj.scales', 'model.layers.7.self_attn.k_proj.scales', 'model.layers.9.mlp.up_proj.scales', 'model.layers.22.mlp.gate_proj.scales', 'model.layers.6.self_attn.q_proj.scales', 'model.layers.16.mlp.up_proj.scales', 'model.layers.5.mlp.up_proj.scales', 'model.layers.9.mlp.gate_proj.qzeros', 'model.layers.14.mlp.gate_proj.qzeros', 'model.layers.23.self_attn.v_proj.qzeros', 'model.layers.4.mlp.gate_proj.scales', 'model.layers.12.self_attn.q_proj.scales', 'model.layers.12.self_attn.k_proj.qzeros', 'model.layers.15.mlp.down_proj.scales', 'model.layers.3.self_attn.o_proj.scales', 'model.layers.14.self_attn.o_proj.qzeros', 'model.layers.11.self_attn.o_proj.qzeros', 'model.layers.14.mlp.up_proj.qzeros', 'model.layers.1.self_attn.k_proj.qzeros', 'model.layers.20.mlp.up_proj.qzeros', 'model.layers.1.mlp.down_proj.qzeros', 'model.layers.18.mlp.down_proj.scales', 'model.layers.19.self_attn.q_proj.qzeros', 'model.layers.7.mlp.down_proj.qzeros', 'model.layers.19.self_attn.o_proj.scales', 'model.layers.18.self_attn.k_proj.qzeros', 'model.layers.10.self_attn.o_proj.scales', 'model.layers.1.self_attn.o_proj.scales', 'model.layers.13.self_attn.o_proj.qzeros', 'model.layers.21.self_attn.o_proj.qzeros', 'model.layers.5.self_attn.o_proj.qzeros', 'model.layers.17.self_attn.o_proj.qzeros', 'model.layers.3.self_attn.q_proj.scales', 'model.layers.20.self_attn.k_proj.scales'}, initialize them.
+[rank3]: Traceback (most recent call last):
+[rank3]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/distributed/tensor/_dispatch.py", line 156, in dispatch
+[rank3]:     self.sharding_propagator.propagate(op_info)
+[rank3]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/distributed/tensor/_sharding_prop.py", line 327, in propagate
+[rank3]:     OutputSharding, self.propagate_op_sharding(op_info.schema)
+[rank3]:                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank3]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/distributed/tensor/_sharding_prop.py", line 46, in __call__
+[rank3]:     return self.cache(*args, **kwargs)
+[rank3]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank3]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/distributed/tensor/_sharding_prop.py", line 340, in propagate_op_sharding_non_cached
+[rank3]:     out_tensor_meta = self._propagate_tensor_meta_non_cached(op_schema)
+[rank3]:                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank3]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/distributed/tensor/_sharding_prop.py", line 169, in _propagate_tensor_meta_non_cached
+[rank3]:     fake_out = op_schema.op(*fake_args, **fake_kwargs)
+[rank3]:                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank3]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/_ops.py", line 841, in __call__
+[rank3]:     return self._op(*args, **kwargs)
+[rank3]:            ^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank3]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/utils/_stats.py", line 28, in wrapper
+[rank3]:     return fn(*args, **kwargs)
+[rank3]:            ^^^^^^^^^^^^^^^^^^^
+[rank3]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/_subclasses/fake_tensor.py", line 1376, in __torch_dispatch__
+[rank3]:     return self.dispatch(func, types, args, kwargs)
+[rank3]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank3]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/_subclasses/fake_tensor.py", line 2096, in dispatch
+[rank3]:     return self._cached_dispatch_impl(func, types, args, kwargs)
+[rank3]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank3]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/_subclasses/fake_tensor.py", line 1511, in _cached_dispatch_impl
+[rank3]:     output = self._dispatch_impl(func, types, args, kwargs)
+[rank3]:              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank3]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/_subclasses/fake_tensor.py", line 2725, in _dispatch_impl
+[rank3]:     op_impl_out = op_impl(self, func, *args, **kwargs)
+[rank3]:                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank3]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/_subclasses/fake_impls.py", line 169, in dispatch_to_op_implementations_dict
+[rank3]:     return op_implementations_dict[func](fake_mode, func, *args, **kwargs)
+[rank3]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank3]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/_subclasses/fake_impls.py", line 938, in multi_device_op_default
+[rank3]:     return run_and_return_new_tensor_of_input_device(fake_mode, func, args, kwargs)
+[rank3]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank3]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/_subclasses/fake_impls.py", line 846, in run_and_return_new_tensor_of_input_device
+[rank3]:     out = func(*args, **kwargs)
+[rank3]:           ^^^^^^^^^^^^^^^^^^^^^
+[rank3]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/_ops.py", line 841, in __call__
+[rank3]:     return self._op(*args, **kwargs)
+[rank3]:            ^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank3]: RuntimeError: The size of tensor a (896) must match the size of tensor b (12544) at non-singleton dimension 0
+
+[rank3]: The above exception was the direct cause of the following exception:
+
+[rank3]: Traceback (most recent call last):
+[rank3]:   File "/home/ubuntu/data/exp/proj2410/./VeOmni/tasks/quantize/train.py", line 1497, in <module>
+[rank3]:     main()
+[rank3]:   File "/home/ubuntu/data/exp/proj2410/./VeOmni/tasks/quantize/train.py", line 815, in main
+[rank3]:     reinit_quant_params(model)
+[rank3]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/utils/_contextlib.py", line 120, in decorate_context
+[rank3]:     return func(*args, **kwargs)
+[rank3]:            ^^^^^^^^^^^^^^^^^^^^^
+[rank3]:   File "/home/ubuntu/data/exp/proj2410/EfficientQAT/core/linear/int_quant_linear.py", line 352, in reinit_quant_params
+[rank3]:     m.scales.data.copy_(scale)
+[rank3]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/_compile.py", line 53, in inner
+[rank3]:     return disable_fn(*args, **kwargs)
+[rank3]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank3]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/_dynamo/eval_frame.py", line 1044, in _fn
+[rank3]:     return fn(*args, **kwargs)
+[rank3]:            ^^^^^^^^^^^^^^^^^^^
+[rank3]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/distributed/tensor/_api.py", line 349, in __torch_dispatch__
+[rank3]:     return DTensor._op_dispatcher.dispatch(
+[rank3]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank3]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/distributed/tensor/_dispatch.py", line 169, in dispatch
+[rank3]:     raise RuntimeError(
+[rank3]: RuntimeError: Sharding propagation failed for Op(op=aten.copy_.default, args_schema=Spec(S(0) on (896, 14)), Spec(S(0) on (12544, 1)) @ mesh: (4,))
+[rank2]: Traceback (most recent call last):
+[rank2]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/distributed/tensor/_dispatch.py", line 156, in dispatch
+[rank2]:     self.sharding_propagator.propagate(op_info)
+[rank2]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/distributed/tensor/_sharding_prop.py", line 327, in propagate
+[rank2]:     OutputSharding, self.propagate_op_sharding(op_info.schema)
+[rank2]:                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank2]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/distributed/tensor/_sharding_prop.py", line 46, in __call__
+[rank2]:     return self.cache(*args, **kwargs)
+[rank2]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank2]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/distributed/tensor/_sharding_prop.py", line 340, in propagate_op_sharding_non_cached
+[rank2]:     out_tensor_meta = self._propagate_tensor_meta_non_cached(op_schema)
+[rank2]:                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank2]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/distributed/tensor/_sharding_prop.py", line 169, in _propagate_tensor_meta_non_cached
+[rank2]:     fake_out = op_schema.op(*fake_args, **fake_kwargs)
+[rank2]:                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank2]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/_ops.py", line 841, in __call__
+[rank2]:     return self._op(*args, **kwargs)
+[rank2]:            ^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank2]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/utils/_stats.py", line 28, in wrapper
+[rank2]:     return fn(*args, **kwargs)
+[rank2]:            ^^^^^^^^^^^^^^^^^^^
+[rank2]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/_subclasses/fake_tensor.py", line 1376, in __torch_dispatch__
+[rank2]:     return self.dispatch(func, types, args, kwargs)
+[rank2]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank2]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/_subclasses/fake_tensor.py", line 2096, in dispatch
+[rank2]:     return self._cached_dispatch_impl(func, types, args, kwargs)
+[rank2]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank2]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/_subclasses/fake_tensor.py", line 1511, in _cached_dispatch_impl
+[rank2]:     output = self._dispatch_impl(func, types, args, kwargs)
+[rank2]:              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank2]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/_subclasses/fake_tensor.py", line 2725, in _dispatch_impl
+[rank2]:     op_impl_out = op_impl(self, func, *args, **kwargs)
+[rank2]:                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank2]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/_subclasses/fake_impls.py", line 169, in dispatch_to_op_implementations_dict
+[rank2]:     return op_implementations_dict[func](fake_mode, func, *args, **kwargs)
+[rank2]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank2]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/_subclasses/fake_impls.py", line 938, in multi_device_op_default
+[rank2]:     return run_and_return_new_tensor_of_input_device(fake_mode, func, args, kwargs)
+[rank2]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank2]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/_subclasses/fake_impls.py", line 846, in run_and_return_new_tensor_of_input_device
+[rank2]:     out = func(*args, **kwargs)
+[rank2]:           ^^^^^^^^^^^^^^^^^^^^^
+[rank2]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/_ops.py", line 841, in __call__
+[rank2]:     return self._op(*args, **kwargs)
+[rank2]:            ^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank2]: RuntimeError: The size of tensor a (896) must match the size of tensor b (12544) at non-singleton dimension 0
+
+[rank2]: The above exception was the direct cause of the following exception:
+
+[rank2]: Traceback (most recent call last):
+[rank2]:   File "/home/ubuntu/data/exp/proj2410/./VeOmni/tasks/quantize/train.py", line 1497, in <module>
+[rank2]:     main()
+[rank2]:   File "/home/ubuntu/data/exp/proj2410/./VeOmni/tasks/quantize/train.py", line 815, in main
+[rank2]:     reinit_quant_params(model)
+[rank2]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/utils/_contextlib.py", line 120, in decorate_context
+[rank2]:     return func(*args, **kwargs)
+[rank2]:            ^^^^^^^^^^^^^^^^^^^^^
+[rank2]:   File "/home/ubuntu/data/exp/proj2410/EfficientQAT/core/linear/int_quant_linear.py", line 352, in reinit_quant_params
+[rank2]:     m.scales.data.copy_(scale)
+[rank2]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/_compile.py", line 53, in inner
+[rank2]:     return disable_fn(*args, **kwargs)
+[rank2]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank2]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/_dynamo/eval_frame.py", line 1044, in _fn
+[rank2]:     return fn(*args, **kwargs)
+[rank2]:            ^^^^^^^^^^^^^^^^^^^
+[rank2]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/distributed/tensor/_api.py", line 349, in __torch_dispatch__
+[rank2]:     return DTensor._op_dispatcher.dispatch(
+[rank2]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank2]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/distributed/tensor/_dispatch.py", line 169, in dispatch
+[rank2]:     raise RuntimeError(
+[rank2]: RuntimeError: Sharding propagation failed for Op(op=aten.copy_.default, args_schema=Spec(S(0) on (896, 14)), Spec(S(0) on (12544, 1)) @ mesh: (4,))
+[rank1]: Traceback (most recent call last):
+[rank1]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/distributed/tensor/_dispatch.py", line 156, in dispatch
+[rank1]:     self.sharding_propagator.propagate(op_info)
+[rank1]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/distributed/tensor/_sharding_prop.py", line 327, in propagate
+[rank1]:     OutputSharding, self.propagate_op_sharding(op_info.schema)
+[rank1]:                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/distributed/tensor/_sharding_prop.py", line 46, in __call__
+[rank1]:     return self.cache(*args, **kwargs)
+[rank1]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/distributed/tensor/_sharding_prop.py", line 340, in propagate_op_sharding_non_cached
+[rank1]:     out_tensor_meta = self._propagate_tensor_meta_non_cached(op_schema)
+[rank1]:                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/distributed/tensor/_sharding_prop.py", line 169, in _propagate_tensor_meta_non_cached
+[rank1]:     fake_out = op_schema.op(*fake_args, **fake_kwargs)
+[rank1]:                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/_ops.py", line 841, in __call__
+[rank1]:     return self._op(*args, **kwargs)
+[rank1]:            ^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/utils/_stats.py", line 28, in wrapper
+[rank1]:     return fn(*args, **kwargs)
+[rank1]:            ^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/_subclasses/fake_tensor.py", line 1376, in __torch_dispatch__
+[rank1]:     return self.dispatch(func, types, args, kwargs)
+[rank1]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/_subclasses/fake_tensor.py", line 2096, in dispatch
+[rank1]:     return self._cached_dispatch_impl(func, types, args, kwargs)
+[rank1]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/_subclasses/fake_tensor.py", line 1511, in _cached_dispatch_impl
+[rank1]:     output = self._dispatch_impl(func, types, args, kwargs)
+[rank1]:              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/_subclasses/fake_tensor.py", line 2725, in _dispatch_impl
+[rank1]:     op_impl_out = op_impl(self, func, *args, **kwargs)
+[rank1]:                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/_subclasses/fake_impls.py", line 169, in dispatch_to_op_implementations_dict
+[rank1]:     return op_implementations_dict[func](fake_mode, func, *args, **kwargs)
+[rank1]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/_subclasses/fake_impls.py", line 938, in multi_device_op_default
+[rank1]:     return run_and_return_new_tensor_of_input_device(fake_mode, func, args, kwargs)
+[rank1]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/_subclasses/fake_impls.py", line 846, in run_and_return_new_tensor_of_input_device
+[rank1]:     out = func(*args, **kwargs)
+[rank1]:           ^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/_ops.py", line 841, in __call__
+[rank1]:     return self._op(*args, **kwargs)
+[rank1]:            ^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]: RuntimeError: The size of tensor a (896) must match the size of tensor b (12544) at non-singleton dimension 0
+
+[rank1]: The above exception was the direct cause of the following exception:
+
+[rank1]: Traceback (most recent call last):
+[rank1]:   File "/home/ubuntu/data/exp/proj2410/./VeOmni/tasks/quantize/train.py", line 1497, in <module>
+[rank1]:     main()
+[rank1]:   File "/home/ubuntu/data/exp/proj2410/./VeOmni/tasks/quantize/train.py", line 815, in main
+[rank1]:     reinit_quant_params(model)
+[rank1]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/utils/_contextlib.py", line 120, in decorate_context
+[rank1]:     return func(*args, **kwargs)
+[rank1]:            ^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/home/ubuntu/data/exp/proj2410/EfficientQAT/core/linear/int_quant_linear.py", line 352, in reinit_quant_params
+[rank1]:     m.scales.data.copy_(scale)
+[rank1]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/_compile.py", line 53, in inner
+[rank1]:     return disable_fn(*args, **kwargs)
+[rank1]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/_dynamo/eval_frame.py", line 1044, in _fn
+[rank1]:     return fn(*args, **kwargs)
+[rank1]:            ^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/distributed/tensor/_api.py", line 349, in __torch_dispatch__
+[rank1]:     return DTensor._op_dispatcher.dispatch(
+[rank1]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank1]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/distributed/tensor/_dispatch.py", line 169, in dispatch
+[rank1]:     raise RuntimeError(
+[rank1]: RuntimeError: Sharding propagation failed for Op(op=aten.copy_.default, args_schema=Spec(S(0) on (896, 14)), Spec(S(0) on (12544, 1)) @ mesh: (4,))
+[rank0]: Traceback (most recent call last):
+[rank0]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/distributed/tensor/_dispatch.py", line 156, in dispatch
+[rank0]:     self.sharding_propagator.propagate(op_info)
+[rank0]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/distributed/tensor/_sharding_prop.py", line 327, in propagate
+[rank0]:     OutputSharding, self.propagate_op_sharding(op_info.schema)
+[rank0]:                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/distributed/tensor/_sharding_prop.py", line 46, in __call__
+[rank0]:     return self.cache(*args, **kwargs)
+[rank0]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/distributed/tensor/_sharding_prop.py", line 340, in propagate_op_sharding_non_cached
+[rank0]:     out_tensor_meta = self._propagate_tensor_meta_non_cached(op_schema)
+[rank0]:                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/distributed/tensor/_sharding_prop.py", line 169, in _propagate_tensor_meta_non_cached
+[rank0]:     fake_out = op_schema.op(*fake_args, **fake_kwargs)
+[rank0]:                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/_ops.py", line 841, in __call__
+[rank0]:     return self._op(*args, **kwargs)
+[rank0]:            ^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/utils/_stats.py", line 28, in wrapper
+[rank0]:     return fn(*args, **kwargs)
+[rank0]:            ^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/_subclasses/fake_tensor.py", line 1376, in __torch_dispatch__
+[rank0]:     return self.dispatch(func, types, args, kwargs)
+[rank0]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/_subclasses/fake_tensor.py", line 2096, in dispatch
+[rank0]:     return self._cached_dispatch_impl(func, types, args, kwargs)
+[rank0]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/_subclasses/fake_tensor.py", line 1511, in _cached_dispatch_impl
+[rank0]:     output = self._dispatch_impl(func, types, args, kwargs)
+[rank0]:              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/_subclasses/fake_tensor.py", line 2725, in _dispatch_impl
+[rank0]:     op_impl_out = op_impl(self, func, *args, **kwargs)
+[rank0]:                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/_subclasses/fake_impls.py", line 169, in dispatch_to_op_implementations_dict
+[rank0]:     return op_implementations_dict[func](fake_mode, func, *args, **kwargs)
+[rank0]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/_subclasses/fake_impls.py", line 938, in multi_device_op_default
+[rank0]:     return run_and_return_new_tensor_of_input_device(fake_mode, func, args, kwargs)
+[rank0]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/_subclasses/fake_impls.py", line 846, in run_and_return_new_tensor_of_input_device
+[rank0]:     out = func(*args, **kwargs)
+[rank0]:           ^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/_ops.py", line 841, in __call__
+[rank0]:     return self._op(*args, **kwargs)
+[rank0]:            ^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]: RuntimeError: The size of tensor a (896) must match the size of tensor b (12544) at non-singleton dimension 0
+
+[rank0]: The above exception was the direct cause of the following exception:
+
+[rank0]: Traceback (most recent call last):
+[rank0]:   File "/home/ubuntu/data/exp/proj2410/./VeOmni/tasks/quantize/train.py", line 1497, in <module>
+[rank0]:     main()
+[rank0]:   File "/home/ubuntu/data/exp/proj2410/./VeOmni/tasks/quantize/train.py", line 815, in main
+[rank0]:     reinit_quant_params(model)
+[rank0]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/utils/_contextlib.py", line 120, in decorate_context
+[rank0]:     return func(*args, **kwargs)
+[rank0]:            ^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/home/ubuntu/data/exp/proj2410/EfficientQAT/core/linear/int_quant_linear.py", line 352, in reinit_quant_params
+[rank0]:     m.scales.data.copy_(scale)
+[rank0]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/_compile.py", line 53, in inner
+[rank0]:     return disable_fn(*args, **kwargs)
+[rank0]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/_dynamo/eval_frame.py", line 1044, in _fn
+[rank0]:     return fn(*args, **kwargs)
+[rank0]:            ^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/distributed/tensor/_api.py", line 349, in __torch_dispatch__
+[rank0]:     return DTensor._op_dispatcher.dispatch(
+[rank0]:            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rank0]:   File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/distributed/tensor/_dispatch.py", line 169, in dispatch
+[rank0]:     raise RuntimeError(
+[rank0]: RuntimeError: Sharding propagation failed for Op(op=aten.copy_.default, args_schema=Spec(S(0) on (896, 14)), Spec(S(0) on (12544, 1)) @ mesh: (4,))
+[rank1]:[W121 17:05:57.570815587 ProcessGroupNCCL.cpp:1524] Warning: WARNING: destroy_process_group() was not called before program exit, which can leak resources. For more info, please see https://pytorch.org/docs/stable/distributed.html#shutdown (function operator())
+[rank0]:[W121 17:05:58.671556156 ProcessGroupNCCL.cpp:1524] Warning: WARNING: destroy_process_group() was not called before program exit, which can leak resources. For more info, please see https://pytorch.org/docs/stable/distributed.html#shutdown (function operator())
+W0121 17:05:59.339000 3682625 .venv/lib/python3.12/site-packages/torch/distributed/elastic/multiprocessing/api.py:908] Sending process 3683380 closing signal SIGTERM
+W0121 17:05:59.341000 3682625 .venv/lib/python3.12/site-packages/torch/distributed/elastic/multiprocessing/api.py:908] Sending process 3683381 closing signal SIGTERM
+W0121 17:05:59.342000 3682625 .venv/lib/python3.12/site-packages/torch/distributed/elastic/multiprocessing/api.py:908] Sending process 3683383 closing signal SIGTERM
+E0121 17:05:59.609000 3682625 .venv/lib/python3.12/site-packages/torch/distributed/elastic/multiprocessing/api.py:882] failed (exitcode: 1) local_rank: 3 (pid: 3683384) of binary: /home/ubuntu/data/exp/proj2410/.venv/bin/python3
+Traceback (most recent call last):
+  File "/home/ubuntu/data/exp/proj2410/.venv/bin/torchrun", line 10, in <module>
+    sys.exit(main())
+             ^^^^^^
+  File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/distributed/elastic/multiprocessing/errors/__init__.py", line 357, in wrapper
+    return f(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/distributed/run.py", line 936, in main
+    run(args)
+  File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/distributed/run.py", line 927, in run
+    elastic_launch(
+  File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/distributed/launcher/api.py", line 156, in __call__
+    return launch_agent(self._config, self._entrypoint, list(args))
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/ubuntu/data/exp/proj2410/.venv/lib/python3.12/site-packages/torch/distributed/launcher/api.py", line 293, in launch_agent
+    raise ChildFailedError(
+torch.distributed.elastic.multiprocessing.errors.ChildFailedError: 
+============================================================
+./VeOmni/tasks/quantize/train.py FAILED
+------------------------------------------------------------
+Failures:
+  <NO_OTHER_FAILURES>
+------------------------------------------------------------
+Root Cause (first observed failure):
+[0]:
+  time      : 2026-01-21_17:05:59
+  host      : heqi.lxd
+  rank      : 3 (local_rank: 3)
+  exitcode  : 1 (pid: 3683384)
+  error_file: <N/A>
+  traceback : To enable traceback see: https://pytorch.org/docs/stable/elastic/errors.html
+============================================================

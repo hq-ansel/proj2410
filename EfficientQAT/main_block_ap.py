@@ -28,6 +28,7 @@ def evaluate(model: Any, tokenizer: AutoTokenizer, config: Dict[str, Any], logge
     if config["train_param_settings"]["eval_ppl"]:
         datasets = ["wikitext2", "c4"]
         ppl_results = test_ppl(model, tokenizer, datasets, config.get('ppl_seqlen', 2048))
+        results['ppl_results'] = ppl_results
         for dataset in ppl_results:
             if logger is not None:
                 logger.info(f'{dataset} perplexity: {ppl_results[dataset]:.2f}')
@@ -39,6 +40,13 @@ def evaluate(model: Any, tokenizer: AutoTokenizer, config: Dict[str, Any], logge
         from lm_eval.utils import make_table
         task_list = config['train_param_settings']['eval_tasks'].split(',')
         num_fewshot = config['train_param_settings']['num_fewshot']
+        use_local_mmlu = utils.enable_local_mmlu_cache(task_list)
+        if use_local_mmlu:
+            msg = "Using local MMLU cache; HF offline mode enabled."
+            if logger is not None:
+                logger.info(msg)
+            else:
+                print(msg)
         model_eval = HFLM(pretrained=model, batch_size=config.get('eval_batch_size', 16))
         print(f"Evaluating on tasks: {task_list}")
         task_manager = TaskManager()
@@ -52,11 +60,22 @@ def evaluate(model: Any, tokenizer: AutoTokenizer, config: Dict[str, Any], logge
             logger.info(make_table(eval_results))
         else:
             print(make_table(eval_results))
+        
+        # Summarize results
+        task_accuracies = {}
         total_acc = 0
         for task in task_list:
             if eval_results and 'results' in eval_results and task in eval_results['results']:
-                total_acc += eval_results['results'][task].get('acc,none', 0)
+                acc = eval_results['results'][task].get('acc,none', 0)
+                task_accuracies[task] = acc
+                total_acc += acc
+        
         avg_acc = total_acc / len(task_list) * 100 if task_list else 0
+        results['eval_summary'] = {
+            'task_accuracies': task_accuracies,
+            'avg_acc': avg_acc
+        }
+        
         if logger is not None:
             logger.info(f'Average Acc: {avg_acc:.2f}%')
         else:

@@ -7,6 +7,10 @@ if [[ -z "${EVAL_QUANT_PATHS:-}" ]]; then
   DEFAULT_QUANT_PATHS=(
     # "$REPO_ROOT/quant_model/Qwen2.5-0.5B/EfficientQAT/w2g128-int2-kd/checkpoints/out"
     "$REPO_ROOT/quant_model/Qwen2.5-0.5B/EfficientQAT/w2g128-gradual-kd/checkpoints/out"
+    "$REPO_ROOT/quant_model/Qwen2.5-0.5B/EfficientQAT/w2g128-gradual/checkpoints/out"
+    # "$REPO_ROOT/quant_model/Qwen2.5-0.5B/EfficientQAT/w2g128-gradual-end025/checkpoints/out"
+    # "$REPO_ROOT/quant_model/Qwen2.5-0.5B/EfficientQAT/w2g128-gradual-end050/checkpoints/out"
+    # "$REPO_ROOT/quant_model/Qwen2.5-0.5B/EfficientQAT/w2g128-gradual-end075/checkpoints/out"
   )
   IFS=',' EVAL_QUANT_PATHS="${DEFAULT_QUANT_PATHS[*]}"
 fi

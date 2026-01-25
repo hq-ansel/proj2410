@@ -401,4 +401,4 @@ def benchmark_kernel(M, K, split_k_iters,
     # return ms, min_ms, max_ms
 
 if __name__ == '__main__':
-    benchmark_kernel.run(show_plots=True,print_data=True,save_path='awq.png')
+    benchmark_kernel.run(show_plots=False, print_data=True, save_path='.')

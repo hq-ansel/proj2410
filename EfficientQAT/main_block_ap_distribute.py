@@ -54,6 +54,13 @@ def evaluate(model, tokenizer, args, logger=None):
         from lm_eval.models.huggingface import HFLM
         from lm_eval.utils import make_table
         task_list = args.eval_tasks.split(',')
+        use_local_mmlu = utils.enable_local_mmlu_cache(task_list)
+        if use_local_mmlu:
+            msg = "Using local MMLU cache; HF offline mode enabled."
+            if logger is not None:
+                logger.info(msg)
+            else:
+                print(msg)
         model = HFLM(pretrained=model, batch_size=args.eval_batch_size)
         task_manager = lm_eval.tasks.TaskManager()
         results = lm_eval.simple_evaluate(

@@ -126,7 +126,8 @@ def main():
     for quant_path in get_quant_paths():
         quant_model, tokenizer = load_model_and_tokenizer(quant_path)
         args = build_eval_args()
-        evaluate(quant_model, tokenizer, args)
+        result = evaluate(quant_model, tokenizer, args)
+        print(f"quant_path: {quant_path}, result: {result}")
         torch.cuda.synchronize()
         torch.cuda.empty_cache()
 

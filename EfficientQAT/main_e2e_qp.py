@@ -25,7 +25,7 @@ from transformers import (
 from .datautils_block import test_ppl
 from .datautils_e2e import make_data_module
 from .quantize.int_linear_real import load_quantized_model,QuantLinear
-from .utils import create_logger
+from .utils import create_logger, enable_local_mmlu_cache
 
 
 
@@ -526,6 +526,9 @@ def train():
 
     if args.eval_tasks != "":
         task_list = args.eval_tasks.split(',')
+        use_local_mmlu = enable_local_mmlu_cache(task_list)
+        if use_local_mmlu:
+            logger.info("Using local MMLU cache; HF offline mode enabled.")
         lm_eval_model = HFLM(pretrained=model, batch_size=32)
         task_manager = lm_eval.tasks.TaskManager()
         results = lm_eval.simple_evaluate( # call simple_evaluate
@@ -541,6 +544,9 @@ def train():
         logger.info(f'Average Acc: {total_acc/len(task_list)*100:.2f}%')
 
     if args.do_mmlu_eval:
+        use_local_mmlu = enable_local_mmlu_cache(["mmlu"])
+        if use_local_mmlu:
+            logger.info("Using local MMLU cache; HF offline mode enabled.")
         lm_eval_model = HFLM(pretrained=model, batch_size=16)
         task_manager = lm_eval.tasks.TaskManager()
         results = lm_eval.simple_evaluate( # call simple_evaluate

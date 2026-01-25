@@ -318,6 +318,10 @@ def reinit_quant_params(model: nn.Module) -> None:
     Args:
         model: PyTorch 模型
     """
+    # Import locally to avoid circular dependency
+    from .int_quant_linear_infra import IntQuantLinearInfra
+    from ..quantizer import UniformAffineQuantizer
+
     for m in model.modules():
         if isinstance(m, IntQuantLinear) and m.weight_quantizer is not None:
             q = m.weight_quantizer
@@ -334,6 +338,24 @@ def reinit_quant_params(model: nn.Module) -> None:
                 q.zero_point.data.copy_(zp)
             else:
                 q.zero_point = nn.Parameter(zp)
+        elif isinstance(m, IntQuantLinearInfra):
+            # For Infra, we use UniformAffineQuantizer's static method to init
+            scale, zp = UniformAffineQuantizer.init_with_weight(
+                m.weight, m.n_bits, m.group_size, clamp_method=m.config.clamp_method
+            )
+            if scale is None or zp is None:
+                continue
+            scale = scale.to(device=m.weight.device, dtype=m.weight.dtype)
+            zp = zp.to(device=m.weight.device, dtype=m.weight.dtype)
+            
+            if hasattr(m, "scales") and isinstance(m.scales, nn.Parameter):
+                m.scales.data.copy_(scale)
+            else:
+                m.scales = nn.Parameter(scale)
+            if hasattr(m, "qzeros") and isinstance(m.qzeros, nn.Parameter):
+                m.qzeros.data.copy_(zp)
+            else:
+                m.qzeros = nn.Parameter(zp)
 
 
 @torch.no_grad()
@@ -347,6 +369,9 @@ def sanitize_quant_params(model: nn.Module) -> int:
         int: 修复的参数数量
     """
     repaired = 0
+    # Import locally to avoid circular dependency
+    from .int_quant_linear_infra import IntQuantLinearInfra
+
     for m in model.modules():
         if isinstance(m, IntQuantLinear) and m.weight_quantizer is not None:
             q = m.weight_quantizer
@@ -364,6 +389,24 @@ def sanitize_quant_params(model: nn.Module) -> int:
                     zp = torch.nan_to_num(zp, nan=0.0, posinf=float(q.qmax), neginf=float(q.qmin))
                 zp.clamp_(q.qmin, q.qmax)
                 q.zero_point.data.copy_(zp)
+        elif isinstance(m, IntQuantLinearInfra):
+            # Infra mode uses m.scales and m.qzeros directly
+            if hasattr(m, "scales") and isinstance(m.scales, nn.Parameter):
+                scale = m.scales.data
+                if not torch.isfinite(scale).all():
+                    repaired += 1
+                    scale = torch.nan_to_num(scale, nan=1e-4, posinf=1e4, neginf=1e-4)
+                scale.clamp_(1e-4, 1e4)
+                m.scales.data.copy_(scale)
+            if hasattr(m, "qzeros") and isinstance(m.qzeros, nn.Parameter):
+                zp = m.qzeros.data
+                if not torch.isfinite(zp).all():
+                    repaired += 1
+                    # We don't have qmin/qmax directly on m, but we can infer from n_bits
+                    qmin, qmax = 0, (1 << m.n_bits) - 1
+                    zp = torch.nan_to_num(zp, nan=0.0, posinf=float(qmax), neginf=float(qmin))
+                    zp.clamp_(qmin, qmax)
+                m.qzeros.data.copy_(zp)
     return repaired
 
 

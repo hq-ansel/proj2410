@@ -1,0 +1,87 @@
+model:
+  model_path: /home/ubuntu/data/exp/proj2410/model/Qwen2.5-0.5B
+
+data:
+  train_path: /home/ubuntu/data/exp/proj2410/hf_home/rp_text_caches/data-00000-of-00001.arrow
+  dataloader_type: native
+  datasets_type: mapping
+  data_type: plaintext
+  max_seq_len: 4096
+  text_keys: text
+  drop_last: true
+
+train:
+  num_train_epochs: 2
+  output_dir: /home/ubuntu/data/exp/proj2410/quant_model/Qwen2.5-0.5B/EfficientQAT/w2g128-gradual-end075
+  data_parallel_mode: fsdp2
+  ulysses_parallel_size: 2
+  enable_activation_offload: true
+  activation_gpu_limit: 40.0
+  global_batch_size: 8
+  micro_batch_size: 1
+  rmpad: false
+  rmpad_with_pos_ids: true
+  bsz_warmup_ratio: 0.007
+  dyn_bsz_margin: 0
+  optimizer: adamw
+  lr: 1.0e-5
+  lr_warmup_ratio: 0.007
+  lr_decay_style: constant
+  lr_decay_ratio: 1.0
+  weight_decay: 0.01
+  max_grad_norm: 1.0
+  enable_mixed_precision: true
+  enable_gradient_checkpointing: false
+  enable_full_shard: true
+  enable_fsdp_offload: false
+  enable_activation_offload: false
+  init_device: meta
+  enable_full_determinism: false
+  empty_cache_steps: 500
+  ckpt_manager: dcp
+  load_checkpoint_path: ""
+  save_steps: 1000
+  save_hf_weights: true
+  wandb_project: Qwen2-0.5B
+  wandb_name: Qwen2-0.5B-int2-g128-gradual-end075
+
+quantizer:
+  quant_type: gradual # uniform_affine or gradual
+  n_bits: 2
+  group_size: 64
+  clamp_method: STE
+  round_method: ste
+  quant_lr: 0.0001
+
+  # Gradual quantization configuration
+  enable_gradual_quant: true
+  qat_warmup_steps: 0
+  gradual_start_ratio: 0.0  # 立即全部量化
+  gradual_end_ratio: 0.75
+  priority_type: uniform
+
+  stat_quant: false
+  iterative_freezing: false
+  iterative_freezing_sheduler: linear
+  # is_tracking 决定 freeze_momentum 和 freeze_threshold 是否生效
+  is_tracking: false
+  freeze_momentum: 0.004
+  freeze_threshold: 0.0
+  # 暂时未启用的选项
+  interpolate: false
+  lora_rank: 0
+  decay_rate: 0.01
+  shrinking_ratio: 0.5
+  quant_weight_decay: 0.0
+
+profile:
+  profile_module_name: ["model.layers.0"]
+  quant_stat_interval: 1
+  # 不要优先盯 q/k/v/gate/up 这种“块内部”的线性层，
+  # 而是优先盯每个 block 里把信息写回 residual stream 的两条“注入边
+  # 这两个是一阶的线性影响隐藏状态，而没有非线性因素
+  quant_stat_module_name: [
+    "model.layers.0.self_attn.o_proj",
+    "model.layers.0.mlp.down_proj"
+  ]
+  quant_stat_percentiles: [0.999]

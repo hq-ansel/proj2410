@@ -16,6 +16,8 @@ class GradualMixin:
 
         # 外部调度器可以设置显式 mask
         self.group_mask: Optional[torch.BoolTensor] = None
+        # 外部调度器可以设置每个 group 的软量化比例 (0-1)
+        self.group_ratio: Optional[torch.Tensor] = None
 
     def update_position_ratio(self, new_ratio: float) -> None:
         """更新量化位置比例
@@ -46,6 +48,19 @@ class GradualMixin:
         """清除分组掩码，恢复使用 ratio 逻辑"""
         self.group_mask = None
 
+    def set_group_ratio(self, ratios: Optional[torch.Tensor]) -> None:
+        """设置每个 group 的软量化比例
+
+        Args:
+            ratios: 比例张量，shape 为 [num_groups]，dtype 为 float
+                    如果为 None，则回退到 mask/ratio 逻辑
+        """
+        self.group_ratio = ratios
+
+    def clear_group_ratio(self) -> None:
+        """清除每个 group 的软量化比例"""
+        self.group_ratio = None
+
     def _split_quant_groups(self, x: torch.Tensor) -> int:
         """根据比例计算要量化的分组数量
 
@@ -74,6 +89,7 @@ class GradualQuantizer(GradualMixin, UniformAffineQuantizer):
         self.quantization_position_ratio = 0.0
         self.interpolate_ratio = 0.0
         self.group_mask = None
+        self.group_ratio = None
 
         # 用于调度器的标识符
         self.prefix = prefix
@@ -155,7 +171,7 @@ class GradualQuantizer(GradualMixin, UniformAffineQuantizer):
         return lam
 
     def fake_quant(self, x: torch.Tensor) -> torch.Tensor:
-        """假量化：根据 group_mask 部分量化
+        """假量化：支持按 group_mask 或 group_ratio 部分/软量化
 
         Args:
             x: 输入张量
@@ -169,14 +185,42 @@ class GradualQuantizer(GradualMixin, UniformAffineQuantizer):
         x = x.reshape(-1, self.group_size)  # [G, group_size]
         G = x.shape[0]
 
-        # 1) 决定 mask：显式 mask 优先
+        # 1) 软量化比例优先（每个 group 一个比例）
+        ratios = self.group_ratio
+        if ratios is not None:
+            if ratios.numel() != G:
+                raise ValueError(f"group_ratio 长度不匹配：得到 {ratios.numel()}，期望 {G}")
+            ratios = ratios.to(device=x.device, dtype=x.dtype).clamp(0.0, 1.0)
+            mask = ratios > 0
+            if not mask.any():
+                return x.reshape(ori_shape)
+
+            selected_indices = torch.nonzero(mask, as_tuple=True)[0]
+            x_quant = torch.index_select(x, 0, selected_indices)
+            selected_scale = torch.index_select(scale, 0, selected_indices)
+            selected_zp = torch.index_select(round_zero_point, 0, selected_indices)
+
+            x_int = self._quantize(x_quant, selected_scale, selected_zp)
+            if self.is_tracking:
+                x_int = self.weight_freeze_tracker(x_int)
+            x_dequant = self._dequantize(x_int, selected_scale, selected_zp)
+
+            selected_ratio = torch.index_select(ratios, 0, selected_indices).view(-1, 1)
+            x_mix = x_quant + (x_dequant - x_quant) * selected_ratio
+
+            out = x.clone()
+            if selected_indices.numel() > 0:
+                out.index_copy_(0, selected_indices, x_mix)
+            return out.reshape(ori_shape)
+
+        # 2) 决定 mask：显式 mask 优先
         mask = self.group_mask
         if mask is not None:
             if mask.numel() != G:
                 raise ValueError(f"group_mask 长度不匹配：得到 {mask.numel()}，期望 {G}")
             mask = mask.to(device=x.device, dtype=torch.bool)
         else:
-            # 2) 回退：基于 ratio -> 前 k 个 groups
+            # 3) 回退：基于 ratio -> 前 k 个 groups
             qg = self._split_quant_groups(x)
             if qg <= 0:
                 return x.reshape(ori_shape)

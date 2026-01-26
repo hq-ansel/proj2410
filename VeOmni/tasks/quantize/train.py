@@ -2,6 +2,7 @@ import json
 import math
 import os
 import time
+from contextlib import nullcontext
 from datetime import timedelta
 from dataclasses import asdict, dataclass, field
 from functools import partial
@@ -25,6 +26,7 @@ from veomni.data import (
 from veomni.data.data_transform import process_pretrain_example, process_sft_example
 from veomni.distributed.offloading import build_activation_offloading_context
 from veomni.distributed.parallel_state import get_parallel_state, init_parallel_state
+from veomni.distributed.pipeline import infer_pp_input_shape
 from veomni.distributed.torch_parallelize import build_parallelize_model
 from veomni.models import build_foundation_model, build_tokenizer, save_model_assets, save_model_weights
 from veomni.ops import loss as veomni_loss
@@ -59,6 +61,8 @@ from EfficientQAT.core.quantizer.scheduler import (
     UniformPriorityCalculator,
     MagnitudePriorityCalculator,
     PriorityCalculator,
+    UniformRatioAssigner,
+    ScoreProportionalRatioAssigner,
 )
 
 # Support running as package or standalone script
@@ -332,6 +336,60 @@ def _resolve_quant_modules(
 
 def _percentile_label(p: float) -> str:
     return f"p{int(round(p * 1000.0))}"
+
+
+def _normalize_profiler_activities(activities: List[str]) -> List["torch.profiler.ProfilerActivity"]:
+    mapping = {
+        "CPU": torch.profiler.ProfilerActivity.CPU,
+        "CUDA": torch.profiler.ProfilerActivity.CUDA,
+    }
+    resolved: List[torch.profiler.ProfilerActivity] = []
+    for name in activities:
+        key = str(name).strip().upper()
+        if key in mapping:
+            if mapping[key] == torch.profiler.ProfilerActivity.CUDA and not torch.cuda.is_available():
+                continue
+            resolved.append(mapping[key])
+    if not resolved:
+        resolved = [torch.profiler.ProfilerActivity.CPU]
+    # de-dup while preserving order
+    seen = set()
+    uniq: List[torch.profiler.ProfilerActivity] = []
+    for act in resolved:
+        if act in seen:
+            continue
+        uniq.append(act)
+        seen.add(act)
+    return uniq
+
+
+def _unwrap_model_for_profiling(model: torch.nn.Module) -> torch.nn.Module:
+    return model.module if hasattr(model, "module") else model
+
+
+def _install_module_profiler_hooks(model: torch.nn.Module) -> List[torch.utils.hooks.RemovableHandle]:
+    handles: List[torch.utils.hooks.RemovableHandle] = []
+
+    def _pre_hook(module, _inputs):
+        stack = module.__dict__.setdefault("_profiler_ctx_stack", [])
+        name = module.__dict__.get("_profiler_qualname", module.__class__.__name__)
+        ctx = torch.profiler.record_function(name)
+        ctx.__enter__()
+        stack.append(ctx)
+
+    def _post_hook(module, _inputs, _output):
+        stack = module.__dict__.get("_profiler_ctx_stack")
+        if stack:
+            ctx = stack.pop()
+            ctx.__exit__(None, None, None)
+
+    for name, module in model.named_modules():
+        qualname = f"module:{name}:{module.__class__.__name__}" if name else f"module:<root>:{module.__class__.__name__}"
+        module.__dict__["_profiler_qualname"] = qualname
+        handles.append(module.register_forward_pre_hook(_pre_hook))
+        handles.append(module.register_forward_hook(_post_hook))
+
+    return handles
 
 
 def _compute_quant_stats_for_module(
@@ -800,6 +858,14 @@ def main():
     helper.print_device_mem_info("VRAM usage after building model")
 
     get_optimizer_pre_hook = getattr(model, "get_optimizer_pre_hook", None)
+    pp_input_shape = None
+    if args.train.pipeline_parallel_size > 1:
+        pp_input_shape = infer_pp_input_shape(
+            model,
+            micro_batch_size=args.train.micro_batch_size,
+            max_seq_len=args.data.max_seq_len,
+            tp_size=args.train.tensor_parallel_size,
+        )
     model = build_parallelize_model(
         model,
         init_device=args.train.init_device,
@@ -811,10 +877,66 @@ def main():
         basic_modules=model._no_split_modules + args.model.basic_modules,
         enable_reentrant=args.train.enable_reentrant,
         enable_forward_prefetch=args.train.enable_forward_prefetch,
+        pp_input_shape=pp_input_shape,
     )
     reinit_quant_params(model)
     sanitize_quant_params(model)
     
+    # <------QAT prefetch configuration-------->
+    if args.train.num_to_forward_prefetch > 0 or args.train.num_to_backward_prefetch > 0:
+        logger.info_rank0(
+            "Configuring manual prefetching: forward=%d, backward=%d",
+            args.train.num_to_forward_prefetch,
+            args.train.num_to_backward_prefetch,
+        )
+        layers = getattr(model, "layers", None)
+        if layers is None and hasattr(model, "model"):
+            layers = getattr(model.model, "layers", None)
+            
+        if layers is not None:
+            num_fwd = args.train.num_to_forward_prefetch
+            if num_fwd > 0:
+                for i, layer in enumerate(layers):
+                    if i >= len(layers) - 1: # No next layer
+                        continue
+                        
+                    # We want to prefetch up to num_fwd next layers
+                    targets = layers[i + 1 : i + 1 + num_fwd]
+                    
+                    prefetch_modules = []
+                    for t in targets:
+                        # Use _fsdp_modules if available (populated by FSDP2 setup)
+                        if hasattr(t, "_fsdp_modules"):
+                            prefetch_modules.extend(reversed(t._fsdp_modules))
+                        else:
+                            prefetch_modules.append(t)
+                    
+                    if hasattr(layer, "set_modules_to_forward_prefetch"):
+                        layer.set_modules_to_forward_prefetch(prefetch_modules)
+
+            num_bwd = args.train.num_to_backward_prefetch
+            if num_bwd > 0:
+                for i, layer in enumerate(layers):
+                    if i == 0:
+                        continue
+                    
+                    # Prefetch previous layers: i-1, i-2... (in reverse order of distance)
+                    start_idx = max(0, i - num_bwd)
+                    targets = layers[start_idx : i]
+                    targets = list(reversed(targets))
+                    
+                    prefetch_modules = []
+                    for t in targets:
+                        if hasattr(t, "_fsdp_modules"):
+                             prefetch_modules.extend(reversed(t._fsdp_modules))
+                        else:
+                             prefetch_modules.append(t)
+
+                    if hasattr(layer, "set_modules_to_backward_prefetch"):
+                        layer.set_modules_to_backward_prefetch(prefetch_modules)
+        else:
+             logger.warning_rank0("Could not find model.layers to configure manual prefetching.")
+
     # Gradual sync only for non-infra (since infra has no quantizer object)
     if not getattr(args.quantizer, "enable_infra", False):
         _sync_gradual_quantizer_metadata(model)
@@ -824,6 +946,8 @@ def main():
 
     kd_mode = args.distill.kd_mode
     kd_enabled = kd_mode != "none"
+    if kd_enabled and get_parallel_state().pp_enabled:
+        raise NotImplementedError("KD is not supported with pipeline parallelism yet.")
     if kd_enabled and veomni_loss.fused_linear_cross_entropy is not None:
         # KD needs student logits; disable fused loss kernels which skip logits.
         logger.info_rank0("KD enabled: disabling fused_linear_cross_entropy to keep logits.")
@@ -851,7 +975,7 @@ def main():
         teacher_model = build_foundation_model(
             config_path=args.distill.teacher_model,
             weights_path=args.distill.teacher_model,
-            torch_dtype="bfloat16" if args.train.enable_mixed_precision else "float32",
+            torch_dtype="bfloat16",
             attn_implementation=args.model.attn_implementation,
             moe_implementation=args.model.moe_implementation,
             init_device=args.train.init_device,
@@ -862,13 +986,15 @@ def main():
             init_device=args.train.init_device,
             weights_path=args.distill.teacher_model,
             enable_full_shard=args.train.enable_full_shard,
-            enable_mixed_precision=args.train.enable_mixed_precision,
+            enable_mixed_precision=False,
             enable_gradient_checkpointing=False,
             enable_fsdp_offload=args.train.enable_fsdp_offload,
             basic_modules=teacher_model._no_split_modules + args.model.basic_modules,
             enable_reentrant=args.train.enable_reentrant,
             enable_forward_prefetch=args.train.enable_forward_prefetch,
+            pp_input_shape=pp_input_shape,
         )
+        logger.info_rank0("KD teacher model forced to bfloat16 to reduce memory usage.")
         teacher_model.eval()
         teacher_model.requires_grad_(False)
     # <------QAT并行与开关管理设计-------->
@@ -970,6 +1096,50 @@ def main():
         )
         profiler.start()
 
+    if args.train.enable_profiling and args.train.debug:
+        logger.warning_rank0(
+            "Both enable_profiling and debug profiling are enabled. Expect higher overhead."
+        )
+
+    debug_profiler = None
+    module_profiler_hooks: List[torch.utils.hooks.RemovableHandle] = []
+    if args.train.debug and args.train.debug_profile_this_rank:
+        rank = dist.get_rank() if dist.is_initialized() else args.train.global_rank
+        trace_root = os.path.join(args.train.output_dir, "debug_profiler")
+        trace_dir = os.path.join(trace_root, f"rank{rank}")
+        os.makedirs(trace_dir, exist_ok=True)
+        activities = _normalize_profiler_activities(args.train.debug_profiler_activities)
+        wait = max(0, int(args.train.debug_profiler_wait))
+        warmup = max(0, int(args.train.debug_profiler_warmup))
+        active = max(1, int(args.train.debug_profiler_active))
+        repeat = max(1, int(args.train.debug_profiler_repeat))
+        schedule = torch.profiler.schedule(
+            wait=wait,
+            warmup=warmup,
+            active=active,
+            repeat=repeat,
+        )
+
+        def _debug_trace_handler(prof):
+            trace_path = os.path.join(trace_dir, f"trace_step{prof.step_num}.json")
+            prof.export_chrome_trace(trace_path)
+
+        debug_profiler = torch.profiler.profile(
+            activities=activities,
+            schedule=schedule,
+            on_trace_ready=_debug_trace_handler,
+            record_shapes=args.train.debug_profiler_record_shapes,
+            profile_memory=args.train.debug_profiler_profile_memory,
+            with_stack=args.train.debug_profiler_with_stack,
+        )
+        debug_profiler.start()
+        module_profiler_hooks = _install_module_profiler_hooks(_unwrap_model_for_profiling(model))
+
+    def _record_function(name: str):
+        if debug_profiler is None:
+            return nullcontext()
+        return torch.profiler.record_function(name)
+
     start_epoch, start_step, global_step = 0, 0, 0
     save_checkpoint_path = None
     grad_probes = []
@@ -1065,7 +1235,7 @@ def main():
 
     # <------QAT Gradual Quantization Integration-------->
     # Initialize gradual quantization controller if enabled
-    # gradual 量化：全程 use_weight_quant=True，通过 group_mask 控制哪些 groups 被量化
+    # gradual 量化：全程 use_weight_quant=True，通过 group_mask 或 group_ratio 控制量化强度
     gradual_controller = None
     enable_infra = getattr(args.quantizer, "enable_infra", False)
     
@@ -1088,6 +1258,7 @@ def main():
 
         # 选择优先级计算器
         priority_type = args.quantizer.priority_type
+        priority_kind = priority_type
         if priority_type == "uniform":
             priority_calculator = UniformPriorityCalculator()
         elif priority_type == "magnitude":
@@ -1095,6 +1266,13 @@ def main():
         else:
             logger.info_rank0(f"Unknown priority_type={priority_type}, fallback to uniform")
             priority_calculator = UniformPriorityCalculator()
+            priority_kind = "uniform"
+
+        # 软调度：沿用原有 priority_type 来决定 ratio 分配策略
+        if priority_kind == "uniform":
+            ratio_assigner = UniformRatioAssigner()
+        else:
+            ratio_assigner = ScoreProportionalRatioAssigner()
 
         budget = RatioBudget(
             start_ratio=start_ratio,
@@ -1107,10 +1285,11 @@ def main():
             budget_policy=budget,
             selector=selector,
             priority_calculator=priority_calculator,
+            ratio_assigner=ratio_assigner,
         )
         gradual_controller = GradualQuantController(model, scheduler)
 
-        # Gradual quantization: quantizer is always enabled, but group_mask controls which groups are quantized
+        # Gradual quantization: quantizer is always enabled; group_mask/group_ratio 控制量化强度
         set_quant_state(model, weight_quant=True)
         logger.info_rank0(
             f"Gradual quantization enabled: warmup_steps={warmup_steps}, "
@@ -1145,7 +1324,8 @@ def main():
             global_step += 1
 
             try:
-                micro_batches: List[Dict[str, Any]] = next(data_iterator)
+                with _record_function("data_load"):
+                    micro_batches: List[Dict[str, Any]] = next(data_iterator)
             except StopIteration:
                 logger.info(f"epoch:{epoch} Dataloader finished with drop_last {args.data.drop_last}")
                 break
@@ -1161,59 +1341,31 @@ def main():
             debug_batch = None
             synchronize()
             start_time = time.time()
-            for micro_batch in micro_batches:
-                environ_meter.add(micro_batch)
-                if args.data.enable_multisource:
-                    micro_batch.pop("ds_idx", None)
-                    micro_batch.pop("source_name", None)
+            if get_parallel_state().pp_enabled:
+                pipeline_model = model.module if hasattr(model, "module") else model
+                if not hasattr(pipeline_model, "forward_backward_1f1b"):
+                    raise RuntimeError("Pipeline model does not implement forward_backward_1f1b.")
+                if teacher_model is not None:
+                    raise NotImplementedError("KD is not supported with pipeline parallelism yet.")
 
-                if debug_batch is None:
-                    debug_batch = {k: v for k, v in micro_batch.items()}
-                micro_batch = {
-                    k: v.to(get_device_type(), non_blocking=True) if isinstance(v, torch.Tensor) else v
-                    for k, v in micro_batch.items()
-                }
-                with model_fwd_context:
-                    student_out = model(**micro_batch, use_cache=False)
-                    task_loss = student_out.loss.mean()
+                prepared_micro_batches = []
+                for micro_batch in micro_batches:
+                    environ_meter.add(micro_batch)
+                    if args.data.enable_multisource:
+                        micro_batch.pop("ds_idx", None)
+                        micro_batch.pop("source_name", None)
+
+                    if debug_batch is None:
+                        debug_batch = {k: v for k, v in micro_batch.items()}
+                    prepared_micro_batches.append(micro_batch)
+
+                def loss_fn(output, micro_batch):
+                    nonlocal total_task_loss, total_qweight_l2_reg, total_qweight_l2_scaled
+                    task_loss = pipeline_model._compute_lm_loss(output, micro_batch)
                     task_loss = _to_local_tensor(task_loss)
                     combined_loss = task_loss
-                    kd_loss = None
-                    if teacher_model is not None:
-                        teacher_inputs = {k: v for k, v in micro_batch.items() if k != "labels"}
-                        with torch.no_grad():
-                            teacher_out = teacher_model(**teacher_inputs, use_cache=False)
-                        kd_loss = _compute_kd_loss(
-                            student_logits=getattr(student_out, "logits", None),
-                            teacher_logits=getattr(teacher_out, "logits", None),
-                            labels=micro_batch.get("labels"),
-                            temperature=kd_temperature,
-                        )
-                        if kd_loss is not None:
-                            combined_loss = (1.0 - kd_alpha) * task_loss + kd_alpha * kd_loss
-                        elif not kd_warning_emitted and args.train.global_rank == 0:
-                            kd_skip_reason = _get_kd_skip_reason(
-                                getattr(student_out, "logits", None),
-                                getattr(teacher_out, "logits", None),
-                                micro_batch.get("labels"),
-                            )
-                            student_keys = _maybe_get_output_keys(student_out)
-                            teacher_keys = _maybe_get_output_keys(teacher_out)
-                            kd_skip_msg = (
-                                f"KD enabled but {kd_skip_reason}; skipping KD loss."
-                                if kd_skip_reason
-                                else "KD enabled but logits missing or mismatched; skipping KD loss."
-                            )
-                            if student_keys:
-                                kd_skip_msg = f"{kd_skip_msg} student_out.keys={student_keys}"
-                            if teacher_keys:
-                                kd_skip_msg = f"{kd_skip_msg} teacher_out.keys={teacher_keys}"
-                            logger.warning_rank0(
-                                kd_skip_msg
-                            )
-                            kd_warning_emitted = True
                     if enable_qweight_l2_reg:
-                        reg_loss = _compute_weight_l2_reg_loss(model)
+                        reg_loss = _compute_weight_l2_reg_loss(pipeline_model)
                         if reg_loss is not None:
                             combined_loss = combined_loss + qweight_l2_reg_lambda * reg_loss
                             reg_loss_val = float(reg_loss.detach())
@@ -1221,16 +1373,88 @@ def main():
                             total_qweight_l2_scaled += (
                                 qweight_l2_reg_lambda * reg_loss_val / len(micro_batches)
                             )
-                    loss: "torch.Tensor" = combined_loss / len(micro_batches)
+                    total_task_loss += task_loss.item() / len(micro_batches)
+                    return combined_loss
 
-                with model_bwd_context:
-                    loss.backward()
+                with _record_function("pipeline_fwd_bwd"):
+                    total_loss = pipeline_model.forward_backward_1f1b(
+                        prepared_micro_batches,
+                        model_fwd_context=model_fwd_context,
+                        model_bwd_context=model_bwd_context,
+                        use_cache=False,
+                        loss_fn=loss_fn,
+                    )
+            else:
+                for micro_batch in micro_batches:
+                    environ_meter.add(micro_batch)
+                    if args.data.enable_multisource:
+                        micro_batch.pop("ds_idx", None)
+                        micro_batch.pop("source_name", None)
 
-                total_loss += loss.item()
-                total_task_loss += task_loss.item() / len(micro_batches)
-                if kd_loss is not None:
-                    total_kd_loss += kd_loss.item() / len(micro_batches)
-                del micro_batch
+                    if debug_batch is None:
+                        debug_batch = {k: v for k, v in micro_batch.items()}
+                    micro_batch = {
+                        k: v.to(get_device_type(), non_blocking=True) if isinstance(v, torch.Tensor) else v
+                        for k, v in micro_batch.items()
+                    }
+                    with _record_function("forward"):
+                        with model_fwd_context:
+                            student_out = model(**micro_batch, use_cache=False)
+                            task_loss = student_out.loss.mean()
+                            task_loss = _to_local_tensor(task_loss)
+                            combined_loss = task_loss
+                            kd_loss = None
+                            if teacher_model is not None:
+                                teacher_inputs = {k: v for k, v in micro_batch.items() if k != "labels"}
+                                with torch.no_grad():
+                                    teacher_out = teacher_model(**teacher_inputs, use_cache=False)
+                                kd_loss = _compute_kd_loss(
+                                    student_logits=getattr(student_out, "logits", None),
+                                    teacher_logits=getattr(teacher_out, "logits", None),
+                                    labels=micro_batch.get("labels"),
+                                    temperature=kd_temperature,
+                                )
+                                if kd_loss is not None:
+                                    combined_loss = (1.0 - kd_alpha) * task_loss + kd_alpha * kd_loss
+                                elif not kd_warning_emitted and args.train.global_rank == 0:
+                                    kd_skip_reason = _get_kd_skip_reason(
+                                        getattr(student_out, "logits", None),
+                                        getattr(teacher_out, "logits", None),
+                                        micro_batch.get("labels"),
+                                    )
+                                    student_keys = _maybe_get_output_keys(student_out)
+                                    teacher_keys = _maybe_get_output_keys(teacher_out)
+                                    kd_skip_msg = (
+                                        f"KD enabled but {kd_skip_reason}; skipping KD loss."
+                                        if kd_skip_reason
+                                        else "KD enabled but logits missing or mismatched; skipping KD loss."
+                                    )
+                                    if student_keys:
+                                        kd_skip_msg = f"{kd_skip_msg} student_out.keys={student_keys}"
+                                    if teacher_keys:
+                                        kd_skip_msg = f"{kd_skip_msg} teacher_out.keys={teacher_keys}"
+                                    logger.warning_rank0(kd_skip_msg)
+                                    kd_warning_emitted = True
+                            if enable_qweight_l2_reg:
+                                reg_loss = _compute_weight_l2_reg_loss(model)
+                                if reg_loss is not None:
+                                    combined_loss = combined_loss + qweight_l2_reg_lambda * reg_loss
+                                    reg_loss_val = float(reg_loss.detach())
+                                    total_qweight_l2_reg += reg_loss_val / len(micro_batches)
+                                    total_qweight_l2_scaled += (
+                                        qweight_l2_reg_lambda * reg_loss_val / len(micro_batches)
+                                    )
+                            loss: "torch.Tensor" = combined_loss / len(micro_batches)
+
+                    with _record_function("backward"):
+                        with model_bwd_context:
+                            loss.backward()
+
+                    total_loss += loss.item()
+                    total_task_loss += task_loss.item() / len(micro_batches)
+                    if kd_loss is not None:
+                        total_kd_loss += kd_loss.item() / len(micro_batches)
+                    del micro_batch
 
             # Prefer model-provided clip_grad_norm_ (now both FSDP1 and FSDP2 registers custom grad norm clipping)
             if hasattr(model, "clip_grad_norm_"):
@@ -1316,9 +1540,17 @@ def main():
                         )
                     forward_metrics.update(probe_metrics)
 
-            optimizer.step()
-            lr_scheduler.step()
-            optimizer.zero_grad()
+            with _record_function("optimizer_step"):
+                optimizer.step()
+
+                # Record event for FSDP2 optimization
+                if hasattr(model, "set_post_optim_event"):
+                    evt = torch.cuda.Event()
+                    evt.record()
+                    model.set_post_optim_event(evt)
+                
+                lr_scheduler.step()
+                optimizer.zero_grad(set_to_none=True)
             quant_stat_metrics: Dict[str, float] = {}
             if (
                 enable_quant_stats
@@ -1339,8 +1571,8 @@ def main():
                     )
 
             # <------QAT Gradual Quantization Step Update-------->
-            # Update gradual quantization state: group_mask controls which groups are quantized
-            # 在 gradual 模式下，全程 use_weight_quant=True，但通过 group_mask 控制哪些 groups 被量化
+            # Update gradual quantization state: group_mask/group_ratio controls quantization strength
+            # 在 gradual 模式下，全程 use_weight_quant=True，但通过 group_mask/group_ratio 控制量化强度
             if gradual_controller is not None:
                 gradual_controller.on_step_end(step=global_step, epoch=epoch)
             if hasattr(grad_norm, "full_tensor"):
@@ -1397,6 +1629,9 @@ def main():
                 if global_step == args.train.profile_end_step:
                     profiler.stop()
 
+            if debug_profiler is not None:
+                debug_profiler.step()
+
             if args.train.save_steps and global_step % args.train.save_steps == 0:
                 helper.empty_cache()
                 save_checkpoint_path = os.path.join(args.train.save_checkpoint_path, f"global_step_{global_step}")
@@ -1440,6 +1675,11 @@ def main():
             Checkpointer.save(args.train.save_checkpoint_path, state, global_steps=global_step)
             dist.barrier()
             logger.info_rank0(f"Distributed checkpoint saved at {save_checkpoint_path} successfully!")
+
+    if debug_profiler is not None:
+        debug_profiler.stop()
+    for handle in module_profiler_hooks:
+        handle.remove()
 
     synchronize()
     # release memory

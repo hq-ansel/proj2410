@@ -116,10 +116,13 @@ class IntQuantLinear(nn.Linear):
             restore = (
                 quantizer.quantization_position_ratio,
                 quantizer.group_mask,
+                getattr(quantizer, "group_ratio", None),
                 quantizer.interpolate_ratio,
             )
             quantizer.quantization_position_ratio = 1.0
             quantizer.group_mask = None
+            if hasattr(quantizer, "group_ratio"):
+                quantizer.group_ratio = None
             quantizer.interpolate_ratio = 0.0
 
         try:
@@ -139,7 +142,9 @@ class IntQuantLinear(nn.Linear):
             if restore is not None:
                 quantizer.quantization_position_ratio = restore[0]
                 quantizer.group_mask = restore[1]
-                quantizer.interpolate_ratio = restore[2]
+                if hasattr(quantizer, "group_ratio"):
+                    quantizer.group_ratio = restore[2]
+                quantizer.interpolate_ratio = restore[3]
 
         if store_debug is None:
             store_debug = bool(self.debug_int_weight)

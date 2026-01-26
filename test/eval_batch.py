@@ -11,6 +11,7 @@ os.environ.setdefault("HF_HOME", str(HF_HOME))
 
 import accelerate
 import torch
+import wandb
 from easydict import EasyDict
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
@@ -124,10 +125,53 @@ def get_quant_paths():
 
 def main():
     for quant_path in get_quant_paths():
+        run_name = Path(quant_path).name
+        # If the path ends in 'out', take the parent directory name for better context
+        if run_name == "out":
+            run_name = Path(quant_path).parent.parent.name 
+        elif run_name == "checkpoints":
+             run_name = Path(quant_path).parent.name
+        
+        # Try to extract a more descriptive name if possible, e.g. "w2g128-gradual-kd"
+        # Assuming path structure like .../w2g128-gradual-kd/checkpoints/out
+        try:
+             parts = Path(quant_path).parts
+             if "checkpoints" in parts:
+                 idx = parts.index("checkpoints")
+                 if idx > 0:
+                     run_name = parts[idx-1]
+        except ValueError:
+            pass
+
+        wandb.init(
+            project="EfficientQAT-Eval",
+            name=f"eval-{run_name}",
+            config={"quant_path": quant_path},
+            reinit=True
+        )
+        
         quant_model, tokenizer = load_model_and_tokenizer(quant_path)
         args = build_eval_args()
         result = evaluate(quant_model, tokenizer, args)
         print(f"quant_path: {quant_path}, result: {result}")
+        
+        # Flatten and log results to wandb
+        log_data = {}
+        if 'ppl_results' in result:
+            for ds, ppl in result['ppl_results'].items():
+                log_data[f"ppl/{ds}"] = ppl
+        
+        if 'eval_summary' in result:
+            summary = result['eval_summary']
+            if 'avg_acc' in summary:
+                log_data["acc/avg"] = summary['avg_acc']
+            if 'task_accuracies' in summary:
+                for task, acc in summary['task_accuracies'].items():
+                    log_data[f"acc/{task}"] = acc
+        
+        wandb.log(log_data)
+        wandb.finish()
+
         torch.cuda.synchronize()
         torch.cuda.empty_cache()
 

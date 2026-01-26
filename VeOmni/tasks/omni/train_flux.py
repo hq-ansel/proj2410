@@ -17,6 +17,7 @@ from veomni.checkpoint import build_checkpointer, ckpt_to_state_dict
 from veomni.data.diffusion.data_loader import build_dit_dataloader
 from veomni.data.diffusion.dataset import build_text_image_dataset
 from veomni.distributed.offloading import build_activation_offloading_context
+from veomni.distributed.pipeline import infer_pp_input_shape
 from veomni.distributed.parallel_state import get_parallel_state, init_parallel_state
 from veomni.distributed.torch_parallelize import build_parallelize_model
 from veomni.models import save_model_assets
@@ -178,6 +179,8 @@ def main():
         ulysses_size=args.train.ulysses_parallel_size,
         dp_mode=args.train.data_parallel_mode,
     )
+    if get_parallel_state().pp_enabled:
+        raise NotImplementedError("Pipeline parallelism is not supported for diffusion training yet.")
     logger.info_rank0(
         f"Parallel state: dp:{args.train.data_parallel_mode}, tp:{args.train.tensor_parallel_size}, ep:{args.train.expert_parallel_size}, pp:{args.train.pipeline_parallel_size}, cp:{args.train.context_parallel_size}, ulysses:{args.train.ulysses_parallel_size}"
     )
@@ -296,6 +299,15 @@ def main():
         return
 
     ops_to_save = convert_ops_to_objects(args.train.ops_to_save)
+    pp_input_shape = None
+    if args.train.pipeline_parallel_size > 1:
+        pp_input_shape = infer_pp_input_shape(
+            model,
+            micro_batch_size=args.train.micro_batch_size,
+            max_seq_len=args.data.max_seq_len,
+            tp_size=args.train.tensor_parallel_size,
+        )
+
     model = build_parallelize_model(
         model,
         enable_full_shard=args.train.enable_full_shard,
@@ -308,6 +320,7 @@ def main():
         enable_forward_prefetch=args.train.enable_forward_prefetch,
         use_orig_params=_use_orig_params,
         ops_to_save=ops_to_save,
+        pp_input_shape=pp_input_shape,
     )
 
     optimizer = build_optimizer(

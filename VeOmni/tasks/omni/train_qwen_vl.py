@@ -27,6 +27,7 @@ from veomni.data import (
     build_multimodal_chat_template,
 )
 from veomni.distributed.offloading import build_activation_offloading_context
+from veomni.distributed.pipeline import infer_pp_input_shape
 from veomni.distributed.parallel_state import get_parallel_state, init_parallel_state
 from veomni.distributed.torch_parallelize import build_parallelize_model
 from veomni.models import build_foundation_model, build_processor, save_model_assets, save_model_weights
@@ -233,6 +234,15 @@ def main():
         if args.train.data_parallel_mode == "fsdp1":
             fsdp_kwargs["use_orig_params"] = True
 
+    pp_input_shape = None
+    if args.train.pipeline_parallel_size > 1:
+        pp_input_shape = infer_pp_input_shape(
+            model,
+            micro_batch_size=args.train.micro_batch_size,
+            max_seq_len=args.data.max_seq_len,
+            tp_size=args.train.tensor_parallel_size,
+        )
+
     model = build_parallelize_model(
         model,
         enable_full_shard=args.train.enable_full_shard,
@@ -244,6 +254,7 @@ def main():
         basic_modules=model._no_split_modules,
         enable_reentrant=args.train.enable_reentrant,
         enable_forward_prefetch=args.train.enable_forward_prefetch,
+        pp_input_shape=pp_input_shape,
     )
     optimizer = build_optimizer(
         model,
@@ -349,42 +360,75 @@ def main():
             total_loss = 0
             synchronize()
             start_time = time.time()
-            for micro_batch in micro_batches:
-                environ_meter.add(micro_batch)
-                if args.data.enable_multisource:
-                    micro_batch.pop("ds_idx", None)
-                    micro_batch.pop("source_name", None)
+            if get_parallel_state().pp_enabled:
+                pipeline_model = model.module if hasattr(model, "module") else model
+                if not hasattr(pipeline_model, "forward_backward_1f1b"):
+                    raise RuntimeError("Pipeline model does not implement forward_backward_1f1b.")
+                prepared_micro_batches = []
+                for micro_batch in micro_batches:
+                    environ_meter.add(micro_batch)
+                    if args.data.enable_multisource:
+                        micro_batch.pop("ds_idx", None)
+                        micro_batch.pop("source_name", None)
 
-                # For QwenVL: get_position_id -> (dim, 1, seq_len), then squeezed to (dim, seq_len)
-                # data collator adds batch dim -> (1, dim, seq_len) for unified SP slicing
-                # transpose back to (dim, 1, seq_len) for QwenVL compatibility
-                if micro_batch["position_ids"].shape[1] == 3:
-                    micro_batch["position_ids"] = micro_batch["position_ids"].transpose(0, 1).contiguous()
+                    if micro_batch["position_ids"].shape[1] == 3:
+                        micro_batch["position_ids"] = micro_batch["position_ids"].transpose(0, 1).contiguous()
 
-                # Prepare flash attention kwargs from position_ids for both Qwen2.5-VL and Qwen3-VL
-                fa_kwargs = prepare_fa_kwargs_from_position_ids(micro_batch["position_ids"][0])
-                micro_batch.update(
-                    dict(
-                        cu_seq_lens_q=fa_kwargs["cu_seq_lens_q"],
-                        cu_seq_lens_k=fa_kwargs["cu_seq_lens_k"],
-                        max_length_q=fa_kwargs["max_length_q"],
-                        max_length_k=fa_kwargs["max_length_k"],
+                    fa_kwargs = prepare_fa_kwargs_from_position_ids(micro_batch["position_ids"][0])
+                    micro_batch.update(
+                        dict(
+                            cu_seq_lens_q=fa_kwargs["cu_seq_lens_q"],
+                            cu_seq_lens_k=fa_kwargs["cu_seq_lens_k"],
+                            max_length_q=fa_kwargs["max_length_q"],
+                            max_length_k=fa_kwargs["max_length_k"],
+                        )
                     )
+
+                    prepared_micro_batches.append(micro_batch)
+
+                total_loss = pipeline_model.forward_backward_1f1b(
+                    prepared_micro_batches,
+                    model_fwd_context=model_fwd_context,
+                    model_bwd_context=model_bwd_context,
+                    use_cache=False,
                 )
+            else:
+                for micro_batch in micro_batches:
+                    environ_meter.add(micro_batch)
+                    if args.data.enable_multisource:
+                        micro_batch.pop("ds_idx", None)
+                        micro_batch.pop("source_name", None)
 
-                micro_batch = {
-                    k: v.to(get_device_type(), non_blocking=True) if isinstance(v, torch.Tensor) else v
-                    for k, v in micro_batch.items()
-                }
+                    # For QwenVL: get_position_id -> (dim, 1, seq_len), then squeezed to (dim, seq_len)
+                    # data collator adds batch dim -> (1, dim, seq_len) for unified SP slicing
+                    # transpose back to (dim, 1, seq_len) for QwenVL compatibility
+                    if micro_batch["position_ids"].shape[1] == 3:
+                        micro_batch["position_ids"] = micro_batch["position_ids"].transpose(0, 1).contiguous()
 
-                with model_fwd_context:
-                    loss: "torch.Tensor" = model(**micro_batch, use_cache=False).loss / len(micro_batches)
+                    # Prepare flash attention kwargs from position_ids for both Qwen2.5-VL and Qwen3-VL
+                    fa_kwargs = prepare_fa_kwargs_from_position_ids(micro_batch["position_ids"][0])
+                    micro_batch.update(
+                        dict(
+                            cu_seq_lens_q=fa_kwargs["cu_seq_lens_q"],
+                            cu_seq_lens_k=fa_kwargs["cu_seq_lens_k"],
+                            max_length_q=fa_kwargs["max_length_q"],
+                            max_length_k=fa_kwargs["max_length_k"],
+                        )
+                    )
 
-                with model_bwd_context:
-                    loss.backward()
+                    micro_batch = {
+                        k: v.to(get_device_type(), non_blocking=True) if isinstance(v, torch.Tensor) else v
+                        for k, v in micro_batch.items()
+                    }
 
-                total_loss += loss.item()
-                del micro_batch
+                    with model_fwd_context:
+                        loss: "torch.Tensor" = model(**micro_batch, use_cache=False).loss / len(micro_batches)
+
+                    with model_bwd_context:
+                        loss.backward()
+
+                    total_loss += loss.item()
+                    del micro_batch
 
             # Prefer model-provided clip_grad_norm_ (FSDP1 with EP, and FSDP2 with EP register one)
             if hasattr(model, "clip_grad_norm_"):

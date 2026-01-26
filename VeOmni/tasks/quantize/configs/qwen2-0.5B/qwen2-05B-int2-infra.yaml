@@ -34,6 +34,8 @@ train:
   enable_gradient_checkpointing: false
   enable_full_shard: true
   enable_fsdp_offload: false
+  num_to_forward_prefetch: 2
+  num_to_backward_prefetch: 2
   init_device: meta
   enable_full_determinism: false
   empty_cache_steps: 500

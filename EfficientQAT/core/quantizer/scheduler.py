@@ -121,6 +121,21 @@ class RatioBudget:
         return max(min(k, total_groups), 0)
 
 
+class RatioAssigner(Protocol):
+    """比例分配器协议：根据优先级分数与全局比例分配每个 group 的软量化比例"""
+    def assign(self, scores: torch.Tensor, ratio: float) -> torch.Tensor:
+        """分配每个 group 的比例
+
+        Args:
+            scores: 每个 group 的优先级分数，shape 为 [G]
+            ratio: 全局比例（0-1）
+
+        Returns:
+            每个 group 的比例张量，shape 为 [G]，范围 [0, 1]
+        """
+        ...
+
+
 class GroupSelector(Protocol):
     """分组选择器协议：根据优先级分数选择要量化的 groups"""
     def select_mask(self, scores: torch.Tensor, k: int) -> torch.BoolTensor:
@@ -219,6 +234,54 @@ def _normalize_scores(
     return scores.to(device=device)
 
 
+def _normalize_ratios(
+    ratios: Optional[torch.Tensor],
+    total_groups: int,
+    device: torch.device,
+    default_ratio: float,
+) -> torch.Tensor:
+    if ratios is None or ratios.numel() != total_groups:
+        return torch.full((total_groups,), float(default_ratio), device=device)
+    ratios = _to_local_tensor(ratios)
+    ratios = ratios.to(device=device, dtype=torch.float32)
+    return ratios.clamp(0.0, 1.0)
+
+
+def _budget_ratio(budget_policy: BudgetPolicy, state: ScheduleState, total_groups: int) -> float:
+    if total_groups <= 0:
+        return 0.0
+    ratio_fn = getattr(budget_policy, "ratio", None)
+    if callable(ratio_fn):
+        try:
+            return float(min(max(ratio_fn(state), 0.0), 1.0))
+        except Exception:
+            pass
+    k = budget_policy.budget(state, total_groups)
+    return float(min(max(k / max(total_groups, 1), 0.0), 1.0))
+
+
+class UniformRatioAssigner:
+    """所有 groups 使用相同的软量化比例"""
+    def assign(self, scores: torch.Tensor, ratio: float) -> torch.Tensor:
+        return torch.full_like(scores, float(ratio))
+
+
+class ScoreProportionalRatioAssigner:
+    """按优先级分数比例分配软量化比例（总量约等于 ratio * G）"""
+    def __init__(self, eps: float = 1e-8):
+        self.eps = float(eps)
+
+    def assign(self, scores: torch.Tensor, ratio: float) -> torch.Tensor:
+        scores = _to_local_tensor(scores).float()
+        scores = scores - scores.min()
+        denom = scores.sum()
+        if denom <= self.eps:
+            return torch.full_like(scores, float(ratio))
+        weights = scores / denom
+        ratios = weights * float(ratio) * scores.numel()
+        return ratios
+
+
 class UniformPriorityCalculator:
     """
     默认优先级计算器：所有 groups 等优先级
@@ -290,14 +353,15 @@ class QuantizationScheduler:
     核心调度逻辑：
     - 接收优先级计算函数
     - 每步动态计算 quantizer 的优先级
-    - 计算预算 k
-    - 使用选择器输出 mask 并设置 quantizer.group_mask
+    - 计算预算 k/ratio
+    - 使用选择器输出 mask 或 ratio 并设置 quantizer.group_mask/group_ratio
     """
     def __init__(
         self,
         budget_policy: BudgetPolicy,
         selector: GroupSelector,
         priority_calculator: Optional[PriorityCalculator] = None,
+        ratio_assigner: Optional[RatioAssigner] = None,
     ):
         """初始化量化调度器
 
@@ -309,6 +373,7 @@ class QuantizationScheduler:
         self.budget_policy = budget_policy
         self.selector = selector
         self.priority_calculator = priority_calculator or UniformPriorityCalculator()
+        self.ratio_assigner = ratio_assigner
 
     @torch.no_grad()
     def apply(
@@ -316,7 +381,7 @@ class QuantizationScheduler:
         state: ScheduleState,
         quantizers: List,  # List[GradualQuantizer]
     ) -> None:
-        """应用调度：动态计算优先级并更新 group_mask
+        """应用调度：动态计算优先级并更新 group_mask/group_ratio
 
         Args:
             state: 当前调度状态
@@ -331,12 +396,19 @@ class QuantizationScheduler:
             prefix = getattr(q, "prefix", str(id(q)))
             # 为此量化器计算总分组数：使用保存的元数据
             total_groups = _get_total_elements(q) // q.group_size
-            k = self.budget_policy.budget(state, total_groups)
-
             scores = _normalize_scores(priorities.get(prefix), total_groups, device=q._device)
-
-            mask = self.selector.select_mask(scores, k)
-            q.set_group_mask(mask)
+            if self.ratio_assigner is not None and hasattr(q, "set_group_ratio"):
+                ratio = _budget_ratio(self.budget_policy, state, total_groups)
+                ratios = self.ratio_assigner.assign(scores, ratio)
+                ratios = _normalize_ratios(ratios, total_groups, device=q._device, default_ratio=ratio)
+                q.set_group_ratio(ratios)
+                q.set_group_mask(None)
+            else:
+                k = self.budget_policy.budget(state, total_groups)
+                mask = self.selector.select_mask(scores, k)
+                q.set_group_mask(mask)
+                if hasattr(q, "set_group_ratio"):
+                    q.set_group_ratio(None)
 
 
 class GradualQuantController:
@@ -356,7 +428,7 @@ class GradualQuantController:
 
     def on_step_end(self, step: int, epoch: int = 0,
                     metrics: Optional[Dict[str, float]] = None) -> None:
-        """在步骤结束时调用：更新所有 quantizers 的 group_mask
+        """在步骤结束时调用：更新所有 quantizers 的 group_mask/group_ratio
 
         Args:
             step: 当前全局步骤
@@ -368,7 +440,7 @@ class GradualQuantController:
 
     def on_epoch_end(self, epoch: int, step: int,
                      metrics: Optional[Dict[str, float]] = None) -> None:
-        """在轮次结束时调用：更新所有 quantizers 的 group_mask
+        """在轮次结束时调用：更新所有 quantizers 的 group_mask/group_ratio
 
         Args:
             epoch: 当前轮次

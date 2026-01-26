@@ -353,6 +353,14 @@ class TrainingArguments:
         default=True,
         metadata={"help": "Enable forward prefetch for FSDP1."},
     )
+    num_to_forward_prefetch: int = field(
+        default=0,
+        metadata={"help": "Number of blocks to forward prefetch. If > 0, manual prefetching is enabled."},
+    )
+    num_to_backward_prefetch: int = field(
+        default=0,
+        metadata={"help": "Number of blocks to backward prefetch. If > 0, manual prefetching is enabled."},
+    )
     enable_fsdp_offload: bool = field(
         default=False,
         metadata={"help": "Enable CPU offload for FSDP1."},
@@ -517,6 +525,46 @@ class TrainingArguments:
             "help": "whether to profile rank0 only. When false, every rank will be profiled; Please expect many files to save, which can be slow and take a lot of disk space."
         },
     )
+    debug: bool = field(
+        default=False,
+        metadata={"help": "Enable torch.profiler debug profiling."},
+    )
+    debug_profiler_activities: List[str] = field(
+        default_factory=lambda: ["CPU", "CUDA"],
+        metadata={"help": "Profiler activities to collect, e.g. ['CPU','CUDA']."},
+    )
+    debug_profiler_wait: int = field(
+        default=2,
+        metadata={"help": "Profiler schedule wait steps."},
+    )
+    debug_profiler_warmup: int = field(
+        default=1,
+        metadata={"help": "Profiler schedule warmup steps."},
+    )
+    debug_profiler_active: int = field(
+        default=3,
+        metadata={"help": "Profiler schedule active steps."},
+    )
+    debug_profiler_repeat: int = field(
+        default=1,
+        metadata={"help": "Profiler schedule repeat count."},
+    )
+    debug_profiler_record_shapes: bool = field(
+        default=True,
+        metadata={"help": "Record tensor shapes in torch.profiler."},
+    )
+    debug_profiler_profile_memory: bool = field(
+        default=True,
+        metadata={"help": "Profile memory usage in torch.profiler."},
+    )
+    debug_profiler_with_stack: bool = field(
+        default=False,
+        metadata={"help": "Record stack traces in torch.profiler."},
+    )
+    debug_profiler_rank0_only: bool = field(
+        default=True,
+        metadata={"help": "Profile rank0 only when debug profiling is enabled."},
+    )
     max_steps: Optional[int] = field(
         default=None,
         metadata={"help": "Max training steps per epoch. (for debug)"},
@@ -540,8 +588,16 @@ class TrainingArguments:
             raise ValueError(
                 f"World size should be a multiple of pipeline_parallel_size: {self.pipeline_parallel_size}, ulysses_parallel_size: {self.ulysses_parallel_size}, context_parallel_size: {self.context_parallel_size}, tensor_parallel_size: {self.tensor_parallel_size}."
             )
-        assert self.tensor_parallel_size == 1, "Tensor parallel size not supported yet."
-        assert self.pipeline_parallel_size == 1, "Pipeline parallel size not supported yet."
+        if self.pipeline_parallel_size > 1:
+            if self.rmpad or self.dyn_bsz:
+                raise ValueError("Pipeline parallelism currently requires fixed shapes; disable rmpad/dyn_bsz.")
+            if self.data_parallel_mode != "ddp":
+                raise ValueError("Pipeline parallelism currently only supports data_parallel_mode=ddp.")
+        if self.tensor_parallel_size > 1:
+            if self.pipeline_parallel_size <= 1:
+                raise ValueError("Tensor parallelism currently requires pipeline_parallel_size > 1.")
+            if self.data_parallel_mode != "ddp":
+                raise ValueError("Tensor parallelism currently only supports data_parallel_mode=ddp.")
         self.data_parallel_size = self.world_size // (
             self.pipeline_parallel_size
             * self.ulysses_parallel_size
@@ -645,6 +701,18 @@ class TrainingArguments:
                 self.profile_this_rank = True
         else:
             self.profile_this_rank = False
+
+        # determine whether to debug-profile this rank
+        if self.debug:
+            if self.debug_profiler_rank0_only:
+                self.debug_profile_this_rank = self.global_rank == 0
+            else:
+                logger.warning_rank0(
+                    "Debug profiling on ALL ranks is enabled. This would save a lot of files and may slow training."
+                )
+                self.debug_profile_this_rank = True
+        else:
+            self.debug_profile_this_rank = False
 
         # Prevent CUDA_LAUNCH_BLOCKING from being accidentally enabled
         if not self.allow_cuda_launch_blocking:

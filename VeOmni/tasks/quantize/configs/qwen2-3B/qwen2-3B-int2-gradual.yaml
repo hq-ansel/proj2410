@@ -1,5 +1,5 @@
 model:
-  model_path: /home/ubuntu/data/exp/proj2410/model/Qwen2.5-0.5B
+  model_path: /home/ubuntu/data/exp/proj2410/model/Qwen2.5-3B
 
 data:
   train_path: /home/ubuntu/data/exp/proj2410/hf_home/rp_text_caches/data-00000-of-00001.arrow
@@ -12,12 +12,12 @@ data:
 
 train:
   num_train_epochs: 2
-  output_dir: /home/ubuntu/data/exp/proj2410/quant_model/Qwen2.5-0.5B/EfficientQAT/w8g128-int8
+  output_dir: /home/ubuntu/data/exp/proj2410/quant_model/Qwen2.5-3B/EfficientQAT/w2g128-gradual
   data_parallel_mode: fsdp2
-  ulysses_parallel_size: 2
+  ulysses_parallel_size: 4
   enable_activation_offload: true
   activation_gpu_limit: 40.0
-  global_batch_size: 8
+  global_batch_size: 4
   micro_batch_size: 1
   rmpad: false
   rmpad_with_pos_ids: true
@@ -39,17 +39,18 @@ train:
   enable_activation_offload: false
   init_device: meta
   enable_full_determinism: false
+  debug: true
   empty_cache_steps: 500
   ckpt_manager: dcp
   load_checkpoint_path: ""
   save_steps: 1000
   save_hf_weights: true
-  wandb_project: Qwen2-0.5B
-  wandb_name: Qwen2-0.5B-int8-g128-uniform
+  wandb_project: Qwen2-3B
+  wandb_name: Qwen2-3B-int2-g128-gradual
 
 quantizer:
-  quant_type: uniform_affine # gradual
-  n_bits: 8
+  quant_type: gradual # uniform_affine or gradual
+  n_bits: 2
   group_size: 64
   clamp_method: STE
   round_method: ste
@@ -58,7 +59,7 @@ quantizer:
   # Gradual quantization configuration
   enable_gradual_quant: true
   qat_warmup_steps: 0
-  gradual_start_ratio: 1.0  # 立即全部量化
+  gradual_start_ratio: 0.0  # 立即全部量化
   gradual_end_ratio: 1.0
   priority_type: uniform
 
@@ -78,3 +79,12 @@ quantizer:
 
 profile:
   profile_module_name: ["model.layers.0"]
+  # quant_stat_interval: 1
+  # 不要优先盯 q/k/v/gate/up 这种“块内部”的线性层，
+  # 而是优先盯每个 block 里把信息写回 residual stream 的两条“注入边
+  # 这两个是一阶的线性影响隐藏状态，而没有非线性因素
+  # quant_stat_module_name: [
+  #   "model.layers.0.self_attn.o_proj",
+  #   "model.layers.0.mlp.down_proj"
+  # ]
+  # quant_stat_percentiles: [0.999]

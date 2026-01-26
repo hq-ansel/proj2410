@@ -34,9 +34,12 @@ train:
   enable_gradient_checkpointing: false
   enable_full_shard: true
   enable_fsdp_offload: false
+  num_to_forward_prefetch: 2
+  num_to_backward_prefetch: 2
   enable_activation_offload: false
   init_device: meta
   enable_full_determinism: false
+  debug: true
   empty_cache_steps: 500
   ckpt_manager: dcp
   load_checkpoint_path: ""
@@ -76,12 +79,12 @@ quantizer:
 
 profile:
   profile_module_name: ["model.layers.0"]
-  quant_stat_interval: 1
+  # quant_stat_interval: 1
   # 不要优先盯 q/k/v/gate/up 这种“块内部”的线性层，
   # 而是优先盯每个 block 里把信息写回 residual stream 的两条“注入边
   # 这两个是一阶的线性影响隐藏状态，而没有非线性因素
-  quant_stat_module_name: [
-    "model.layers.0.self_attn.o_proj",
-    "model.layers.0.mlp.down_proj"
-  ]
-  quant_stat_percentiles: [0.999]
+  # quant_stat_module_name: [
+  #   "model.layers.0.self_attn.o_proj",
+  #   "model.layers.0.mlp.down_proj"
+  # ]
+  # quant_stat_percentiles: [0.999]

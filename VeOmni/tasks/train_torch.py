@@ -21,6 +21,7 @@ from veomni.data import (
 )
 from veomni.data.data_transform import process_pretrain_example, process_sft_example
 from veomni.distributed.offloading import build_activation_offloading_context
+from veomni.distributed.pipeline import infer_pp_input_shape
 from veomni.distributed.parallel_state import get_parallel_state, init_parallel_state
 from veomni.distributed.torch_parallelize import build_parallelize_model
 from veomni.models import build_foundation_model, build_tokenizer, save_model_assets, save_model_weights
@@ -162,6 +163,15 @@ def main():
     helper.print_device_mem_info("VRAM usage after building model")
 
     get_optimizer_pre_hook = getattr(model, "get_optimizer_pre_hook", None)
+    pp_input_shape = None
+    if args.train.pipeline_parallel_size > 1:
+        pp_input_shape = infer_pp_input_shape(
+            model,
+            micro_batch_size=args.train.micro_batch_size,
+            max_seq_len=args.data.max_seq_len,
+            tp_size=args.train.tensor_parallel_size,
+        )
+
     model = build_parallelize_model(
         model,
         init_device=args.train.init_device,
@@ -173,6 +183,7 @@ def main():
         basic_modules=model._no_split_modules + args.model.basic_modules,
         enable_reentrant=args.train.enable_reentrant,
         enable_forward_prefetch=args.train.enable_forward_prefetch,
+        pp_input_shape=pp_input_shape,
     )
 
     optimizer = build_optimizer(
@@ -285,24 +296,44 @@ def main():
             total_loss = 0
             synchronize()
             start_time = time.time()
-            for micro_batch in micro_batches:
-                environ_meter.add(micro_batch)
-                if args.data.enable_multisource:
-                    micro_batch.pop("ds_idx", None)
-                    micro_batch.pop("source_name", None)
 
-                micro_batch = {
-                    k: v.to(get_device_type(), non_blocking=True) if isinstance(v, torch.Tensor) else v
-                    for k, v in micro_batch.items()
-                }
-                with model_fwd_context:
-                    loss: "torch.Tensor" = model(**micro_batch, use_cache=False).loss.mean() / len(micro_batches)
+            if get_parallel_state().pp_enabled:
+                pipeline_model = model.module if hasattr(model, "module") else model
+                if not hasattr(pipeline_model, "forward_backward_1f1b"):
+                    raise RuntimeError("Pipeline model does not implement forward_backward_1f1b.")
+                prepared_micro_batches = []
+                for micro_batch in micro_batches:
+                    environ_meter.add(micro_batch)
+                    if args.data.enable_multisource:
+                        micro_batch.pop("ds_idx", None)
+                        micro_batch.pop("source_name", None)
+                    prepared_micro_batches.append(micro_batch)
 
-                with model_bwd_context:
-                    loss.backward()
+                total_loss = pipeline_model.forward_backward_1f1b(
+                    prepared_micro_batches,
+                    model_fwd_context=model_fwd_context,
+                    model_bwd_context=model_bwd_context,
+                    use_cache=False,
+                )
+            else:
+                for micro_batch in micro_batches:
+                    environ_meter.add(micro_batch)
+                    if args.data.enable_multisource:
+                        micro_batch.pop("ds_idx", None)
+                        micro_batch.pop("source_name", None)
 
-                total_loss += loss.item()
-                del micro_batch
+                    micro_batch = {
+                        k: v.to(get_device_type(), non_blocking=True) if isinstance(v, torch.Tensor) else v
+                        for k, v in micro_batch.items()
+                    }
+                    with model_fwd_context:
+                        loss: "torch.Tensor" = model(**micro_batch, use_cache=False).loss.mean() / len(micro_batches)
+
+                    with model_bwd_context:
+                        loss.backward()
+
+                    total_loss += loss.item()
+                    del micro_batch
 
             # Prefer model-provided clip_grad_norm_ (now both FSDP1 and FSDP2 registers custom grad norm clipping)
             if hasattr(model, "clip_grad_norm_"):

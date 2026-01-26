@@ -446,7 +446,21 @@ def build_parallelize_model(
             },
         )
 
-    if parallel_state.tp_enabled:
+    if parallel_state.tp_enabled and parallel_state.pp_enabled:
+        logger.info_rank0("Apply tensor parallel before pipeline parallel.")
+        model = parallelize_module(
+            model,
+            device_mesh=parallel_state.tp_mesh,
+        )
+
+    if parallel_state.pp_enabled:
+        from .pipeline import PipelineRuntime
+
+        logger.info_rank0("Apply pipeline parallel to the model.")
+        input_shape = kwargs.get("pp_input_shape", None)
+        model = PipelineRuntime(model, input_shape=input_shape)
+
+    if parallel_state.tp_enabled and not parallel_state.pp_enabled:
         logger.info_rank0("Apply tensor parallel to the model.")
         model = parallelize_module(
             model,

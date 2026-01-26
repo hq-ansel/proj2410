@@ -1,5 +1,5 @@
 model:
-  model_path: /home/ubuntu/data/exp/proj2410/model/Qwen2.5-0.5B
+  model_path: /home/ubuntu/data/exp/proj2410/model/Qwen2.5-3B
 
 data:
   train_path: /home/ubuntu/data/exp/proj2410/hf_home/rp_text_caches/data-00000-of-00001.arrow
@@ -12,12 +12,12 @@ data:
 
 train:
   num_train_epochs: 2
-  output_dir: /home/ubuntu/data/exp/proj2410/quant_model/Qwen2.5-0.5B/EfficientQAT/w8g128-int8
+  output_dir: /home/ubuntu/data/exp/proj2410/quant_model/Qwen2.5-3B/EfficientQAT/w2g128-int2-kd
   data_parallel_mode: fsdp2
-  ulysses_parallel_size: 2
+  ulysses_parallel_size: 4
   enable_activation_offload: true
   activation_gpu_limit: 40.0
-  global_batch_size: 8
+  global_batch_size: 4
   micro_batch_size: 1
   rmpad: false
   rmpad_with_pos_ids: true
@@ -39,17 +39,18 @@ train:
   enable_activation_offload: false
   init_device: meta
   enable_full_determinism: false
+  debug: true
   empty_cache_steps: 500
   ckpt_manager: dcp
   load_checkpoint_path: ""
   save_steps: 1000
   save_hf_weights: true
-  wandb_project: Qwen2-0.5B
-  wandb_name: Qwen2-0.5B-int8-g128-uniform
+  wandb_project: Qwen2-3B
+  wandb_name: Qwen2-3B-int2-g128-uniform-kd
 
 quantizer:
   quant_type: uniform_affine # gradual
-  n_bits: 8
+  n_bits: 2
   group_size: 64
   clamp_method: STE
   round_method: ste
@@ -75,6 +76,12 @@ quantizer:
   decay_rate: 0.01
   shrinking_ratio: 0.5
   quant_weight_decay: 0.0
+
+distill:
+  kd_mode: logits
+  teacher_model: /home/ubuntu/data/exp/proj2410/model/Qwen2.5-7B
+  kd_alpha: 0.5
+  kd_temperature: 1.0
 
 profile:
   profile_module_name: ["model.layers.0"]

@@ -153,9 +153,10 @@ class BaseQuantizer(nn.Module):
         Returns:
             量化后的整数张量, shape: [num_elements, group_size]
         """
-        x_int = round_ste(x / scale)
+        u = x / scale
         if round_zero_point is not None:
-            x_int = x_int.add(round_zero_point)
+            u = u.add(round_zero_point)
+        x_int = round_ste(u)
         x_int = x_int.clamp(self.qmin, self.qmax)
         return x_int
 

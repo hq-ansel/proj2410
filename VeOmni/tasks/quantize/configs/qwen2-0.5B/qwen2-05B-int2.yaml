@@ -12,7 +12,7 @@ data:
 
 train:
   num_train_epochs: 2
-  output_dir: /home/ubuntu/data/exp/proj2410/quant_model/Qwen2.5-0.5B/EfficientQAT/w2g128-int2
+  output_dir: /home/ubuntu/data/exp/proj2410/quant_model/Qwen2.5-0.5B/EfficientQAT/w2g64-int2
   data_parallel_mode: fsdp2
   ulysses_parallel_size: 2
   enable_activation_offload: true
@@ -46,7 +46,7 @@ train:
   save_steps: 1000
   save_hf_weights: true
   wandb_project: Qwen2-0.5B
-  wandb_name: Qwen2-0.5B-int2-g128-uniform
+  wandb_name: Qwen2-0.5B-int2-g64-uniform
 
 quantizer:
   quant_type: uniform_affine # gradual

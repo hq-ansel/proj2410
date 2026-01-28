@@ -4,6 +4,8 @@ from dataclasses import dataclass
 import torch
 from torch import nn
 
+from EfficientQAT.core.quantizer.kernel.fake_quant import fake_quant_ste
+
 from .base_quantizer import BaseQuantizer
 from .tracking import TrackOscillation
 from .config import QuantConfig
@@ -51,11 +53,26 @@ class UniformAffineQuantizer(BaseQuantizer):
                 amax_diff=0.0,
                 mean_diff=0.0)
 
-    def fake_quant(self, x: torch.Tensor) -> torch.Tensor:
-        """假量化：量化后反量化，用于可微分量化训练"""
-        scale, round_zero_point = self.cal_qparams(
-            self.scale,
-            self.zero_point)
+    def fake_quant(self,
+                   x: torch.Tensor,
+                   scale: torch.Tensor = None,
+                   zero_point: torch.Tensor = None) -> torch.Tensor:
+        """假量化：量化后反量化，用于可微分量化训练
+
+        Args:
+            x: 输入张量
+            scale: 可选外部 scale（用于对比/梯度注入）
+            zero_point: 可选外部 zero_point（用于对比/梯度注入）
+        """
+        scale = self.scale if scale is None else scale
+        zero_point = self.zero_point if zero_point is None else zero_point
+        return fake_quant_ste(x, scale, zero_point, self.qmin, self.qmax,self.group_size)
+        if zero_point is None:
+            # 仅 clamp scale，zero_point 走 None 分支
+            scale, _ = self.cal_qparams(scale, torch.zeros_like(scale))
+            round_zero_point = None
+        else:
+            scale, round_zero_point = self.cal_qparams(scale, zero_point)
         ori_shape = x.shape
         x = x.reshape(-1, self.group_size)
         # freezing weights - 冻结权重（如果启用了追踪）

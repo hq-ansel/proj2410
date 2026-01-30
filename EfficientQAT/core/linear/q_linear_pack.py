@@ -12,6 +12,11 @@ from .q_linear_base import BaseQuantLinear
 from .q_linear_autograd import QuantLinearFunction
 
 class PackableQuantLinear(BaseQuantLinear):
+    def _unsigned_to_signed(self, x: torch.Tensor) -> torch.Tensor:
+        sign_bit = 1 << (self.bits - 1)
+        full_range = 1 << self.bits
+        return torch.where(x >= sign_bit, x - full_range, x)
+
     def post_init(self, **kwargs):
         """
         初始化不同位宽量化的权重分解参数
@@ -111,6 +116,9 @@ class PackableQuantLinear(BaseQuantLinear):
         # weight: 重塑为 [out_features, in_features]
         weight = weight.reshape(weight.shape[0] * weight.shape[1], weight.shape[2])
 
+        if self.sym:
+            weight = self._unsigned_to_signed(weight)
+
         if num_itr == 1:
             # self.scales: [in_features // group_size, out_features]
             # self.g_idx: [in_features] - 每个输入特征的组索引
@@ -118,7 +126,10 @@ class PackableQuantLinear(BaseQuantLinear):
             # scales[g_idx]: [out_features, in_features] - 将 scale 广播到每个位置
             # zeros[g_idx]: [out_features, in_features] - 将 zero 广播到每个位置
             # weights: [out_features, in_features]
-            weights = self.scales[self.g_idx.long()] * (weight - zeros[self.g_idx.long()])
+            if self.sym:
+                weights = self.scales[self.g_idx.long()] * weight
+            else:
+                weights = self.scales[self.g_idx.long()] * (weight - zeros[self.g_idx.long()])
         else:
             num_dim = self.g_idx.shape[0] // num_itr
             weights = []
@@ -133,13 +144,16 @@ class PackableQuantLinear(BaseQuantLinear):
                 g_idx_i = self.g_idx[i * num_dim : (i + 1) * num_dim].long()
                 # scale_i[g_idx_i]: [out_features, num_dim] - 按组索引
                 # zeros_i[g_idx_i]: [out_features, num_dim] - 按组索引
-                weights.append(scale_i[g_idx_i] * (weight_i - zeros_i[g_idx_i]))
+                if self.sym:
+                    weights.append(scale_i[g_idx_i] * weight_i)
+                else:
+                    weights.append(scale_i[g_idx_i] * (weight_i - zeros_i[g_idx_i]))
             # weights: 连接所有切片, [out_features, in_features]
             weights = torch.cat(weights, dim=1)
 
         return weights
 
-    def pack(self, linear: torch.nn.Module, scales: torch.Tensor, zeros: torch.Tensor, g_idx: torch.Tensor = None):
+    def pack(self, linear: torch.nn.Module, scales: torch.Tensor, zeros: torch.Tensor | None, g_idx: torch.Tensor = None):
         """
         将量化后的权重和零点打包为压缩格式以便存储
 
@@ -149,7 +163,8 @@ class PackableQuantLinear(BaseQuantLinear):
                 - Conv2d: 权重形状 [out_channels, in_channels, kernel_h, kernel_w]
                 - Conv1D: 权重形状 [in_features, out_features] (转置格式)
             scales (torch.Tensor): 量化 scale 张量，形状 [out_features, in_features // group_size]
-            zeros (torch.Tensor): 量化 zero 张量，形状 [out_features, in_features // group_size]
+        zeros (torch.Tensor | None): 量化 zero 张量，形状 [out_features, in_features // group_size]
+            对称量化 (sym=True) 时可为 None，将使用全 0 zero_point。
             g_idx (torch.Tensor, optional): 分组量化的组索引，形状 [in_features]
 
         Notes:
@@ -174,6 +189,10 @@ class PackableQuantLinear(BaseQuantLinear):
         # zeros: 从 [out_features, in_features // group_size] 转置
         #  为 [in_features // group_size, out_features]
         scales = scales.T.contiguous()
+        if zeros is None:
+            if not self.sym:
+                raise ValueError("zeros must be provided for asymmetric quantization.")
+            zeros = torch.zeros_like(scales)
         zeros = zeros.T.contiguous()
 
         # scale_zeros: 零点 * scale，形状 [in_features // group_size, out_features]
@@ -195,11 +214,15 @@ class PackableQuantLinear(BaseQuantLinear):
         # int_weight = torch.round((W + scale_zeros[self.g_idx].T)
         #                           / scales[self.g_idx].T).to(torch.int32)
         # int_weight = torch.round(W/ scales[self.g_idx].T+torch.round(zeros[self.g_idx]).T).to(torch.int32)
-        int_weight = torch.round(W/ scales[self.g_idx].T).to(torch.int32)
-        int_weight = int_weight+torch.round(zeros[self.g_idx]).T.to(torch.int32)
-        # int_weight: 限制在有效量化范围 [0, maxq] 内，
-        #  形状 [out_features, in_features]
-        int_weight = int_weight.clamp(0, self.maxq)
+        int_weight = torch.round(W / scales[self.g_idx].T).to(torch.int32)
+        if self.sym:
+            int_weight = int_weight.clamp(self.qmin, self.qmax)
+            int_weight = torch.bitwise_and(int_weight, self.maxq)
+        else:
+            int_weight = int_weight + torch.round(zeros[self.g_idx]).T.to(torch.int32)
+            # int_weight: 限制在有效量化范围 [0, maxq] 内，
+            #  形状 [out_features, in_features]
+            int_weight = int_weight.clamp(0, self.maxq)
         if getattr(self, "debug_int_weight", False):
             self.int_weight_debug = int_weight.detach().cpu()
         elif hasattr(self, "int_weight_debug"):
@@ -429,6 +452,7 @@ class PackableQuantLinear(BaseQuantLinear):
             self.bits,
             self.pack_dtype_bits,
             self.maxq,
+            self.sym,
         )
         if getattr(self, "bias", None) is not None:
             out_local = out_local + self.bias

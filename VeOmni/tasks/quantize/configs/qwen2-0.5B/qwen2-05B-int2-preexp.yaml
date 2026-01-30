@@ -53,7 +53,7 @@ quantizer:
   group_size: 64
   clamp_method: STE
   round_method: ste
-  quant_lr: 0.0001
+  quant_lr: 1e-5
 
   # Weight L2 regularization between quantized and float weights
   enable_qweight_l2_reg: true

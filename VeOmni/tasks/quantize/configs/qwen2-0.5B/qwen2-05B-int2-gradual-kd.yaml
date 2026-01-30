@@ -34,8 +34,8 @@ train:
   enable_gradient_checkpointing: false
   enable_full_shard: true
   enable_fsdp_offload: false
-  num_to_forward_prefetch: 2
-  num_to_backward_prefetch: 2
+  num_to_forward_prefetch: 0
+  num_to_backward_prefetch: 0
   enable_activation_offload: false
   init_device: meta
   enable_full_determinism: false
@@ -53,8 +53,8 @@ quantizer:
   group_size: 64
   clamp_method: STE
   round_method: ste
-  symmetric: false
-  quant_lr: 0.0001
+  symmetric: true
+  quant_lr: 1e-4
 
   # Gradual quantization configuration
   enable_gradual_quant: true
@@ -79,7 +79,7 @@ quantizer:
 
 distill:
   kd_mode: logits
-  teacher_model: /home/ubuntu/data/exp/proj2410/model/Qwen2.5-1.5B
+  teacher_model: /home/ubuntu/data/exp/proj2410/model/Qwen2.5-0.5B
   kd_alpha: 1
   kd_temperature: 1.0
 

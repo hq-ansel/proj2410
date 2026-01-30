@@ -12,7 +12,7 @@ data:
 
 train:
   num_train_epochs: 2
-  output_dir: /home/ubuntu/data/exp/proj2410/quant_model/Qwen2.5-3B/EfficientQAT/w2g128-gradual-kd
+  output_dir: /home/ubuntu/data/exp/proj2410/quant_model/Qwen2.5-3B/EfficientQAT/w2g64-gradual-kd
   data_parallel_mode: fsdp2
   ulysses_parallel_size: 4
   enable_activation_offload: true
@@ -20,7 +20,7 @@ train:
   global_batch_size: 4
   micro_batch_size: 1
   rmpad: false
-  rmpad_with_pos_ids: true
+  rmpad_with_pos_ids: false
   bsz_warmup_ratio: 0.007
   dyn_bsz_margin: 0
   optimizer: adamw
@@ -45,7 +45,7 @@ train:
   save_steps: 1000
   save_hf_weights: true
   wandb_project: Qwen2-3B
-  wandb_name: Qwen2-3B-int2-g128-gradual-kd
+  wandb_name: Qwen2-3B-int2-g64-gradual-kd
 
 quantizer:
   quant_type: gradual # uniform_affine or gradual
@@ -53,6 +53,7 @@ quantizer:
   group_size: 64
   clamp_method: STE
   round_method: ste
+  symmetric: false
   quant_lr: 0.0001
 
   # Gradual quantization configuration
@@ -78,18 +79,20 @@ quantizer:
 
 distill:
   kd_mode: logits
-  teacher_model: /home/ubuntu/data/exp/proj2410/model/Qwen2.5-7B
-  kd_alpha: 0.5
+  teacher_model: /home/ubuntu/data/exp/proj2410/model/Qwen2.5-3B
+  kd_alpha: 1
   kd_temperature: 1.0
+  enable_teacher_cuda_graph: true
+  teacher_cuda_graph_warmup_iters: 3
 
-profile:
-  profile_module_name: ["model.layers.0"]
-  quant_stat_interval: 1
-  # 不要优先盯 q/k/v/gate/up 这种“块内部”的线性层，
-  # 而是优先盯每个 block 里把信息写回 residual stream 的两条“注入边
-  # 这两个是一阶的线性影响隐藏状态，而没有非线性因素
-  quant_stat_module_name: [
-    "model.layers.0.self_attn.o_proj",
-    "model.layers.0.mlp.down_proj"
-  ]
-  quant_stat_percentiles: [0.999]
+# profile:
+#   profile_module_name: ["model.layers.0"]
+#   quant_stat_interval: 1
+#   # 不要优先盯 q/k/v/gate/up 这种“块内部”的线性层，
+#   # 而是优先盯每个 block 里把信息写回 residual stream 的两条“注入边
+#   # 这两个是一阶的线性影响隐藏状态，而没有非线性因素
+#   quant_stat_module_name: [
+#     "model.layers.0.self_attn.o_proj",
+#     "model.layers.0.mlp.down_proj"
+#   ]
+#   quant_stat_percentiles: [0.999]

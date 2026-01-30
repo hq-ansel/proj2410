@@ -1,6 +1,7 @@
 import json
 import math
 import os
+import shutil
 import time
 from contextlib import nullcontext
 from datetime import timedelta
@@ -158,6 +159,145 @@ def _prepare_probe_batch(batch: Dict[str, Any], enable_multisource: bool) -> Dic
         k: v.to(get_device_type(), non_blocking=True) if isinstance(v, torch.Tensor) else v
         for k, v in probe_batch.items()
     }
+
+
+def _prepare_teacher_inputs(
+    micro_batch: Dict[str, Any],
+    enable_multisource: bool,
+) -> Dict[str, torch.Tensor]:
+    teacher_batch = {k: v for k, v in micro_batch.items()}
+    if enable_multisource:
+        teacher_batch.pop("ds_idx", None)
+        teacher_batch.pop("source_name", None)
+    teacher_inputs = {k: v for k, v in teacher_batch.items() if k != "labels"}
+    return {
+        k: v.to(get_device_type(), non_blocking=True) if isinstance(v, torch.Tensor) else v
+        for k, v in teacher_inputs.items()
+    }
+
+
+@dataclass
+class _TeacherCudaGraphRunner:
+    graph: "torch.cuda.CUDAGraph"
+    static_inputs: Dict[str, torch.Tensor]
+    static_outputs: Any
+    input_keys: List[str]
+
+    def matches(self, inputs: Dict[str, Any]) -> bool:
+        if set(inputs.keys()) != set(self.input_keys):
+            return False
+        for key in self.input_keys:
+            val = inputs.get(key)
+            if not isinstance(val, torch.Tensor):
+                return False
+            static_val = self.static_inputs[key]
+            if val.shape != static_val.shape or val.dtype != static_val.dtype or val.device != static_val.device:
+                return False
+        return True
+
+    def replay(self, inputs: Dict[str, torch.Tensor]) -> Any:
+        for key in self.input_keys:
+            self.static_inputs[key].copy_(inputs[key], non_blocking=True)
+        self.graph.replay()
+        return self.static_outputs
+
+
+def _teacher_cudagraph_skip_reason(
+    teacher_inputs: Dict[str, Any],
+    args: "Arguments",
+) -> str | None:
+    if get_device_type() != "cuda" or not torch.cuda.is_available():
+        return "CUDA is not available"
+    if args.train.rmpad:
+        return "rmpad enabled (padding-free inputs)"
+    if "cu_seqlens" in teacher_inputs or "max_seqlen" in teacher_inputs:
+        return "padding-free inputs detected (cu_seqlens/max_seqlen)"
+    if "input_ids" not in teacher_inputs:
+        return "input_ids missing"
+    input_ids = teacher_inputs["input_ids"]
+    if not isinstance(input_ids, torch.Tensor):
+        return "input_ids is not a tensor"
+    if input_ids.dim() != 2:
+        return f"input_ids dim != 2 (got {input_ids.dim()})"
+    if input_ids.shape[0] != args.train.micro_batch_size:
+        return (
+            f"input_ids batch={input_ids.shape[0]} != "
+            f"micro_batch_size={args.train.micro_batch_size}"
+        )
+    ps = get_parallel_state()
+    sp_size = ps.sp_size if ps.sp_enabled else 1
+    max_seq_len = int(args.data.max_seq_len)
+    padded_full_len = ((max_seq_len + sp_size - 1) // sp_size) * sp_size
+    expected_local_len = padded_full_len // sp_size
+    allowed_seq_lens = {max_seq_len, padded_full_len, expected_local_len}
+    if input_ids.shape[1] not in allowed_seq_lens:
+        return (
+            f"input_ids seq_len={input_ids.shape[1]} not in expected {sorted(allowed_seq_lens)} "
+            f"(max_seq_len={max_seq_len}, sp_size={sp_size})"
+        )
+    for key in ("attention_mask", "position_ids"):
+        if key in teacher_inputs:
+            val = teacher_inputs[key]
+            if not isinstance(val, torch.Tensor):
+                return f"{key} is not a tensor"
+            if val.dim() == 2:
+                expected_shapes = {
+                    (input_ids.shape[0], expected_local_len),
+                    (input_ids.shape[0], max_seq_len),
+                    (input_ids.shape[0], padded_full_len),
+                }
+                if tuple(val.shape) not in expected_shapes:
+                    return (
+                        f"{key} shape {tuple(val.shape)} mismatched with expected "
+                        f"{sorted(expected_shapes)}"
+                    )
+            elif val.dim() >= 3:
+                if val.shape[-1] not in (expected_local_len, max_seq_len, padded_full_len):
+                    return (
+                        f"{key} last_dim={val.shape[-1]} mismatched with "
+                        f"expected seq len {expected_local_len} or {max_seq_len} or {padded_full_len}"
+                    )
+    for key, val in teacher_inputs.items():
+        if not isinstance(val, torch.Tensor):
+            return f"non-tensor input detected: {key}"
+    return None
+
+
+def _build_teacher_cuda_graph(
+    teacher_model: torch.nn.Module,
+    teacher_inputs: Dict[str, torch.Tensor],
+    args: "Arguments",
+) -> _TeacherCudaGraphRunner | None:
+    skip_reason = _teacher_cudagraph_skip_reason(teacher_inputs, args)
+    if skip_reason:
+        logger.warning_rank0("Skip teacher CUDA graph capture: %s", skip_reason)
+        return None
+
+    warmup_iters = max(0, int(getattr(args.distill, "teacher_cuda_graph_warmup_iters", 3)))
+    static_inputs: Dict[str, torch.Tensor] = {
+        key: torch.empty_like(val) for key, val in teacher_inputs.items()
+    }
+    for key in static_inputs:
+        static_inputs[key].copy_(teacher_inputs[key], non_blocking=True)
+
+    try:
+        with torch.no_grad():
+            for _ in range(warmup_iters):
+                teacher_model(**static_inputs, use_cache=False)
+            torch.cuda.synchronize()
+            graph = torch.cuda.CUDAGraph()
+            with torch.cuda.graph(graph):
+                static_outputs = teacher_model(**static_inputs, use_cache=False)
+    except Exception as exc:
+        logger.warning_rank0("Teacher CUDA graph capture failed: %s", exc)
+        return None
+
+    return _TeacherCudaGraphRunner(
+        graph=graph,
+        static_inputs=static_inputs,
+        static_outputs=static_outputs,
+        input_keys=list(static_inputs.keys()),
+    )
 
 
 def _compute_logit_divergence(
@@ -688,6 +828,14 @@ class DistillArguments:
         default=1.0,
         metadata={"help": "KD temperature for logits."},
     )
+    enable_teacher_cuda_graph: bool = field(
+        default=False,
+        metadata={"help": "Enable CUDA graph replay for teacher forward (fixed shapes only)."},
+    )
+    teacher_cuda_graph_warmup_iters: int = field(
+        default=3,
+        metadata={"help": "Warmup iterations before capturing teacher CUDA graph."},
+    )
 
 
 @dataclass
@@ -998,6 +1146,27 @@ def main():
         logger.info_rank0("KD teacher model forced to bfloat16 to reduce memory usage.")
         teacher_model.eval()
         teacher_model.requires_grad_(False)
+    teacher_graph = None
+    teacher_graph_failed = False
+    if kd_enabled and args.distill.enable_teacher_cuda_graph:
+        if get_device_type() != "cuda" or not torch.cuda.is_available():
+            logger.warning_rank0("Teacher CUDA graph requested but CUDA is unavailable; disabling.")
+            teacher_graph_failed = True
+        else:
+            ps = get_parallel_state()
+            sp_size = ps.sp_size if ps.sp_enabled else 1
+            max_seq_len = int(args.data.max_seq_len)
+            padded_full_len = ((max_seq_len + sp_size - 1) // sp_size) * sp_size
+            expected_local_len = padded_full_len // sp_size
+            logger.info_rank0(
+                "Teacher CUDA graph enabled (fixed shapes): micro_batch_size=%s, "
+                "max_seq_len=%s, sp_size=%s, local_seq_len=%s, warmup_iters=%s",
+                args.train.micro_batch_size,
+                max_seq_len,
+                sp_size,
+                expected_local_len,
+                args.distill.teacher_cuda_graph_warmup_iters,
+            )
     # <------QAT并行与开关管理设计-------->
     # 设置量化开关：初始化时 use_weight_quant=False，用于前期预热；在 warmup_steps 后切换为 True。
     # 渐进量化：如果使用 GradualQuantizer，创建 GradualQuantContext(total_steps=train_steps*num_epochs, warmup_steps=qat_warmup)，在训练循环中 step(step_id) 更新 quantization_position_ratio。
@@ -1310,6 +1479,8 @@ def main():
     # 在每个 global_step 开始时调用 qat_sched.step(global_step) 以更新 ratio；在 warmup 结束时 set_quant_state(model, weight_quant=True) 启用假量化。
     # 可选：按 step 动态调整 n_bits/group_size（如后续扩展）或只更新 quantization_position_ratio。
     for epoch in range(start_epoch, args.train.num_train_epochs):
+        if global_step == 50:
+            helper.empty_cache()
         if hasattr(train_dataloader, "set_epoch"):
             train_dataloader.set_epoch(epoch)
 
@@ -1321,12 +1492,40 @@ def main():
             disable=args.train.local_rank != 0,
         )
         data_iterator = iter(train_dataloader)
+        pending_micro_batches = None
+        if (
+            kd_enabled
+            and args.distill.enable_teacher_cuda_graph
+            and teacher_model is not None
+            and teacher_graph is None
+            and not teacher_graph_failed
+        ):
+            try:
+                pending_micro_batches = next(data_iterator)
+                warmup_batch = {k: v for k, v in pending_micro_batches[0].items()}
+                teacher_inputs = _prepare_teacher_inputs(warmup_batch, args.data.enable_multisource)
+                teacher_graph = _build_teacher_cuda_graph(
+                    teacher_model=teacher_model,
+                    teacher_inputs=teacher_inputs,
+                    args=args,
+                )
+                if teacher_graph is None:
+                    teacher_graph_failed = True
+                else:
+                    logger.info_rank0("Teacher CUDA graph captured and warmed up.")
+            except StopIteration:
+                logger.warning_rank0("No batch available for teacher CUDA graph warmup; disabling.")
+                teacher_graph_failed = True
         for _ in range(start_step, args.train.train_steps):
             global_step += 1
 
             try:
                 with _record_function("data_load"):
-                    micro_batches: List[Dict[str, Any]] = next(data_iterator)
+                    if pending_micro_batches is not None:
+                        micro_batches = pending_micro_batches
+                        pending_micro_batches = None
+                    else:
+                        micro_batches = next(data_iterator)
             except StopIteration:
                 logger.info(f"epoch:{epoch} Dataloader finished with drop_last {args.data.drop_last}")
                 break
@@ -1406,9 +1605,19 @@ def main():
                             combined_loss = task_loss
                             kd_loss = None
                             if teacher_model is not None:
-                                teacher_inputs = {k: v for k, v in micro_batch.items() if k != "labels"}
+                                teacher_inputs = _prepare_teacher_inputs(
+                                    micro_batch, args.data.enable_multisource
+                                )
                                 with torch.no_grad():
-                                    teacher_out = teacher_model(**teacher_inputs, use_cache=False)
+                                    if teacher_graph is not None:
+                                        if not teacher_graph.matches(teacher_inputs):
+                                            raise RuntimeError(
+                                                "Teacher CUDA graph input mismatch; "
+                                                "check max_seq_len/sp_size or disable graph."
+                                            )
+                                        teacher_out = teacher_graph.replay(teacher_inputs)
+                                    else:
+                                        teacher_out = teacher_model(**teacher_inputs, use_cache=False)
                                 kd_loss = _compute_kd_loss(
                                     student_logits=getattr(student_out, "logits", None),
                                     teacher_logits=getattr(teacher_out, "logits", None),
@@ -1703,7 +1912,9 @@ def main():
             except ImportError:
                 from export_tritonv2_quant import export_tritonv2_quantized_checkpoint
 
-            export_dst = os.path.join(args.train.save_checkpoint_path, "out")
+            export_root = save_checkpoint_path if save_checkpoint_path is not None else args.train.save_checkpoint_path
+            export_dst = os.path.join(export_root, "out")
+            export_dst_dequant = os.path.join(export_root, "out_dequant")
             logger.info_rank0(
                 "Exporting tritonv2 quantized checkpoint: src=%s -> dst=%s (bits=%s, group_size=%s, pack_dtype=%s)",
                 hf_weights_path,
@@ -1715,6 +1926,8 @@ def main():
             export_summary = export_tritonv2_quantized_checkpoint(
                 src=hf_weights_path,
                 dst=export_dst,
+                dst_dequant=export_dst_dequant,
+                save_dequant=True,
                 bits=int(args.quantizer.n_bits),
                 group_size=int(args.quantizer.group_size),
                 pack_dtype="int32",
@@ -1727,6 +1940,10 @@ def main():
                 len(export_summary.get("skipped_modules", [])),
                 os.path.join(export_dst, "quantize_config.json"),
             )
+            fixed_dequant = os.path.join(args.train.save_checkpoint_path, "out_dequant")
+            if os.path.isdir(export_dst_dequant):
+                shutil.copytree(export_dst_dequant, fixed_dequant, dirs_exist_ok=True)
+                logger.info_rank0("Synced dequant checkpoint to fixed path: %s", fixed_dequant)
         except Exception as e:
             logger.warning_rank0("TritonV2 export failed: %s", e)
 

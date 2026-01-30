@@ -93,12 +93,21 @@ class BaseQuantLinear(nn.Module):
         self.group_size = group_size if group_size != -1 else in_features
         self.bits = bits
         self.desc_act = desc_act
+        self.sym = bool(sym)
         self.pack_dtype = pack_dtype
         self.backend = backend
         self.maxq = 2**self.bits - 1
         self.pack_dtype = pack_dtype
         self.adapter = None
         self.optimized = False
+        self.dequant_dtype = torch.bfloat16
+        if self.sym:
+            # Triton packed weights use signed b-bit range in two's complement.
+            self.qmin = -(1 << (self.bits - 1))
+            self.qmax = (1 << (self.bits - 1)) - 1
+        else:
+            self.qmin = 0
+            self.qmax = self.maxq
 
         if self.pack_dtype == torch.int8:
             self.pack_dtype_bits = 8

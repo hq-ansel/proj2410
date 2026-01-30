@@ -153,6 +153,8 @@ def load_tritonv2_quantized_model(
         group_size = int(qcfg["group_size"]) if qcfg.get("group_size") is not None else None
         pack_dtype = _parse_pack_dtype(qcfg.get("pack_dtype", "int32"))
         converted = qcfg.get("converted_modules") or []
+        sym = bool(qcfg.get("sym", False))
+        sym_by_module = qcfg.get("sym_by_module", {}) or {}
         if qcfg.get("excluded_patterns"):
             exclude_patterns = list(exclude_patterns) + list(qcfg["excluded_patterns"])
     else:
@@ -161,6 +163,8 @@ def load_tritonv2_quantized_model(
         group_size = None
         pack_dtype = torch.int32
         converted = []
+        sym = False
+        sym_by_module = {}
 
     state = _load_state_dict(model_dir)
     prefixes = converted or _discover_quantized_prefixes(state)
@@ -204,7 +208,7 @@ def load_tritonv2_quantized_model(
             bits=bits,
             group_size=group_size if group_size is not None else mod.in_features,
             desc_act=False,
-            sym=False,
+            sym=bool(sym_by_module.get(prefix, sym)),
             in_features=mod.in_features,
             out_features=mod.out_features,
             bias=mod.bias is not None,

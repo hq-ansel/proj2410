@@ -31,6 +31,7 @@ def dequant_kernel(
     out_features: tl.constexpr,
     num_groups: tl.constexpr,
     X_BLOCK: tl.constexpr,
+    sym: tl.constexpr,
 ):
     # Block indexing
     """
@@ -83,22 +84,27 @@ def dequant_kernel(
     # Unpack weights
     weights = (qweights >> wf_weights) & maxq  # bit shift qweight
 
-    # Unpack zeros
-    qzero_ncols: tl.constexpr = out_features // elements_per_feature
-    qzeros = tl.load(
-        qzeros_ptr + ((qzero_ncols * groups) + (col_idx // elements_per_feature)),
-        None,
-        eviction_policy="evict_last",
-    )
-    zeros = (qzeros >> wf_zeros) & maxq
-
-    # Dequantize
-    weights = (weights - zeros).to(tl.float32) * scales
+    if sym:
+        sign_bit = (1 << (bits - 1))
+        full_range = (1 << bits)
+        weights = tl.where(weights >= sign_bit, weights - full_range, weights)
+        weights = weights.to(tl.float32) * scales
+    else:
+        # Unpack zeros
+        qzero_ncols: tl.constexpr = out_features // elements_per_feature
+        qzeros = tl.load(
+            qzeros_ptr + ((qzero_ncols * groups) + (col_idx // elements_per_feature)),
+            None,
+            eviction_policy="evict_last",
+        )
+        zeros = (qzeros >> wf_zeros) & maxq
+        # Dequantize
+        weights = (weights - zeros).to(tl.float32) * scales
 
     tl.store(out_ptr + (x_index), weights, mask=xmask)
 
 
-def dequant(qweight, scales, qzeros, g_idx, bits, pack_bits, maxq):
+def dequant(qweight, scales, qzeros, g_idx, bits, pack_bits, maxq, sym: bool = False):
     """
     Launcher for triton dequant kernel.  Only valid for bits = 2, 4, 8
     """
@@ -123,12 +129,13 @@ def dequant(qweight, scales, qzeros, g_idx, bits, pack_bits, maxq):
         bits=bits,
         out_features=out_features,
         num_groups=num_groups,
+        sym=sym,
     )
     return out
 
 
-def quant_matmul(input, qweight, scales, qzeros, g_idx, bits, pack_bits, maxq, transpose=False):
-    weight = dequant(qweight, scales, qzeros, g_idx, bits, pack_bits, maxq)
+def quant_matmul(input, qweight, scales, qzeros, g_idx, bits, pack_bits, maxq, transpose=False, sym: bool = False):
+    weight = dequant(qweight, scales, qzeros, g_idx, bits, pack_bits, maxq, sym=sym)
     if transpose:
         return input @ weight.t()
     return input @ weight

@@ -330,19 +330,28 @@ def reinit_quant_params(model: nn.Module) -> None:
     for m in model.modules():
         if isinstance(m, IntQuantLinear) and m.weight_quantizer is not None:
             q = m.weight_quantizer
-            scale, zp = q.init_with_weight(m.weight, q.n_bits, q.group_size, clamp_method=q.clamp_method)
-            if scale is None or zp is None:
+            scale, zp = q.init_with_weight(
+                m.weight,
+                q.n_bits,
+                q.group_size,
+                clamp_method=q.clamp_method,
+                symmetric=getattr(q, "symmetric", False),
+            )
+            if scale is None:
                 continue
             scale = scale.to(device=m.weight.device, dtype=m.weight.dtype)
-            zp = zp.to(device=m.weight.device, dtype=m.weight.dtype)
             if hasattr(q, "scale") and isinstance(q.scale, nn.Parameter):
                 q.scale.data.copy_(scale)
             else:
                 q.scale = nn.Parameter(scale)
-            if hasattr(q, "zero_point") and isinstance(q.zero_point, nn.Parameter):
-                q.zero_point.data.copy_(zp)
+            if zp is None:
+                q.register_parameter("zero_point", None)
             else:
-                q.zero_point = nn.Parameter(zp)
+                zp = zp.to(device=m.weight.device, dtype=m.weight.dtype)
+                if hasattr(q, "zero_point") and isinstance(q.zero_point, nn.Parameter):
+                    q.zero_point.data.copy_(zp)
+                else:
+                    q.zero_point = nn.Parameter(zp)
         elif isinstance(m, IntQuantLinearInfra):
             # For Infra, we use UniformAffineQuantizer's static method to init
             scale, zp = UniformAffineQuantizer.init_with_weight(

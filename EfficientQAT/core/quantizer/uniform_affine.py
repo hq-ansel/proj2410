@@ -36,10 +36,17 @@ class UniformAffineQuantizer(BaseQuantizer):
         self.stat_quant = config.stat_quant
 
         scale, zp = BaseQuantizer.init_with_weight(
-            weight, self.n_bits, self.group_size, clamp_method=self.clamp_method
+            weight,
+            self.n_bits,
+            self.group_size,
+            clamp_method=self.clamp_method,
+            symmetric=self.symmetric,
         )
         self.scale = nn.Parameter(scale)
-        self.zero_point = nn.Parameter(zp)
+        if zp is None:
+            self.register_parameter("zero_point", None)
+        else:
+            self.zero_point = nn.Parameter(zp)
 
         if self.is_tracking:
             self.weight_freeze_tracker = TrackOscillation(

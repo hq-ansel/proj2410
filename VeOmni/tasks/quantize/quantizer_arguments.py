@@ -28,6 +28,10 @@ class QuantizerArguments:
         default="ste",
         metadata={"help": "Rounding method used inside quantizer."},
     )
+    symmetric: bool = field(
+        default=False,
+        metadata={"help": "Enable symmetric quantization (zero_point=None)."},
+    )
     stat_quant: bool = field(
         default=False,
         metadata={"help": "Whether to record quantization statistics (amax/mean diff)."},

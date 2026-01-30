@@ -54,6 +54,7 @@ quantizer:
   group_size: 64
   clamp_method: STE
   round_method: ste
+  symmetric: false
   quant_lr: 0.0001
 
   # Gradual quantization configuration

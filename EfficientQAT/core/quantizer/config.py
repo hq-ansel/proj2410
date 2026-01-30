@@ -12,6 +12,7 @@ class QuantConfig:
         group_size (int): 分组大小 (默认: 128)
         clamp_method (str): 截断方法 ('STE' 或 'MAD') (默认: 'STE')
         round_method (str): 舍入方法 ('ste' 或 'highpass') (默认: 'ste')
+        symmetric (bool): 是否启用对称量化 (默认: False)
         stat_quant (bool): 是否统计量化信息 (默认: False)
         iterative_freezing (bool): 是否启用渐进式冻结 (默认: False)
         iterative_freezing_sheduler (str): 冻结调度器类型 ('linear' 或 'step') (默认: 'linear')
@@ -31,6 +32,7 @@ class QuantConfig:
     group_size: int = 128  # 分组大小
     clamp_method: str = "STE"  # "STE" | "MAD" - 截断方法
     round_method: str = "ste"  # "ste" | "highpass" - 舍入方法
+    symmetric: bool = False  # 是否启用对称量化
 
     stat_quant: bool = False  # 是否统计量化信息
 

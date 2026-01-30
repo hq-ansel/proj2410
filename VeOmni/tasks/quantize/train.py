@@ -818,6 +818,7 @@ def main():
         group_size=args.quantizer.group_size,
         clamp_method=args.quantizer.clamp_method,
         round_method=args.quantizer.round_method,
+        symmetric=getattr(args.quantizer, "symmetric", False),
         stat_quant=args.quantizer.stat_quant,
         iterative_freezing=args.quantizer.iterative_freezing,
         iterative_freezing_sheduler=args.quantizer.iterative_freezing_sheduler,

@@ -30,9 +30,8 @@ class BaseQuantizer(nn.Module):
 
         # 使用直接参数覆盖配置对象中的值（如果提供了）
         self.n_bits = config.n_bits
-        # 当前的配置模式是非对称量化
-        self.qmin = 0
-        self.qmax = (1 << self.n_bits) - 1
+        self.symmetric = bool(getattr(config, "symmetric", False))
+        self._set_qrange(self.n_bits)
         self.group_size = group_size if group_size is not None else config.group_size
         self.enable = enable if enable is not None else config.enable
         self.clamp_method = clamp_method if clamp_method is not None else config.clamp_method
@@ -48,15 +47,23 @@ class BaseQuantizer(nn.Module):
             n_bits: 新的量化位数
         """
         self.n_bits = n_bits
-        self.qmin = 0
-        self.qmax = (1 << n_bits) - 1
+        self._set_qrange(n_bits)
+
+    def _set_qrange(self, n_bits: int) -> None:
+        if self.symmetric:
+            self.qmin = -((1 << n_bits) - 1)
+            self.qmax = (1 << n_bits) - 1
+        else:
+            self.qmin = 0
+            self.qmax = (1 << n_bits) - 1
 
     @staticmethod
     def init_with_weight(weight: torch.Tensor,
                         n_bits: int,
                         group_size: int,
-                        clamp_method: str = "STE"
-                        ) -> Tuple[torch.Tensor, torch.Tensor]:
+                        clamp_method: str = "STE",
+                        symmetric: bool = False
+                        ) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
         """根据权重初始化 scale 和 zero_point
 
         Args:
@@ -64,10 +71,11 @@ class BaseQuantizer(nn.Module):
             n_bits: 量化位数
             group_size: 分组大小
             clamp_method: 截断方法
+            symmetric: 是否启用对称量化
 
         Returns:
             scale: 缩放因子, shape: [num_groups, 1]
-            zero_point: 零点偏移, shape: [num_groups, 1]
+            zero_point: 零点偏移, shape: [num_groups, 1] 或 None
         """
         if weight is None:
             print("weight is None")
@@ -80,6 +88,14 @@ class BaseQuantizer(nn.Module):
             # xmin, xmax: [num_groups, 1]
             xmin = x.amin([-1], keepdim=True)
             xmax =  x.amax([-1], keepdim=True)
+            if symmetric:
+                max_abs = torch.max(xmin.abs(), xmax.abs())
+                scale = max_abs / ((1 << n_bits) - 1)
+                if clamp_method == "STE":
+                    scale = clamp_ste(scale, 1e-4, 1e4)
+                elif clamp_method == "MAD":
+                    scale = clamp_mad(scale, 1e-4, 1e4)
+                return scale, None
             # x_range, scale: [num_groups, 1]
             x_range = xmax - xmin
             # scale shape [num_groups, 1]
@@ -95,17 +111,17 @@ class BaseQuantizer(nn.Module):
 
     def cal_qparams(self,
                     scale: torch.Tensor,
-                    zero_point: torch.Tensor,
-                    ) -> Tuple[torch.Tensor, torch.Tensor]:
+                    zero_point: Optional[torch.Tensor],
+                    ) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
         """计算量化参数（scale 和 zero_point）并应用截断
 
         Args:
             scale: 缩放因子, shape: [num_groups, 1]
-            zero_point: 零点偏移, shape: [num_groups, 1]
+            zero_point: 零点偏移, shape: [num_groups, 1] 或 None
 
         Returns:
             scale: 截断后的缩放因子, shape: [num_groups, 1]
-            round_zero_point: 截断并舍入后的零点, shape: [num_groups, 1]
+            round_zero_point: 截断并舍入后的零点, shape: [num_groups, 1] 或 None
         """
         min_scale = 1e-5
         max_scale = 1e4
@@ -113,11 +129,17 @@ class BaseQuantizer(nn.Module):
             scale_dtype = scale.dtype
             sign = torch.where(scale >= 0, torch.ones_like(scale), -torch.ones_like(scale))
             scale = clamp_ste(scale.abs(), min_scale, max_scale).to(scale_dtype) * sign
-            round_zero_point = clamp_ste(round_ste(zero_point), self.qmin, self.qmax)
+            if zero_point is None:
+                round_zero_point = None
+            else:
+                round_zero_point = clamp_ste(round_ste(zero_point), self.qmin, self.qmax)
         elif self.clamp_method == "MAD":
             sign = torch.where(scale >= 0, torch.ones_like(scale), -torch.ones_like(scale))
             scale = clamp_mad(scale.abs(), min_scale, max_scale) * sign
-            round_zero_point = clamp_mad(round_ste(zero_point), self.qmin, self.qmax)
+            if zero_point is None:
+                round_zero_point = None
+            else:
+                round_zero_point = clamp_mad(round_ste(zero_point), self.qmin, self.qmax)
         # # 检查 round_zero_point 是否超出范围
         # if (round_zero_point < self.qmin).any() or (round_zero_point > self.qmax).any():
         #     # 找出越界的位置和值

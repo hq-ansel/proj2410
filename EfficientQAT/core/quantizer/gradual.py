@@ -198,7 +198,10 @@ class GradualQuantizer(GradualMixin, UniformAffineQuantizer):
             selected_indices = torch.nonzero(mask, as_tuple=True)[0]
             x_quant = torch.index_select(x, 0, selected_indices)
             selected_scale = torch.index_select(scale, 0, selected_indices)
-            selected_zp = torch.index_select(round_zero_point, 0, selected_indices)
+            if round_zero_point is None:
+                selected_zp = None
+            else:
+                selected_zp = torch.index_select(round_zero_point, 0, selected_indices)
 
             x_int = self._quantize(x_quant, selected_scale, selected_zp)
             if self.is_tracking:
@@ -245,7 +248,10 @@ class GradualQuantizer(GradualMixin, UniformAffineQuantizer):
 
         # 只选择对应的 scale 和 zero_point，避免广播问题
         selected_scale = torch.index_select(scale, 0, selected_indices)
-        selected_zp = torch.index_select(round_zero_point, 0, selected_indices)
+        if round_zero_point is None:
+            selected_zp = None
+        else:
+            selected_zp = torch.index_select(round_zero_point, 0, selected_indices)
 
         x_int = self._quantize(x_quant, selected_scale, selected_zp)
         if self.is_tracking:

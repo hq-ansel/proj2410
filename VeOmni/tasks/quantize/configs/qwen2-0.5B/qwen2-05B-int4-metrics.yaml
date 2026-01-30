@@ -6,7 +6,7 @@ data:
   dataloader_type: native
   datasets_type: mapping
   data_type: plaintext
-  max_seq_len: 4096
+  max_seq_len: 1024
   text_keys: text
   drop_last: true
 

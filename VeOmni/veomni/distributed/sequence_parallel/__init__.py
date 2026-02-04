@@ -46,6 +46,17 @@ from .data import (
     sp_pad_and_slice,
 )
 from .loss import reduce_sequence_parallel_loss
+from .ring_attn import (
+    is_ring_flash_attn_available,
+    init_ring_attention,
+    get_ring_attention_group,
+    substitute_hf_ring_attn,
+    update_ring_attn_cu_seqlens,
+    get_ring_attn_cu_seqlens,
+    ring_flash_attn_forward,
+    prepare_inputs_for_ring_attn,
+    gather_outputs_from_ring_attn,
+)
 from .ulysses import (
     all_to_all_images,
     gather_heads_scatter_seq,
@@ -88,4 +99,14 @@ __all__ = [
     "async_ulysses_output_projection",
     "divide_qkv_linear_weight",
     "divide_qkv_linear_bias",
+    # Ring attention exports
+    "is_ring_flash_attn_available",
+    "init_ring_attention",
+    "get_ring_attention_group",
+    "substitute_hf_ring_attn",
+    "update_ring_attn_cu_seqlens",
+    "get_ring_attn_cu_seqlens",
+    "ring_flash_attn_forward",
+    "prepare_inputs_for_ring_attn",
+    "gather_outputs_from_ring_attn",
 ]

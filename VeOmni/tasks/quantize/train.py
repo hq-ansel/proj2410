@@ -434,6 +434,376 @@ def _get_kd_skip_reason(
     return None
 
 
+def _get_multistep_loss_weights(
+    num_steps: int,
+    weight_scheme: str,
+    decay_factor: float = 0.9,
+) -> List[float]:
+    """Generate loss weights for multi-step KD based on the weighting scheme."""
+    if num_steps <= 0:
+        return []
+    if weight_scheme == "decay":
+        # Later steps have lower weight (exponential decay)
+        weights = [decay_factor ** i for i in range(num_steps)]
+    elif weight_scheme == "increase":
+        # Later steps have higher weight (exponential increase)
+        weights = [decay_factor ** (num_steps - 1 - i) for i in range(num_steps)]
+    else:  # uniform
+        weights = [1.0] * num_steps
+    # Normalize weights to sum to 1
+    total = sum(weights)
+    return [w / total for w in weights]
+
+
+def _compute_multistep_kd_loss_windowed(
+    student_logits: torch.Tensor,
+    teacher_logits: torch.Tensor,
+    labels: torch.Tensor | None,
+    num_steps: int,
+    stride: int,
+    temperature: float,
+    loss_weights: List[float],
+) -> tuple[torch.Tensor | None, Dict[str, float]]:
+    """
+    Compute multi-step windowed KD loss on pre-computed logits.
+    
+    This is a sliding window approach that divides the sequence into multiple
+    windows and computes KD loss for each window. This builds longer-range
+    dependencies by ensuring the model learns to align with teacher across
+    different positions in the sequence.
+    
+    Args:
+        student_logits: Student model logits [batch, seq_len, vocab]
+        teacher_logits: Teacher model logits [batch, seq_len, vocab]
+        labels: Labels for loss masking [batch, seq_len]
+        num_steps: Number of windows to compute KD loss
+        stride: Size of each window (number of tokens)
+        temperature: KD temperature
+        loss_weights: Weight for each window's KD loss
+        
+    Returns:
+        Tuple of (total_kd_loss, metrics_dict)
+    """
+    if student_logits is None or teacher_logits is None:
+        return None, {}
+    if student_logits.shape != teacher_logits.shape:
+        return None, {}
+    if num_steps <= 0 or stride <= 0:
+        return None, {}
+    
+    batch_size, seq_len, vocab_size = student_logits.shape
+    
+    # Accumulate KD losses across windows
+    total_kd_loss = None
+    step_losses = []
+    metrics = {}
+    
+    temperature = float(temperature)
+    if temperature <= 0.0:
+        temperature = 1.0
+    
+    # Compute KD loss for each window
+    for step_idx in range(num_steps):
+        window_start = step_idx * stride
+        window_end = min((step_idx + 1) * stride, seq_len)
+        
+        if window_start >= seq_len:
+            break
+        
+        # Extract logits for this window
+        student_window = student_logits[:, window_start:window_end, :].float() / temperature
+        teacher_window = teacher_logits[:, window_start:window_end, :].float() / temperature
+        
+        # Apply label mask if available
+        if labels is not None:
+            labels_window = labels[:, window_start:window_end].reshape(-1)
+            mask = labels_window != -100
+            if mask.any():
+                student_window = student_window.reshape(-1, vocab_size)[mask]
+                teacher_window = teacher_window.reshape(-1, vocab_size)[mask]
+            else:
+                # Skip this window if all labels are masked
+                continue
+        else:
+            student_window = student_window.reshape(-1, vocab_size)
+            teacher_window = teacher_window.reshape(-1, vocab_size)
+        
+        # Compute KD loss for this window
+        window_kd_loss = F.kl_div(
+            F.log_softmax(student_window, dim=-1),
+            F.softmax(teacher_window, dim=-1),
+            reduction="batchmean",
+        )
+        window_kd_loss = _to_local_tensor(window_kd_loss * (temperature ** 2))
+        
+        # Apply weight
+        weight = loss_weights[step_idx] if step_idx < len(loss_weights) else loss_weights[-1]
+        weighted_loss = weight * window_kd_loss
+        step_losses.append(window_kd_loss.item())
+        
+        if total_kd_loss is None:
+            total_kd_loss = weighted_loss
+        else:
+            total_kd_loss = total_kd_loss + weighted_loss
+    
+    # Collect metrics
+    if step_losses:
+        metrics["multistep_kd/num_windows"] = len(step_losses)
+        metrics["multistep_kd/mean_window_loss"] = sum(step_losses) / len(step_losses)
+        for i, loss_val in enumerate(step_losses):
+            metrics[f"multistep_kd/window_{i}_loss"] = loss_val
+    
+    return total_kd_loss, metrics
+
+
+def _teacher_generate_tokens(
+    teacher_model: torch.nn.Module,
+    input_ids: torch.Tensor,
+    attention_mask: torch.Tensor | None,
+    num_new_tokens: int,
+    temperature: float = 1.0,
+    do_sample: bool = False,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """
+    Teacher model generates new tokens autoregressively.
+    
+    Args:
+        teacher_model: The FP teacher model
+        input_ids: Input token IDs [batch, seq_len]
+        attention_mask: Attention mask [batch, seq_len]
+        num_new_tokens: Number of new tokens to generate
+        temperature: Sampling temperature
+        do_sample: Whether to sample or use greedy decoding
+        
+    Returns:
+        Tuple of (extended_input_ids, all_logits)
+        - extended_input_ids: [batch, seq_len + num_new_tokens]
+        - all_logits: [batch, num_new_tokens, vocab_size] - logits for each generated position
+    """
+    batch_size, orig_seq_len = input_ids.shape
+    device = input_ids.device
+    
+    current_ids = input_ids.clone()
+    current_mask = attention_mask.clone() if attention_mask is not None else None
+    
+    all_logits = []
+    
+    with torch.no_grad():
+        for step in range(num_new_tokens):
+            # Forward pass
+            outputs = teacher_model(
+                input_ids=current_ids,
+                attention_mask=current_mask,
+                use_cache=False,
+            )
+            
+            # Get logits for the last position
+            next_token_logits = outputs.logits[:, -1, :]  # [batch, vocab]
+            all_logits.append(next_token_logits)
+            
+            # Generate next token
+            if do_sample and temperature > 0:
+                probs = F.softmax(next_token_logits / temperature, dim=-1)
+                next_token = torch.multinomial(probs, num_samples=1)
+            else:
+                next_token = next_token_logits.argmax(dim=-1, keepdim=True)
+            
+            # Append to sequence
+            current_ids = torch.cat([current_ids, next_token], dim=1)
+            if current_mask is not None:
+                new_mask = torch.ones(batch_size, 1, device=device, dtype=current_mask.dtype)
+                current_mask = torch.cat([current_mask, new_mask], dim=1)
+    
+    # Stack all logits: [batch, num_new_tokens, vocab]
+    all_logits = torch.stack(all_logits, dim=1)
+    
+    return current_ids, all_logits
+
+
+def _compute_multistep_kd_loss_extrapolate(
+    student_model: torch.nn.Module,
+    teacher_model: torch.nn.Module,
+    input_ids: torch.Tensor,
+    attention_mask: torch.Tensor | None,
+    position_ids: torch.Tensor | None,
+    labels: torch.Tensor | None,
+    num_steps: int,
+    stride: int,
+    temperature: float,
+    loss_weights: List[float],
+    model_fwd_context,
+    sp_group: "dist.ProcessGroup | None" = None,
+) -> tuple[torch.Tensor | None, Dict[str, float]]:
+    """
+    Compute multi-step extrapolation KD loss.
+    
+    The teacher model generates new tokens beyond the original sequence,
+    then the student model learns to align with teacher's predictions
+    on this extended sequence. This builds long-range dependencies.
+    
+    Flow:
+    1. Teacher generates num_steps * stride new tokens
+    2. Student does forward on the extended sequence (original + generated)
+    3. Compute KD loss between student and teacher logits on generated positions
+    
+    Args:
+        student_model: The quantized student model
+        teacher_model: The FP teacher model  
+        input_ids: Input token IDs [batch, seq_len]
+        attention_mask: Attention mask [batch, seq_len]
+        position_ids: Position IDs [batch, seq_len]
+        labels: Labels (used for original sequence loss)
+        num_steps: Number of generation steps
+        stride: Tokens to generate per step
+        temperature: KD temperature
+        loss_weights: Weight for each step's KD loss
+        model_fwd_context: Context manager for model forward
+        sp_group: Sequence parallel process group (for gather/scatter)
+        
+    Returns:
+        Tuple of (total_kd_loss, metrics_dict)
+    """
+    if num_steps <= 0 or stride <= 0:
+        return None, {}
+    
+    batch_size, orig_seq_len = input_ids.shape
+    device = input_ids.device
+    num_new_tokens = num_steps * stride
+    
+    metrics = {}
+    
+    # Handle sequence parallel: gather full sequence to rank 0
+    # For simplicity, we'll do generation on the full sequence
+    # In SP mode, each rank has a shard of the sequence
+    gathered_input_ids = input_ids
+    gathered_attention_mask = attention_mask
+    
+    if sp_group is not None and dist.get_world_size(sp_group) > 1:
+        # Gather input_ids across SP ranks
+        sp_size = dist.get_world_size(sp_group)
+        sp_rank = dist.get_rank(sp_group)
+        
+        # All-gather input_ids
+        gathered_list = [torch.zeros_like(input_ids) for _ in range(sp_size)]
+        dist.all_gather(gathered_list, input_ids, group=sp_group)
+        gathered_input_ids = torch.cat(gathered_list, dim=1)  # [batch, full_seq_len]
+        
+        if attention_mask is not None:
+            mask_list = [torch.zeros_like(attention_mask) for _ in range(sp_size)]
+            dist.all_gather(mask_list, attention_mask, group=sp_group)
+            gathered_attention_mask = torch.cat(mask_list, dim=1)
+    
+    # Step 1: Teacher generates new tokens
+    extended_ids, teacher_gen_logits = _teacher_generate_tokens(
+        teacher_model=teacher_model,
+        input_ids=gathered_input_ids,
+        attention_mask=gathered_attention_mask,
+        num_new_tokens=num_new_tokens,
+        temperature=1.0,  # Use greedy for generation
+        do_sample=False,
+    )
+    # extended_ids: [batch, orig_seq_len + num_new_tokens]
+    # teacher_gen_logits: [batch, num_new_tokens, vocab]
+    
+    metrics["multistep_kd/num_generated_tokens"] = num_new_tokens
+    
+    # Step 2: Teacher forward on extended sequence to get full logits
+    with torch.no_grad():
+        teacher_out = teacher_model(
+            input_ids=extended_ids,
+            attention_mask=torch.ones(batch_size, extended_ids.shape[1], device=device) 
+                if gathered_attention_mask is not None else None,
+            use_cache=False,
+        )
+        teacher_full_logits = teacher_out.logits  # [batch, orig_seq_len + num_new_tokens, vocab]
+    
+    # Step 3: Student forward on extended sequence
+    # Prepare extended attention mask and position ids
+    extended_seq_len = extended_ids.shape[1]
+    extended_attention_mask = None
+    if gathered_attention_mask is not None:
+        extended_attention_mask = torch.ones(batch_size, extended_seq_len, device=device, dtype=gathered_attention_mask.dtype)
+    
+    extended_position_ids = None
+    if position_ids is not None:
+        # Extend position ids
+        if sp_group is not None and dist.get_world_size(sp_group) > 1:
+            # Gather position_ids
+            sp_size = dist.get_world_size(sp_group)
+            pos_list = [torch.zeros_like(position_ids) for _ in range(sp_size)]
+            dist.all_gather(pos_list, position_ids, group=sp_group)
+            gathered_position_ids = torch.cat(pos_list, dim=1)
+        else:
+            gathered_position_ids = position_ids
+        
+        # Extend with new positions
+        last_pos = gathered_position_ids[:, -1:] + 1
+        new_positions = last_pos + torch.arange(num_new_tokens, device=device).unsqueeze(0)
+        extended_position_ids = torch.cat([gathered_position_ids, new_positions], dim=1)
+    
+    # Student forward
+    with model_fwd_context:
+        student_out = student_model(
+            input_ids=extended_ids,
+            attention_mask=extended_attention_mask,
+            position_ids=extended_position_ids,
+            use_cache=False,
+        )
+        student_full_logits = student_out.logits  # [batch, orig_seq_len + num_new_tokens, vocab]
+    
+    # Step 4: Compute KD loss on generated positions (step by step)
+    total_kd_loss = None
+    step_losses = []
+    
+    full_orig_seq_len = gathered_input_ids.shape[1]  # Full sequence length before generation
+    
+    for step_idx in range(num_steps):
+        # Position range for this step's generated tokens
+        # Logits at position i predict token at position i+1
+        # So for generated tokens at positions [full_orig_seq_len + step_idx*stride : full_orig_seq_len + (step_idx+1)*stride]
+        # We need logits at positions [full_orig_seq_len + step_idx*stride - 1 : full_orig_seq_len + (step_idx+1)*stride - 1]
+        logit_start = full_orig_seq_len + step_idx * stride - 1
+        logit_end = full_orig_seq_len + (step_idx + 1) * stride - 1
+        
+        if logit_start < 0:
+            logit_start = 0
+        if logit_end > student_full_logits.shape[1]:
+            logit_end = student_full_logits.shape[1]
+        
+        if logit_start >= logit_end:
+            break
+        
+        student_step_logits = student_full_logits[:, logit_start:logit_end, :]
+        teacher_step_logits = teacher_full_logits[:, logit_start:logit_end, :]
+        
+        # Compute KD loss for this step
+        step_kd_loss = _compute_kd_loss(
+            student_logits=student_step_logits,
+            teacher_logits=teacher_step_logits,
+            labels=None,  # No labels for generated tokens
+            temperature=temperature,
+        )
+        
+        if step_kd_loss is not None:
+            weight = loss_weights[step_idx] if step_idx < len(loss_weights) else loss_weights[-1]
+            weighted_loss = weight * step_kd_loss
+            step_losses.append(step_kd_loss.item())
+            
+            if total_kd_loss is None:
+                total_kd_loss = weighted_loss
+            else:
+                total_kd_loss = total_kd_loss + weighted_loss
+    
+    # Collect metrics
+    if step_losses:
+        metrics["multistep_kd/num_steps"] = len(step_losses)
+        metrics["multistep_kd/mean_step_loss"] = sum(step_losses) / len(step_losses)
+        for i, loss_val in enumerate(step_losses):
+            metrics[f"multistep_kd/step_{i}_loss"] = loss_val
+    
+    return total_kd_loss, metrics
+
+
 def _maybe_get_output_keys(output: object) -> str | None:
     if not hasattr(output, "keys"):
         return None
@@ -836,6 +1206,23 @@ class DistillArguments:
         default=3,
         metadata={"help": "Warmup iterations before capturing teacher CUDA graph."},
     )
+    # Multi-step distillation arguments
+    enable_multistep_kd: bool = field(
+        default=False,
+        metadata={"help": "Enable multi-step autoregressive distillation for long-range dependency."},
+    )
+    multistep_kd_steps: int = field(
+        default=4,
+        metadata={"help": "Number of autoregressive steps for multi-step KD."},
+    )
+    multistep_kd_stride: int = field(
+        default=1,
+        metadata={"help": "Token stride per autoregressive step (how many tokens to generate per step)."},
+    )
+    multistep_kd_loss_weight: str = field(
+        default="uniform",
+        metadata={"help": "Loss weighting scheme for multi-step KD: uniform | decay | increase."},
+    )
 
 
 @dataclass
@@ -1028,6 +1415,31 @@ def main():
         enable_forward_prefetch=args.train.enable_forward_prefetch,
         pp_input_shape=pp_input_shape,
     )
+    
+    # Substitute HF flash attention with ring attention if CP is enabled
+    ps = get_parallel_state()
+    if ps.cp_enabled:
+        from veomni.distributed.sequence_parallel import (
+            is_ring_flash_attn_available,
+            substitute_hf_ring_attn,
+        )
+        if is_ring_flash_attn_available():
+            # Get number of KV heads for GQA stride
+            num_kv_heads = getattr(model_config, "num_key_value_heads", None)
+            num_heads = getattr(model_config, "num_attention_heads", None)
+            heads_k_stride = 1
+            if num_kv_heads is not None and num_heads is not None and num_kv_heads < num_heads:
+                heads_k_stride = num_heads // num_kv_heads
+            substitute_hf_ring_attn(heads_k_stride=heads_k_stride)
+            logger.info_rank0(
+                f"Ring attention enabled for CP (cp_size={ps.cp_size}, heads_k_stride={heads_k_stride})"
+            )
+        else:
+            logger.warning_rank0(
+                "CP enabled but ring-flash-attn not available. "
+                "Install with: pip install ring-flash-attn"
+            )
+    
     reinit_quant_params(model)
     sanitize_quant_params(model)
     
@@ -1109,6 +1521,31 @@ def main():
     if kd_temperature <= 0.0:
         logger.warning_rank0("distill.kd_temperature=%s is <= 0; defaulting to 1.0.", kd_temperature)
         kd_temperature = 1.0
+
+    # Multi-step KD configuration
+    enable_multistep_kd = args.distill.enable_multistep_kd and kd_enabled
+    multistep_kd_steps = int(args.distill.multistep_kd_steps)
+    multistep_kd_stride = int(args.distill.multistep_kd_stride)
+    multistep_kd_loss_weights = []
+    if enable_multistep_kd:
+        if multistep_kd_steps <= 0:
+            logger.warning_rank0("multistep_kd_steps=%s <= 0; disabling multi-step KD.", multistep_kd_steps)
+            enable_multistep_kd = False
+        elif multistep_kd_stride <= 0:
+            logger.warning_rank0("multistep_kd_stride=%s <= 0; disabling multi-step KD.", multistep_kd_stride)
+            enable_multistep_kd = False
+        else:
+            multistep_kd_loss_weights = _get_multistep_loss_weights(
+                num_steps=multistep_kd_steps,
+                weight_scheme=args.distill.multistep_kd_loss_weight,
+            )
+            logger.info_rank0(
+                "Multi-step KD enabled: steps=%d, stride=%d, weight_scheme=%s, weights=%s",
+                multistep_kd_steps,
+                multistep_kd_stride,
+                args.distill.multistep_kd_loss_weight,
+                [f"{w:.4f}" for w in multistep_kd_loss_weights],
+            )
 
     teacher_model = None
     if kd_enabled:
@@ -1538,6 +1975,7 @@ def main():
             total_kd_loss = 0.0
             total_qweight_l2_reg = 0.0
             total_qweight_l2_scaled = 0.0
+            accumulated_multistep_kd_metrics: Dict[str, float] = {}
             debug_batch = None
             synchronize()
             start_time = time.time()
@@ -1593,6 +2031,21 @@ def main():
 
                     if debug_batch is None:
                         debug_batch = {k: v for k, v in micro_batch.items()}
+                    # For ring-flash-attn with CP, update cu_seqlens before each forward.
+                    ps = get_parallel_state()
+                    if ps.cp_enabled:
+                        try:
+                            from veomni.distributed.sequence_parallel import (
+                                is_ring_flash_attn_available,
+                                update_ring_attn_cu_seqlens,
+                            )
+                            if is_ring_flash_attn_available():
+                                cu_seqlens = micro_batch.get("cu_seq_lens_q")
+                                if cu_seqlens is not None:
+                                    update_ring_attn_cu_seqlens(cu_seqlens)
+                        except Exception:
+                            # Avoid breaking training if ring-flash-attn is unavailable.
+                            pass
                     micro_batch = {
                         k: v.to(get_device_type(), non_blocking=True) if isinstance(v, torch.Tensor) else v
                         for k, v in micro_batch.items()
@@ -1604,36 +2057,56 @@ def main():
                             task_loss = _to_local_tensor(task_loss)
                             combined_loss = task_loss
                             kd_loss = None
+                            multistep_kd_metrics = {}
                             if teacher_model is not None:
-                                teacher_inputs = _prepare_teacher_inputs(
-                                    micro_batch, args.data.enable_multisource
-                                )
-                                with torch.no_grad():
-                                    if teacher_graph is not None:
-                                        if not teacher_graph.matches(teacher_inputs):
-                                            raise RuntimeError(
-                                                "Teacher CUDA graph input mismatch; "
-                                                "check max_seq_len/sp_size or disable graph."
-                                            )
-                                        teacher_out = teacher_graph.replay(teacher_inputs)
-                                    else:
-                                        teacher_out = teacher_model(**teacher_inputs, use_cache=False)
-                                kd_loss = _compute_kd_loss(
-                                    student_logits=getattr(student_out, "logits", None),
-                                    teacher_logits=getattr(teacher_out, "logits", None),
-                                    labels=micro_batch.get("labels"),
-                                    temperature=kd_temperature,
-                                )
+                                if enable_multistep_kd:
+                                    # Multi-step extrapolation KD: teacher generates, student aligns
+                                    ps = get_parallel_state()
+                                    sp_group = ps.sp_group if ps.sp_enabled else None
+                                    kd_loss, multistep_kd_metrics = _compute_multistep_kd_loss_extrapolate(
+                                        student_model=model,
+                                        teacher_model=teacher_model,
+                                        input_ids=micro_batch["input_ids"],
+                                        attention_mask=micro_batch.get("attention_mask"),
+                                        position_ids=micro_batch.get("position_ids"),
+                                        labels=micro_batch.get("labels"),
+                                        num_steps=multistep_kd_steps,
+                                        stride=multistep_kd_stride,
+                                        temperature=kd_temperature,
+                                        loss_weights=multistep_kd_loss_weights,
+                                        model_fwd_context=model_fwd_context,
+                                        sp_group=sp_group,
+                                    )
+                                else:
+                                    # Single-step KD (original behavior)
+                                    teacher_inputs = _prepare_teacher_inputs(
+                                        micro_batch, args.data.enable_multisource
+                                    )
+                                    with torch.no_grad():
+                                        if teacher_graph is not None:
+                                            if not teacher_graph.matches(teacher_inputs):
+                                                raise RuntimeError(
+                                                    "Teacher CUDA graph input mismatch; "
+                                                    "check max_seq_len/sp_size or disable graph."
+                                                )
+                                            teacher_out = teacher_graph.replay(teacher_inputs)
+                                        else:
+                                            teacher_out = teacher_model(**teacher_inputs, use_cache=False)
+                                    kd_loss = _compute_kd_loss(
+                                        student_logits=getattr(student_out, "logits", None),
+                                        teacher_logits=getattr(teacher_out, "logits", None),
+                                        labels=micro_batch.get("labels"),
+                                        temperature=kd_temperature,
+                                    )
                                 if kd_loss is not None:
                                     combined_loss = (1.0 - kd_alpha) * task_loss + kd_alpha * kd_loss
                                 elif not kd_warning_emitted and args.train.global_rank == 0:
                                     kd_skip_reason = _get_kd_skip_reason(
                                         getattr(student_out, "logits", None),
-                                        getattr(teacher_out, "logits", None),
+                                        getattr(teacher_out, "logits", None) if not enable_multistep_kd else None,
                                         micro_batch.get("labels"),
                                     )
                                     student_keys = _maybe_get_output_keys(student_out)
-                                    teacher_keys = _maybe_get_output_keys(teacher_out)
                                     kd_skip_msg = (
                                         f"KD enabled but {kd_skip_reason}; skipping KD loss."
                                         if kd_skip_reason
@@ -1641,8 +2114,6 @@ def main():
                                     )
                                     if student_keys:
                                         kd_skip_msg = f"{kd_skip_msg} student_out.keys={student_keys}"
-                                    if teacher_keys:
-                                        kd_skip_msg = f"{kd_skip_msg} teacher_out.keys={teacher_keys}"
                                     logger.warning_rank0(kd_skip_msg)
                                     kd_warning_emitted = True
                             if enable_qweight_l2_reg:
@@ -1664,6 +2135,13 @@ def main():
                     total_task_loss += task_loss.item() / len(micro_batches)
                     if kd_loss is not None:
                         total_kd_loss += kd_loss.item() / len(micro_batches)
+                    # Accumulate multi-step KD metrics
+                    if multistep_kd_metrics:
+                        for key, val in multistep_kd_metrics.items():
+                            if key in accumulated_multistep_kd_metrics:
+                                accumulated_multistep_kd_metrics[key] += val / len(micro_batches)
+                            else:
+                                accumulated_multistep_kd_metrics[key] = val / len(micro_batches)
                     del micro_batch
 
             # Prefer model-provided clip_grad_norm_ (now both FSDP1 and FSDP2 registers custom grad norm clipping)
@@ -1823,6 +2301,9 @@ def main():
                         "training/kd_loss": total_kd_loss,
                     }
                 )
+                # Add multi-step KD metrics if available
+                if accumulated_multistep_kd_metrics:
+                    train_metrics.update(accumulated_multistep_kd_metrics)
 
             data_loader_tqdm.set_postfix_str(f"loss: {total_loss:.2f}, grad_norm: {grad_norm:.2f}, lr: {lr:.2e}")
             data_loader_tqdm.update()
@@ -1912,7 +2393,7 @@ def main():
             except ImportError:
                 from export_tritonv2_quant import export_tritonv2_quantized_checkpoint
 
-            export_root = save_checkpoint_path if save_checkpoint_path is not None else args.train.save_checkpoint_path
+            export_root = args.train.save_checkpoint_path
             export_dst = os.path.join(export_root, "out")
             export_dst_dequant = os.path.join(export_root, "out_dequant")
             logger.info_rank0(
@@ -1940,10 +2421,8 @@ def main():
                 len(export_summary.get("skipped_modules", [])),
                 os.path.join(export_dst, "quantize_config.json"),
             )
-            fixed_dequant = os.path.join(args.train.save_checkpoint_path, "out_dequant")
             if os.path.isdir(export_dst_dequant):
-                shutil.copytree(export_dst_dequant, fixed_dequant, dirs_exist_ok=True)
-                logger.info_rank0("Synced dequant checkpoint to fixed path: %s", fixed_dequant)
+                logger.info_rank0("Dequant checkpoint saved at: %s", export_dst_dequant)
         except Exception as e:
             logger.warning_rank0("TritonV2 export failed: %s", e)
 

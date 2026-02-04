@@ -95,9 +95,6 @@ class ParallelState:
         if not self.include_sp_in_fsdp:
             raise NotImplementedError("Decoupled sequence parallel has not been implemented.")
 
-        if self.cp_size > 1:
-            raise NotImplementedError("Ring attention is not supported yet.")
-
         if self.pp_size * self.dp_size * self.cp_size * self.ulysses_size * self.tp_size != self.world_size:
             raise ValueError("The product of parallel sizes should be equal to the world size.")
 
@@ -121,6 +118,18 @@ class ParallelState:
                     set_ulysses_sequence_parallel_group(self.device_mesh.get_group("ulysses"))
                 if self.cp_size > 1:
                     set_context_parallel_group(self.device_mesh.get_group("cp"))
+                    # Initialize ring attention for CP
+                    from ..distributed.sequence_parallel import (
+                        is_ring_flash_attn_available,
+                        init_ring_attention,
+                    )
+                    if is_ring_flash_attn_available():
+                        init_ring_attention(self.device_mesh.get_group("cp"))
+                    else:
+                        logger.warning_rank0(
+                            "ring-flash-attn not available. CP will use fallback implementation. "
+                            "Install with: pip install ring-flash-attn"
+                        )
                 # set unified sequence parallel group
                 set_unified_sequence_parallel_group(self.device_mesh.get_group("sp"))
             else:

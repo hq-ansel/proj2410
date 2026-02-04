@@ -1,5 +1,7 @@
 import os
 import sys
+import json
+import re
 from pathlib import Path
 # 将VeOmni的读取代码加入路径
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -13,7 +15,7 @@ import accelerate
 import torch
 import wandb
 from easydict import EasyDict
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
 
 from EfficientQAT.main_block_ap import evaluate
 
@@ -28,6 +30,141 @@ def load_quantized_model(path: str):
         device="cuda",
         dtype="float16",
     )
+    return model, tokenizer
+
+
+def _load_quantize_config(path: str):
+    cand = Path(path) / "quantize_config.json"
+    if cand.is_file():
+        with open(cand, "r", encoding="utf-8") as f:
+            return json.load(f)
+    # If path is hf_ckpt or nested, try to find sibling checkpoints/out
+    for parent in Path(path).parents:
+        alt = parent / "out" / "quantize_config.json"
+        if alt.is_file():
+            with open(alt, "r", encoding="utf-8") as f:
+                return json.load(f)
+    return None
+
+
+def _infer_bits_group_from_path(path: str):
+    bits = None
+    group_size = None
+    m = re.search(r"w(\d+)g(\d+)", path)
+    if m:
+        bits = int(m.group(1))
+        group_size = int(m.group(2))
+    if bits is None:
+        m = re.search(r"int(\d+)", path)
+        if m:
+            bits = int(m.group(1))
+    if bits is None:
+        bits = 8
+    if group_size is None:
+        group_size = 128
+    return bits, group_size
+
+
+def _find_latest_hf_ckpt(quant_path: str):
+    p = Path(quant_path).resolve()
+    checkpoints_dir = None
+    for parent in p.parents:
+        if parent.name == "checkpoints":
+            checkpoints_dir = parent
+            break
+    if checkpoints_dir is None or not checkpoints_dir.is_dir():
+        return None
+    candidates = []
+    for child in checkpoints_dir.iterdir():
+        if not child.is_dir():
+            continue
+        if not child.name.startswith("global_step_"):
+            continue
+        try:
+            step = int(child.name.split("_")[-1])
+        except ValueError:
+            continue
+        hf = child / "hf_ckpt"
+        if hf.is_dir():
+            candidates.append((step, hf))
+    if not candidates:
+        return None
+    candidates.sort(key=lambda x: x[0])
+    return str(candidates[-1][1])
+
+
+def _convert_linear_with_skip(module, prefix, config, skip_names):
+    from EfficientQAT.core.linear.int_quant_linear import IntQuantLinear
+    for name, child in module.named_children():
+        child_prefix = f"{prefix}.{name}" if prefix else name
+        if child_prefix in skip_names or child_prefix.endswith(tuple(f".{n}" for n in skip_names)):
+            continue
+        if isinstance(child, torch.nn.Linear) and not isinstance(child, IntQuantLinear):
+            setattr(module, name, IntQuantLinear.from_float(child_prefix, child, config))
+        else:
+            _convert_linear_with_skip(child, child_prefix, config, skip_names)
+
+
+def load_qat_hf_ckpt_model(quant_path: str, qcfg: dict | None):
+    from EfficientQAT.core.quantizer.config import QuantConfig as EQuantConfig
+    from EfficientQAT.core.linear.int_quant_linear import set_quant_state
+
+    bits = None
+    group_size = None
+    sym = False
+    if qcfg:
+        bits = qcfg.get("bits")
+        group_size = qcfg.get("group_size")
+        sym = bool(qcfg.get("sym", False))
+    if bits is None or group_size is None:
+        bits, group_size = _infer_bits_group_from_path(quant_path)
+
+    qconfig = EQuantConfig(
+        quant_type="uniform_affine",
+        n_bits=int(bits),
+        group_size=int(group_size),
+        symmetric=bool(sym),
+    )
+    skip_names = {"lm_head"}
+
+    with accelerate.init_empty_weights():
+        config = AutoConfig.from_pretrained(
+            quant_path,
+            trust_remote_code=True,
+            local_files_only=True,
+        )
+        try:
+            model = AutoModelForCausalLM.from_config(
+                config,
+                trust_remote_code=True,
+                torch_dtype=torch.float16,
+            )
+        except TypeError:
+            model = AutoModelForCausalLM.from_config(config, trust_remote_code=True)
+
+    _convert_linear_with_skip(model, prefix="", config=qconfig, skip_names=skip_names)
+    set_quant_state(model, weight_quant=True)
+    model.tie_weights()
+
+    device_map = {"": "cuda"}
+    try:
+        accelerate.load_checkpoint_in_model(
+            model,
+            checkpoint=quant_path,
+            device_map=device_map,
+            dtype=torch.float16,
+            offload_state_dict=True,
+        )
+    except TypeError:
+        accelerate.load_checkpoint_in_model(
+            model,
+            checkpoint=quant_path,
+            device_map=device_map,
+            offload_state_dict=True,
+        )
+    model = accelerate.dispatch_model(model, device_map=device_map)
+    model.eval()
+    tokenizer = AutoTokenizer.from_pretrained(quant_path, local_files_only=True, trust_remote_code=True)
     return model, tokenizer
 
 
@@ -95,7 +232,24 @@ def build_eval_args():
 def load_model_and_tokenizer(quant_path):
     quant_path = str(quant_path)
     if os.path.isfile(os.path.join(quant_path, "quantize_config.json")):
-        return load_quantized_model(quant_path)
+        qcfg = _load_quantize_config(quant_path)
+        converted = qcfg.get("converted_modules") if qcfg else None
+        if converted:
+            return load_quantized_model(quant_path)
+        hf_ckpt = _find_latest_hf_ckpt(quant_path)
+        if hf_ckpt:
+            print(
+                "Warning: quantize_config.json has no converted modules; "
+                f"falling back to QAT hf_ckpt at {hf_ckpt}"
+            )
+            return load_qat_hf_ckpt_model(hf_ckpt, qcfg)
+        print(
+            "Warning: quantize_config.json has no converted modules and no hf_ckpt found; "
+            "falling back to fp16 HF load."
+        )
+    if "hf_ckpt" in Path(quant_path).parts:
+        qcfg = _load_quantize_config(quant_path)
+        return load_qat_hf_ckpt_model(quant_path, qcfg)
     if "qtip" in quant_path:
         model = qtip_model_from_hf_path(quant_path)
         tokenizer = AutoTokenizer.from_pretrained(quant_path)
@@ -126,6 +280,8 @@ def get_quant_paths():
 def main():
     for quant_path in get_quant_paths():
         run_name = Path(quant_path).name
+        model_name = None
+        
         # If the path ends in 'out', take the parent directory name for better context
         if run_name == "out":
             run_name = Path(quant_path).parent.parent.name 
@@ -133,19 +289,28 @@ def main():
              run_name = Path(quant_path).parent.name
         
         # Try to extract a more descriptive name if possible, e.g. "w2g128-gradual-kd"
-        # Assuming path structure like .../w2g128-gradual-kd/checkpoints/out
+        # Assuming path structure like .../ModelName/EfficientQAT/w2g128-gradual-kd/checkpoints/out
         try:
              parts = Path(quant_path).parts
              if "checkpoints" in parts:
                  idx = parts.index("checkpoints")
                  if idx > 0:
                      run_name = parts[idx-1]
-        except ValueError:
+                 # Extract model name (e.g., "Llama2-7B", "Qwen2.5-3B")
+                 if idx >= 3 and parts[idx-2] == "EfficientQAT":
+                     model_name = parts[idx-3]
+        except (ValueError, IndexError):
             pass
+        
+        # Build wandb run name with model name if available
+        if model_name:
+            wandb_name = f"eval-{model_name}-{run_name}"
+        else:
+            wandb_name = f"eval-{run_name}"
 
         wandb.init(
             project="EfficientQAT-Eval",
-            name=f"eval-{run_name}",
+            name=wandb_name,
             config={"quant_path": quant_path},
             reinit=True
         )

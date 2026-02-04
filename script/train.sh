@@ -1,14 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-export CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-4,5,6,7}"
-export NPROC_PER_NODE=4
+export CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-0,1,2,3,4,5,6,7}"
+export NPROC_PER_NODE=8
 
 parallel=false
+hold=false
 for arg in "$@"; do
   case "$arg" in
     --parallel)
       parallel=true
+      ;;
+    --hold)
+      hold=true
       ;;
     *)
       echo "Unknown argument: $arg" >&2
@@ -16,6 +20,64 @@ for arg in "$@"; do
       ;;
   esac
 done
+
+# 检查GPU显存是否充足的函数（要求所有GPU空闲显存 > 90%）
+check_gpu_memory() {
+    local threshold=90
+    local gpu_ids="$1"
+
+    IFS=',' read -ra GPU_ARRAY <<< "$gpu_ids"
+    for gpu_id in "${GPU_ARRAY[@]}"; do
+        # 获取空闲显存比例 (使用nvidia-smi)
+        local free_mem_ratio
+        free_mem_ratio=$(nvidia-smi --query-gpu=memory.free,memory.total --format=csv,noheader,nounits -i "$gpu_id" 2>/dev/null | awk -F',' '{print ($1/$2)*100}')
+        if [ -z "$free_mem_ratio" ]; then
+            return 1
+        fi
+
+        # 如果有任何一个GPU空闲比例 < 阈值，返回失败
+        if (( $(echo "$free_mem_ratio < $threshold" | bc -l) )); then
+            return 1
+        fi
+    done
+
+    # 所有GPU都满足条件
+    return 0
+}
+
+# 显示60秒进度条（固定区域刷新）
+show_progress_bar() {
+    local duration=600
+    local cols=$(tput cols 2>/dev/null || echo 80)
+    local bar_width=$((cols - 25))
+    
+    for ((i=0; i<=duration; i++)); do
+        local percent=$((i * 100 / duration))
+        local filled=$((i * bar_width / duration))
+        local empty=$((bar_width - filled))
+        
+        printf "\r\033[K["
+        printf "%${filled}s" | tr ' ' '█'
+        printf "%${empty}s" | tr ' ' '░'
+        printf "] %3d%% | Next check in %2ds" "$percent" "$((duration - i))"
+        sleep 1
+    done
+    printf "\r\033[K"
+}
+
+# 如果开启 --hold，等待GPU显存充足
+if "$hold"; then
+    echo "Hold mode enabled. Waiting for all GPUs ($CUDA_VISIBLE_DEVICES) to have >90% free memory..."
+    
+    while true; do
+        if check_gpu_memory "$CUDA_VISIBLE_DEVICES"; then
+            echo "✓ GPU memory check passed. All GPUs ($CUDA_VISIBLE_DEVICES) have sufficient memory."
+            break
+        else
+            show_progress_bar
+        fi
+    done
+fi
 
 train_cmds=(
   # "bash ./VeOmni/train.sh ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/qwen2-0.5B/qwen2-05B-int4.yaml"
@@ -32,12 +94,24 @@ train_cmds=(
   # "bash ./VeOmni/train.sh ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/qwen2-3B/qwen2-3B-int2-gradual.yaml"
   # "bash ./VeOmni/train.sh ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/qwen2-3B/qwen2-3B-int2.yaml"
   # "bash ./VeOmni/train.sh ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/qwen2-3B/qwen2-3B-int2-gradual-kd.yaml"
-  "bash ./VeOmni/train.sh ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/qwen2-3B/qwen2-3B-int2-kd.yaml"
+  # "bash ./VeOmni/train.sh ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/qwen2-3B/qwen2-3B-int2-kd.yaml"
   # "bash ./VeOmni/train.sh ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/qwen2-0.5B/qwen2-05B-int4-kd.yaml"
   # "bash ./VeOmni/train.sh ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/qwen2-0.5B/qwen2-05B-int8-kd.yaml"
   # "bash ./VeOmni/train.sh ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/qwen2-0.5B/qwen2-05B-int4-gradual.yaml"
   # "bash ./VeOmni/train.sh ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/qwen2-0.5B/qwen2-05B-int8-gradual.yaml"
-  # "bash ./VeOmni/train.sh ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/qwen2-0.5B/qwen2-05B-int2-metrics.yaml"
+  # "bash ./VeOmni/train.sh ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/llama2-7B/llama2-7B-int2-kd.yaml"
+  # "bash ./VeOmni/train.sh ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/llama3-8B/llama3-8B-int2-kd.yaml"
+#   "bash ./VeOmni/train.sh ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/qwen2-7B/qwen2-7B-int2-kd.yaml"
+  
+  # INT3-KD training - ordered by model size (small to large)
+  "bash ./VeOmni/train.sh ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/qwen2-0.5B/qwen2-05B-int2-kd-multistep.yaml"
+  "bash ./VeOmni/train.sh ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/qwen2-0.5B/qwen2-05B-int3-kd-multistep.yaml"
+  "bash ./VeOmni/train.sh ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/qwen2-0.5B/qwen2-05B-int3-kd.yaml"
+  # "bash ./VeOmni/train.sh ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/qwen2-3B/qwen2-3B-int3-kd.yaml"
+  # "bash ./VeOmni/train.sh ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/qwen2-7B/qwen2-7B-int3-kd.yaml"
+  # "bash ./VeOmni/train.sh ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/llama2-7B/llama2-7B-int3-kd.yaml"
+  # "bash ./VeOmni/train.sh ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/llama3-8B/llama3-8B-int3-kd.yaml"
+
 )
 
 get_output_dir() {

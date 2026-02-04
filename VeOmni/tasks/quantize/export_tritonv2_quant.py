@@ -563,7 +563,7 @@ def main() -> None:
         default=None,
         help="Optional VeOmni YAML (with `quantizer.n_bits/group_size`) to fill missing CLI args.",
     )
-    ap.add_argument("--bits", type=int, default=2, help="Quant bits for TritonV2QuantLinear (2/4/8)")
+    ap.add_argument("--bits", type=int, default=2, help="Quant bits for TritonV2QuantLinear (2/3/4/8)")
     ap.add_argument(
         "--group-size",
         type=int,

@@ -5,12 +5,15 @@ set -x
 export TOKENIZERS_PARALLELISM=false
 export TORCH_NCCL_AVOID_RECORD_STREAMS=1
 
+# Pre-compile CUDA extensions to avoid multi-process lock contention
+python -c "from EfficientQAT.core.quantizer.kernel.fake_quant import fake_quant_ste" 2>/dev/null || true
+
 NNODES=${NNODES:=1}
 NPROC_PER_NODE=${NPROC_PER_NODE:=$(nvidia-smi --list-gpus | wc -l)}
 NODE_RANK=${NODE_RANK:=0}
-MASTER_ADDR=${MASTER_ADDR:=0.0.0.0}
+MASTER_ADDR=${MASTER_ADDR:=127.0.0.1}
 MASTER_PORT=${MASTER_PORT:=12345}
-PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+# PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 if [[ "$NNODES" == "1" ]]; then
   additional_args="$additional_args --standalone"

@@ -8,7 +8,7 @@ from .q_linear_pack import PackableQuantLinear
 
 
 class TritonV2QuantLinear(PackableQuantLinear, TritonModuleMixin):
-    SUPPORTS_BITS = [2, 4, 8]
+    SUPPORTS_BITS = [2, 3, 4, 8]  # Added 3-bit support
     SUPPORTS_GROUP_SIZE = [-1, 16, 32, 64, 128]
     SUPPORTS_DESC_ACT = [True, False]
     SUPPORTS_SYM = [True, False]

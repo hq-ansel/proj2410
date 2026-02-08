@@ -893,7 +893,11 @@ class Qwen2ForCausalLM(Qwen2PreTrainedModel, GenerationMixin):
 
         loss = None
         logits = None
-        loss, logits = self.loss_function(hidden_states, self.lm_head.weight, labels)
+        if labels is None:
+            # Avoid loss computation when labels are not provided (e.g., teacher forward in KD).
+            logits = self.lm_head(hidden_states)
+        else:
+            loss, logits = self.loss_function(hidden_states, self.lm_head.weight, labels)
 
         if not return_dict:
             output = (logits,) + outputs[1:]

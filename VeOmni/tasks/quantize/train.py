@@ -788,6 +788,8 @@ def _compute_multistep_kd_loss_extrapolate(
             weight = loss_weights[step_idx] if step_idx < len(loss_weights) else loss_weights[-1]
             weighted_loss = weight * step_kd_loss
             step_losses.append(step_kd_loss.item())
+            # Force sync each multistep KD window to surface async CUDA errors earlier.
+            torch.cuda.synchronize()
             
             if total_kd_loss is None:
                 total_kd_loss = weighted_loss
@@ -1430,10 +1432,24 @@ def main():
             heads_k_stride = 1
             if num_kv_heads is not None and num_heads is not None and num_kv_heads < num_heads:
                 heads_k_stride = num_heads // num_kv_heads
-            substitute_hf_ring_attn(heads_k_stride=heads_k_stride)
-            logger.info_rank0(
-                f"Ring attention enabled for CP (cp_size={ps.cp_size}, heads_k_stride={heads_k_stride})"
-            )
+            # ring-flash-attn requires nheads_k % heads_k_stride == 0
+            if num_kv_heads is not None and heads_k_stride > 1:
+                if num_kv_heads % heads_k_stride != 0:
+                    logger.warning_rank0(
+                        "Skip ring attention: incompatible GQA heads for ring-flash-attn "
+                        f"(num_kv_heads={num_kv_heads}, num_heads={num_heads}, "
+                        f"heads_k_stride={heads_k_stride})."
+                    )
+                else:
+                    substitute_hf_ring_attn(heads_k_stride=heads_k_stride)
+                    logger.info_rank0(
+                        f"Ring attention enabled for CP (cp_size={ps.cp_size}, heads_k_stride={heads_k_stride})"
+                    )
+            else:
+                substitute_hf_ring_attn(heads_k_stride=heads_k_stride)
+                logger.info_rank0(
+                    f"Ring attention enabled for CP (cp_size={ps.cp_size}, heads_k_stride={heads_k_stride})"
+                )
         else:
             logger.warning_rank0(
                 "CP enabled but ring-flash-attn not available. "

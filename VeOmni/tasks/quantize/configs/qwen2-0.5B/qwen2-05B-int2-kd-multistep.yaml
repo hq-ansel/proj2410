@@ -6,7 +6,7 @@ data:
   dataloader_type: native
   datasets_type: mapping
   data_type: plaintext
-  max_seq_len: 1024
+  max_seq_len: 512
   text_keys: text
   drop_last: true
 
@@ -15,11 +15,12 @@ train:
   output_dir: /home/ubuntu/data/exp/proj2410/quant_model/Qwen2.5-0.5B/EfficientQAT/w2g64-int2-kd-multistep
   data_parallel_mode: fsdp2
   ulysses_parallel_size: 2
-  context_parallel_size: 4 
+  context_parallel_size: 1 
   enable_activation_offload: true
   activation_gpu_limit: 40.0
   global_batch_size: 8
   micro_batch_size: 1
+  allow_cuda_launch_blocking: true
   rmpad: false
   rmpad_with_pos_ids: true
   bsz_warmup_ratio: 0.007
@@ -89,8 +90,8 @@ distill:
   # Multi-step extrapolation distillation
   # Teacher generates new tokens, student learns to align
   enable_multistep_kd: true
-  multistep_kd_steps: 4
-  multistep_kd_stride: 64
+  multistep_kd_steps: 1
+  multistep_kd_stride: 512
   multistep_kd_loss_weight: uniform
 
 # profile:

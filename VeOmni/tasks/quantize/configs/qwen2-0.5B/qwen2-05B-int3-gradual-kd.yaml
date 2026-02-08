@@ -12,10 +12,9 @@ data:
 
 train:
   num_train_epochs: 2
-  output_dir: /home/ubuntu/data/exp/proj2410/quant_model/Qwen2.5-0.5B/EfficientQAT/w3g64-int3-kd-multistep
+  output_dir: /home/ubuntu/data/exp/proj2410/quant_model/Qwen2.5-0.5B/EfficientQAT/w3g64-gradual-kd
   data_parallel_mode: fsdp2
   ulysses_parallel_size: 2
-  context_parallel_size: 1 
   enable_activation_offload: true
   activation_gpu_limit: 40.0
   global_batch_size: 8
@@ -40,28 +39,27 @@ train:
   enable_activation_offload: false
   init_device: meta
   enable_full_determinism: false
-  debug: true
   empty_cache_steps: 500
   ckpt_manager: dcp
   load_checkpoint_path: ""
   save_steps: 1000
   save_hf_weights: true
   wandb_project: Qwen2-0.5B
-  wandb_name: Qwen2-0.5B-int3-g64-uniform-kd-multistep
+  wandb_name: Qwen2-0.5B-int3-g64-gradual-kd
 
 quantizer:
-  quant_type: uniform_affine # gradual
+  quant_type: gradual # uniform_affine or gradual
   n_bits: 3
   group_size: 64
   clamp_method: STE
   round_method: ste
-  symmetric: false
+  symmetric: true
   quant_lr: 1e-4
 
   # Gradual quantization configuration
   enable_gradual_quant: true
   qat_warmup_steps: 0
-  gradual_start_ratio: 1.0  # 立即全部量化
+  gradual_start_ratio: 0.0  # 立即全部量化
   gradual_end_ratio: 1.0
   priority_type: uniform
 
@@ -84,14 +82,15 @@ distill:
   teacher_model: /home/ubuntu/data/exp/proj2410/model/Qwen2.5-0.5B
   kd_alpha: 1
   kd_temperature: 1.0
-  enable_teacher_cuda_graph: true
-  teacher_cuda_graph_warmup_iters: 3
-  # Multi-step extrapolation distillation
-  # Teacher generates new tokens, student learns to align
-  enable_multistep_kd: true
-  multistep_kd_steps: 4
-  multistep_kd_stride: 64
-  multistep_kd_loss_weight: uniform
 
-# profile:
-#   profile_module_name: ["model.layers.0"]
+profile:
+  profile_module_name: ["model.layers.0"]
+  # quant_stat_interval: 1
+  # # 不要优先盯 q/k/v/gate/up 这种“块内部”的线性层，
+  # # 而是优先盯每个 block 里把信息写回 residual stream 的两条“注入边
+  # # 这两个是一阶的线性影响隐藏状态，而没有非线性因素
+  # quant_stat_module_name: [
+  #   "model.layers.0.self_attn.o_proj",
+  #   "model.layers.0.mlp.down_proj"
+  # ]
+  # quant_stat_percentiles: [0.999]

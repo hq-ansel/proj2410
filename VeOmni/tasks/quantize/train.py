@@ -378,23 +378,31 @@ def _to_local_tensor(tensor: torch.Tensor) -> torch.Tensor:
     return tensor
 
 
-def _compute_kd_loss(
+def _sanitize_temperature(temperature: float) -> float:
+    temperature = float(temperature)
+    if temperature <= 0.0:
+        return 1.0
+    return temperature
+
+
+def _flatten_kd_logits(
     student_logits: torch.Tensor | None,
     teacher_logits: torch.Tensor | None,
     labels: torch.Tensor | None,
     temperature: float,
-) -> torch.Tensor | None:
+) -> tuple[torch.Tensor, torch.Tensor] | None:
     if student_logits is None or teacher_logits is None:
         return None
 
-    temperature = float(temperature)
-    if temperature <= 0.0:
-        temperature = 1.0
+    temperature = _sanitize_temperature(temperature)
 
+    student_logits = _to_local_tensor(student_logits)
+    teacher_logits = _to_local_tensor(teacher_logits)
     student_logits = student_logits.float().reshape(-1, student_logits.shape[-1]) / temperature
     teacher_logits = teacher_logits.float().reshape(-1, teacher_logits.shape[-1]) / temperature
     if student_logits.shape != teacher_logits.shape:
         return None
+
     if labels is not None:
         labels = labels.reshape(-1)
         mask = labels != -100
@@ -404,12 +412,165 @@ def _compute_kd_loss(
         else:
             return None
 
+    return student_logits, teacher_logits
+
+
+def _compute_kd_loss(
+    student_logits: torch.Tensor | None,
+    teacher_logits: torch.Tensor | None,
+    labels: torch.Tensor | None,
+    temperature: float,
+) -> torch.Tensor | None:
+    logits_pair = _flatten_kd_logits(
+        student_logits=student_logits,
+        teacher_logits=teacher_logits,
+        labels=labels,
+        temperature=temperature,
+    )
+    if logits_pair is None:
+        return None
+    student_logits, teacher_logits = logits_pair
+
     kd_loss = F.kl_div(
         F.log_softmax(student_logits, dim=-1),
         F.softmax(teacher_logits, dim=-1),
         reduction="batchmean",
     )
+    temperature = _sanitize_temperature(temperature)
     return _to_local_tensor(kd_loss * (temperature ** 2))
+
+
+def _compute_single_step_distill_loss(
+    student_logits: torch.Tensor | None,
+    teacher_logits: torch.Tensor | None,
+    labels: torch.Tensor | None,
+    temperature: float,
+    kd_loss_type: Literal["forward_kl", "cakld", "gjsd"],
+    cakld_gamma: float | None,
+    gjsd_beta: float,
+) -> torch.Tensor | None:
+    logits_pair = _flatten_kd_logits(
+        student_logits=student_logits,
+        teacher_logits=teacher_logits,
+        labels=labels,
+        temperature=temperature,
+    )
+    if logits_pair is None:
+        return None
+    student_logits, teacher_logits = logits_pair
+
+    log_p_s = F.log_softmax(student_logits, dim=-1)
+    log_p_t = F.log_softmax(teacher_logits, dim=-1)
+    p_s = log_p_s.exp()
+    p_t = log_p_t.exp()
+
+    if kd_loss_type == "forward_kl":
+        kd_loss = F.kl_div(log_p_s, p_t, reduction="batchmean")
+    elif kd_loss_type == "cakld":
+        gamma = 0.5 if cakld_gamma is None else float(cakld_gamma)
+        gamma = max(0.0, min(1.0, gamma))
+        reverse_kl = F.kl_div(log_p_t, p_s, reduction="batchmean")  # KL(Ps || Pt)
+        forward_kl = F.kl_div(log_p_s, p_t, reduction="batchmean")  # KL(Pt || Ps)
+        kd_loss = gamma * reverse_kl + (1.0 - gamma) * forward_kl
+    elif kd_loss_type == "gjsd":
+        beta = max(0.0, min(1.0, float(gjsd_beta)))
+        mix_prob = beta * p_t + (1.0 - beta) * p_s
+        log_mix_prob = torch.log(mix_prob.clamp_min(1e-8))
+        kd_loss = beta * F.kl_div(log_mix_prob, p_t, reduction="batchmean") + (
+            1.0 - beta
+        ) * F.kl_div(log_mix_prob, p_s, reduction="batchmean")
+    else:
+        raise ValueError(f"Unsupported distill.kd_loss_type={kd_loss_type}")
+
+    temperature = _sanitize_temperature(temperature)
+    return _to_local_tensor(kd_loss * (temperature ** 2))
+
+
+def _estimate_cakld_gamma(
+    teacher_model: torch.nn.Module,
+    train_dataloader: Any,
+    enable_multisource: bool,
+    num_batches: int,
+) -> float:
+    num_batches = max(1, int(num_batches))
+    local_prob_sum = 0.0
+    local_valid_tokens = 0.0
+    seen_batches = 0
+
+    dataloader_state = None
+    can_restore_state = hasattr(train_dataloader, "state_dict") and hasattr(train_dataloader, "load_state_dict")
+    if can_restore_state:
+        try:
+            dataloader_state = train_dataloader.state_dict()
+        except Exception as exc:
+            logger.warning_rank0("Failed to snapshot dataloader state for CAKLD gamma estimation: %s", exc)
+            dataloader_state = None
+
+    try:
+        data_iterator = iter(train_dataloader)
+        with torch.no_grad():
+            while seen_batches < num_batches:
+                try:
+                    micro_batches = next(data_iterator)
+                except StopIteration:
+                    break
+                seen_batches += 1
+                for micro_batch in micro_batches:
+                    labels = micro_batch.get("labels")
+                    if labels is None or not isinstance(labels, torch.Tensor):
+                        continue
+                    teacher_inputs = _prepare_teacher_inputs(micro_batch, enable_multisource)
+                    teacher_out = teacher_model(**teacher_inputs, use_cache=False)
+                    teacher_logits = getattr(teacher_out, "logits", None)
+                    if teacher_logits is None:
+                        continue
+                    teacher_logits = _to_local_tensor(teacher_logits).float().reshape(-1, teacher_logits.shape[-1])
+                    labels = labels.to(teacher_logits.device).reshape(-1)
+
+                    vocab_size = teacher_logits.shape[-1]
+                    valid_mask = (labels != -100) & (labels >= 0) & (labels < vocab_size)
+                    if not valid_mask.any():
+                        continue
+
+                    valid_logits = teacher_logits[valid_mask]
+                    valid_labels = labels[valid_mask].long()
+                    target_logits = valid_logits.gather(dim=-1, index=valid_labels.unsqueeze(-1)).squeeze(-1)
+                    log_denom = torch.logsumexp(valid_logits, dim=-1)
+                    token_prob = torch.exp(target_logits - log_denom)
+
+                    local_prob_sum += float(token_prob.sum().item())
+                    local_valid_tokens += float(valid_labels.numel())
+    finally:
+        if dataloader_state is not None:
+            try:
+                train_dataloader.load_state_dict(dataloader_state)
+            except Exception as exc:
+                logger.warning_rank0(
+                    "Failed to restore dataloader state after CAKLD gamma estimation: %s",
+                    exc,
+                )
+
+    metric_group = get_parallel_state().dp_group
+    global_prob_sum, global_valid_tokens = all_reduce(
+        (local_prob_sum, local_valid_tokens),
+        group=metric_group,
+    )
+    if global_valid_tokens <= 0.0:
+        logger.warning_rank0(
+            "CAKLD gamma estimation found no valid tokens in %d batches. Falling back to gamma=0.5.",
+            seen_batches,
+        )
+        return 0.5
+
+    gamma = global_prob_sum / global_valid_tokens
+    gamma = max(0.0, min(1.0, float(gamma)))
+    logger.info_rank0(
+        "Estimated CAKLD gamma=%.6f from %d batch(es), valid_tokens=%.0f.",
+        gamma,
+        seen_batches,
+        global_valid_tokens,
+    )
+    return gamma
 
 
 def _get_kd_skip_reason(
@@ -1218,6 +1379,22 @@ class DistillArguments:
         default=1.0,
         metadata={"help": "KD temperature for logits."},
     )
+    kd_loss_type: Literal["forward_kl", "cakld", "gjsd"] = field(
+        default="forward_kl",
+        metadata={"help": "Single-step KD loss type: forward_kl | cakld | gjsd."},
+    )
+    kd_cakld_gamma: float | None = field(
+        default=None,
+        metadata={"help": "CAKLD gamma override in [0,1]. None estimates gamma from teacher confidence."},
+    )
+    kd_cakld_gamma_batches: int = field(
+        default=10,
+        metadata={"help": "Number of batches to estimate CAKLD gamma before training."},
+    )
+    kd_gjsd_beta: float = field(
+        default=0.5,
+        metadata={"help": "gJSD beta in [0,1]."},
+    )
     enable_teacher_cuda_graph: bool = field(
         default=False,
         metadata={"help": "Enable CUDA graph replay for teacher forward (fixed shapes only)."},
@@ -1554,6 +1731,31 @@ def main():
         veomni_loss.fused_linear_cross_entropy = None
     kd_alpha = float(args.distill.kd_alpha)
     kd_temperature = float(args.distill.kd_temperature)
+    kd_loss_type = str(args.distill.kd_loss_type).lower()
+    valid_kd_loss_types = {"forward_kl", "cakld", "gjsd"}
+    if kd_enabled and kd_loss_type not in valid_kd_loss_types:
+        logger.warning_rank0(
+            "distill.kd_loss_type=%s is invalid; defaulting to forward_kl.",
+            args.distill.kd_loss_type,
+        )
+        kd_loss_type = "forward_kl"
+    kd_cakld_gamma = args.distill.kd_cakld_gamma
+    if kd_cakld_gamma is not None:
+        kd_cakld_gamma = float(kd_cakld_gamma)
+        if kd_enabled and (kd_cakld_gamma < 0.0 or kd_cakld_gamma > 1.0):
+            logger.warning_rank0("distill.kd_cakld_gamma=%s is out of [0,1]; clamping.", kd_cakld_gamma)
+            kd_cakld_gamma = max(0.0, min(1.0, kd_cakld_gamma))
+    kd_cakld_gamma_batches = int(args.distill.kd_cakld_gamma_batches)
+    if kd_enabled and kd_cakld_gamma_batches <= 0:
+        logger.warning_rank0(
+            "distill.kd_cakld_gamma_batches=%s is <= 0; defaulting to 10.",
+            kd_cakld_gamma_batches,
+        )
+        kd_cakld_gamma_batches = 10
+    kd_gjsd_beta = float(args.distill.kd_gjsd_beta)
+    if kd_enabled and (kd_gjsd_beta < 0.0 or kd_gjsd_beta > 1.0):
+        logger.warning_rank0("distill.kd_gjsd_beta=%s is out of [0,1]; clamping.", kd_gjsd_beta)
+        kd_gjsd_beta = max(0.0, min(1.0, kd_gjsd_beta))
     if kd_alpha < 0.0 or kd_alpha > 1.0:
         logger.warning_rank0("distill.kd_alpha=%s is out of [0,1]; clamping.", kd_alpha)
         kd_alpha = max(0.0, min(1.0, kd_alpha))
@@ -1622,6 +1824,23 @@ def main():
         logger.info_rank0("KD teacher model forced to bfloat16 to reduce memory usage.")
         teacher_model.eval()
         teacher_model.requires_grad_(False)
+        if kd_loss_type == "cakld" and kd_cakld_gamma is None:
+            logger.info_rank0(
+                "Estimating CAKLD gamma from teacher confidence using %d batch(es).",
+                kd_cakld_gamma_batches,
+            )
+            kd_cakld_gamma = _estimate_cakld_gamma(
+                teacher_model=teacher_model,
+                train_dataloader=train_dataloader,
+                enable_multisource=args.data.enable_multisource,
+                num_batches=kd_cakld_gamma_batches,
+            )
+        logger.info_rank0(
+            "KD single-step objective: loss_type=%s, cakld_gamma=%s, gjsd_beta=%.4f",
+            kd_loss_type,
+            f"{kd_cakld_gamma:.6f}" if kd_cakld_gamma is not None else "n/a",
+            kd_gjsd_beta,
+        )
     teacher_graph = None
     teacher_graph_failed = False
     if kd_enabled and args.distill.enable_teacher_cuda_graph:
@@ -2117,7 +2336,7 @@ def main():
                                         sp_group=sp_group,
                                     )
                                 else:
-                                    # Single-step KD (original behavior)
+                                    # Single-step KD objective
                                     teacher_inputs = _prepare_teacher_inputs(
                                         micro_batch, args.data.enable_multisource
                                     )
@@ -2131,11 +2350,14 @@ def main():
                                             teacher_out = teacher_graph.replay(teacher_inputs)
                                         else:
                                             teacher_out = teacher_model(**teacher_inputs, use_cache=False)
-                                    kd_loss = _compute_kd_loss(
+                                    kd_loss = _compute_single_step_distill_loss(
                                         student_logits=getattr(student_out, "logits", None),
                                         teacher_logits=getattr(teacher_out, "logits", None),
                                         labels=micro_batch.get("labels"),
                                         temperature=kd_temperature,
+                                        kd_loss_type=kd_loss_type,
+                                        cakld_gamma=kd_cakld_gamma,
+                                        gjsd_beta=kd_gjsd_beta,
                                     )
                                 if kd_loss is not None:
                                     combined_loss = (1.0 - kd_alpha) * task_loss + kd_alpha * kd_loss

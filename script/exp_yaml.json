@@ -1,0 +1,44 @@
+{
+  "experiment_groups": [
+    {
+      "group_name": "Baseline / non-KD (Qwen2-0.5B)",
+      "yamls": [
+        "VeOmni/tasks/quantize/configs/qwen2-0.5B/qwen2-05B.yaml",
+        "VeOmni/tasks/quantize/configs/qwen2-0.5B/qwen2-05B-int2.yaml",
+        "VeOmni/tasks/quantize/configs/qwen2-0.5B/qwen2-05B-int4.yaml",
+        "VeOmni/tasks/quantize/configs/qwen2-0.5B/qwen2-05B-int8.yaml"
+      ]
+    },
+    {
+      "group_name": "Gradual schedules (Qwen2-0.5B / Qwen2-3B)",
+      "yamls": [
+        "VeOmni/tasks/quantize/configs/qwen2-0.5B/qwen2-05B-int2-gradual.yaml",
+        "VeOmni/tasks/quantize/configs/qwen2-0.5B/qwen2-05B-int4-gradual.yaml",
+        "VeOmni/tasks/quantize/configs/qwen2-0.5B/qwen2-05B-int8-gradual.yaml",
+        "VeOmni/tasks/quantize/configs/qwen2-0.5B/qwen2-05B-gradual-end025.yaml",
+        "VeOmni/tasks/quantize/configs/qwen2-0.5B/qwen2-05B-gradual-end050.yaml",
+        "VeOmni/tasks/quantize/configs/qwen2-0.5B/qwen2-05B-gradual-end075.yaml",
+        "VeOmni/tasks/quantize/configs/qwen2-3B/qwen2-3B-int2-gradual.yaml"
+      ]
+    },
+    {
+      "group_name": "Seq2Bit / Seq2Bit-KD",
+      "yamls": [
+        "VeOmni/tasks/quantize/configs/qwen2-0.5B/qwen2-05B-seq2bit.yaml",
+        "VeOmni/tasks/quantize/configs/qwen2-0.5B/qwen2-05B-seq2bit-kd.yaml",
+        "VeOmni/tasks/quantize/configs/qwen2-3B/qwen2-3B-seq2bit-kd.yaml",
+        "VeOmni/tasks/quantize/configs/qwen2-7B/qwen2-7B-seq2bit-kd.yaml",
+        "VeOmni/tasks/quantize/configs/llama2-7B/llama2-7B-seq2bit-kd.yaml",
+        "VeOmni/tasks/quantize/configs/llama3-8B/llama3-8B-seq2bit-kd.yaml"
+      ]
+    },
+    {
+      "group_name": "Seq2Bit-KD divergence (Qwen2-3B)",
+      "yamls": [
+        "VeOmni/tasks/quantize/configs/qwen2-3B/qwen2-3B-seq2bit-kd.yaml",
+        "VeOmni/tasks/quantize/configs/qwen2-3B/qwen2-3B-seq2bit-kd-cakld.yaml",
+        "VeOmni/tasks/quantize/configs/qwen2-3B/qwen2-3B-seq2bit-kd-gjsd.yaml"
+      ]
+    }
+  ]
+}

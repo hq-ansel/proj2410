@@ -8,9 +8,9 @@ class QuantizerArguments:
     CLI/config arguments for weight quantization, plus optimizer knobs for quantizer params.
     """
 
-    quant_type: Literal["uniform_affine", "gradual"] = field(
+    quant_type: Literal["uniform_affine", "gradual", "seq2bit"] = field(
         default="uniform_affine",
-        metadata={"help": "Quantizer type to use: uniform_affine | gradual."},
+        metadata={"help": "Quantizer type to use: uniform_affine | gradual | seq2bit."},
     )
     n_bits: int = field(
         default=8,

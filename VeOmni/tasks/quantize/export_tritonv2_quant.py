@@ -195,6 +195,7 @@ class LinearQatParams:
     scale: "torch.Tensor"  # [num_groups] or [num_groups, 1] - flattened per-group quantization scales
     zero_point: Optional["torch.Tensor"]  # [num_groups] or [num_groups, 1] - flattened per-group zero points
     symmetric: bool = False
+    quantizer_type: str = "uniform_affine"
 
 
 def _find_qat_linear_prefixes(state_dict: Dict[str, "torch.Tensor"]) -> List[str]:
@@ -210,12 +211,13 @@ def _find_qat_linear_prefixes(state_dict: Dict[str, "torch.Tensor"]) -> List[str
     Returns:
         List of module prefixes (e.g., ["model.layers.0.mlp.gate_proj", ...])
     """
-    prefixes = []
+    prefixes = set()
     for k in state_dict.keys():
         if k.endswith(".weight_quantizer.scale"):
-            prefixes.append(k[: -len(".weight_quantizer.scale")])
-    prefixes.sort()
-    return prefixes
+            prefixes.add(k[: -len(".weight_quantizer.scale")])
+        elif k.endswith(".weight_quantizer.alpha"):
+            prefixes.add(k[: -len(".weight_quantizer.alpha")])
+    return sorted(prefixes)
 
 
 def _extract_qat_params(state_dict: Dict[str, "torch.Tensor"], prefix: str) -> LinearQatParams:
@@ -245,7 +247,11 @@ def _extract_qat_params(state_dict: Dict[str, "torch.Tensor"], prefix: str) -> L
     bias = state_dict.get(f"{prefix}.bias")
     # [out_features*in_features/group_size, group_size]
     scale = state_dict.get(f"{prefix}.weight_quantizer.scale")
+    if scale is None:
+        scale = state_dict.get(f"{prefix}.weight_quantizer.alpha")
     zero_point = state_dict.get(f"{prefix}.weight_quantizer.zero_point")
+    if zero_point is None:
+        zero_point = state_dict.get(f"{prefix}.weight_quantizer._zero_point")
     if scale is None:
         raise KeyError(f"Missing quantizer params for {prefix}: scale")
 
@@ -253,6 +259,14 @@ def _extract_qat_params(state_dict: Dict[str, "torch.Tensor"], prefix: str) -> L
     if scale.dtype not in (torch.float16, torch.bfloat16, torch.float32):
         scale = scale.float()
     symmetric = zero_point is None
+    quantizer_type = (
+        "seq2bit"
+        if (
+            f"{prefix}.weight_quantizer.alpha" in state_dict
+            or f"{prefix}.weight_quantizer._zero_point" in state_dict
+        )
+        else "uniform_affine"
+    )
     if zero_point is not None:
         zero_point = zero_point.detach().to(device="cpu")
         if zero_point.dtype not in (torch.float16, torch.bfloat16, torch.float32, torch.int32, torch.int64):
@@ -264,6 +278,7 @@ def _extract_qat_params(state_dict: Dict[str, "torch.Tensor"], prefix: str) -> L
         scale=scale,
         zero_point=zero_point,
         symmetric=symmetric,
+        quantizer_type=quantizer_type,
     )
 
 
@@ -411,6 +426,100 @@ def _clamp_qparams(
     maxq = (1 << bits) - 1
     zero_point = torch.clamp(torch.round(zero_point), 0, maxq).to(dtype=zero_point.dtype)
     return scale, zero_point
+
+
+def _pack_codes_rowwise(codes: "torch.Tensor", bits: int) -> "torch.Tensor":
+    import torch
+
+    if bits <= 0 or bits > 8:
+        raise ValueError(f"Unsupported bits for row-wise packing: {bits}")
+    out_features, in_features = codes.shape
+    pack_factor = 32 // bits
+    if in_features % pack_factor != 0:
+        raise ValueError(
+            f"in_features={in_features} must be divisible by pack_factor={pack_factor} for {bits}-bit packing"
+        )
+    mask = (1 << bits) - 1
+    codes = codes.to(dtype=torch.int32) & mask
+    reshaped = codes.view(out_features, -1, pack_factor)
+    shifts = torch.arange(0, 32, bits, dtype=torch.int32, device=codes.device)
+    packed = torch.zeros((out_features, reshaped.shape[1]), dtype=torch.int32, device=codes.device)
+    for i in range(pack_factor):
+        packed |= reshaped[..., i] << shifts[i]
+    return packed.contiguous()
+
+
+def _dequant_seq2bit_from_stored(
+    qweight: "torch.Tensor",
+    scales: "torch.Tensor",
+    g_idx: "torch.Tensor",
+) -> "torch.Tensor":
+    import torch
+
+    in_features = int(g_idx.numel())
+    # raw (no-pack) path: [out_features, in_features]
+    if qweight.ndim == 2 and qweight.shape[1] == in_features:
+        code_tensor = qweight.to(dtype=torch.int32)
+    else:
+        # packed path (legacy): [out_features, in_features/16] for 2-bit
+        qweight = qweight.to(dtype=torch.int32)
+        unpacked = [((qweight >> (2 * i)) & 0x3) for i in range(16)]
+        code_tensor = torch.stack(unpacked, dim=-1).reshape(qweight.shape[0], -1)
+        if code_tensor.shape[1] > in_features:
+            code_tensor = code_tensor[:, :in_features]
+
+    levels = code_tensor.to(torch.float32) * 0.5 - 0.75
+    gather_idx = g_idx.to(dtype=torch.long).view(1, -1)
+    alpha = torch.gather(scales.to(torch.float32), 1, gather_idx.expand(scales.shape[0], -1))
+    return levels * alpha
+
+
+def _pack_one_linear_seq2bit_torch(
+    prefix: str,
+    qat: LinearQatParams,
+    group_size: int,
+    weight_dtype: "torch.dtype",
+) -> Tuple[Dict[str, "torch.Tensor"], "torch.Tensor"]:
+    import torch
+
+    out_features, in_features = qat.weight.shape
+    inferred_group = _infer_group_size(in_features, out_features, qat.scale.numel())
+    if group_size is None:
+        group_size = inferred_group
+    if inferred_group != group_size:
+        raise ValueError(
+            f"{prefix}: inferred group_size={inferred_group} from QAT params but CLI group_size={group_size}"
+        )
+    if in_features % group_size != 0:
+        raise ValueError(f"{prefix}: in_features={in_features} not divisible by group_size={group_size}")
+
+    alpha_out_g, _ = _reshape_qat_scale_zp(
+        qat.scale,
+        None,
+        out_features=out_features,
+        in_features=in_features,
+        group_size=group_size,
+        order="out_major",
+    )
+    alpha = alpha_out_g.to(dtype=torch.float32).unsqueeze(-1).clamp_min(1e-6)
+    weight = qat.weight.to(dtype=torch.float32).view(out_features, -1, group_size)
+    x = (weight / alpha).clamp(-1.0, 1.0)
+    # Levels: {-0.75, -0.25, 0.25, 0.75}
+    codes = torch.round((x + 0.75) / 0.5).clamp(0, 3).to(torch.int32)
+    dequant = (codes.to(torch.float32) * 0.5 - 0.75) * alpha
+    dequant = dequant.view(out_features, in_features).to(dtype=weight_dtype)
+
+    # No-pack export for seq2bit (store raw code matrix directly).
+    qweight = codes.view(out_features, in_features).to(torch.int8)
+    g_idx = torch.arange(in_features, dtype=torch.int32) // group_size
+    packed: Dict[str, torch.Tensor] = {
+        f"{prefix}.qweight": qweight.cpu(),
+        f"{prefix}.scales": alpha_out_g.to(dtype=torch.float16).cpu(),
+        f"{prefix}.g_idx": g_idx.cpu(),
+    }
+    if qat.bias is not None:
+        packed[f"{prefix}.bias"] = qat.bias.to(dtype=weight_dtype).cpu()
+    return packed, dequant.detach().cpu()
 
 
 def _pack_one_linear(
@@ -657,21 +766,36 @@ def main() -> None:
     # Resolved group_size (inferred from first module if not provided)
     resolved_group_size: Optional[int] = args.group_size
     sym_by_module: Dict[str, bool] = {}
+    quant_impl_by_module: Dict[str, str] = {}
     sym_all = True
 
     for prefix in prefixes:
         qat = _extract_qat_params(state, prefix)
         try:
-            packed, qlinear = _pack_one_linear(
-                prefix=prefix,
-                qat=qat,
-                bits=int(args.bits),
-                group_size=args.group_size,
-                pack_dtype=pack_dtype,
-                weight_dtype=weight_dtype,
-                qat_param_order=args.qat_param_order,
-                return_dequant=dequant_state is not None,
-            )
+            if qat.quantizer_type == "seq2bit":
+                if int(args.bits) != 2:
+                    raise ValueError(f"{prefix}: seq2bit export requires bits=2, got bits={args.bits}")
+                packed, dequant_weight = _pack_one_linear_seq2bit_torch(
+                    prefix=prefix,
+                    qat=qat,
+                    group_size=args.group_size,
+                    weight_dtype=weight_dtype,
+                )
+                qlinear = None
+                quant_impl_by_module[prefix] = "quant_sim_linear"
+            else:
+                packed, qlinear = _pack_one_linear(
+                    prefix=prefix,
+                    qat=qat,
+                    bits=int(args.bits),
+                    group_size=args.group_size,
+                    pack_dtype=pack_dtype,
+                    weight_dtype=weight_dtype,
+                    qat_param_order=args.qat_param_order,
+                    return_dequant=dequant_state is not None,
+                )
+                dequant_weight = None
+                quant_impl_by_module[prefix] = "tritonv2"
         except Exception as e:
             # Fallback: keep float weight/bias, but drop quantizer params so the layer can be loaded as nn.Linear.
             _drop_quantizer_keys(new_state, prefix)
@@ -687,11 +811,14 @@ def main() -> None:
         sym_by_module[prefix] = bool(qat.symmetric)
         sym_all = sym_all and bool(qat.symmetric)
 
-        if dequant_state is not None and qlinear is not None:
-            dequant_weight = qlinear.dequantize_weight().to(dtype=weight_dtype)
+        if dequant_state is not None:
+            if qlinear is not None:
+                dequant_weight = qlinear.dequantize_weight().to(dtype=weight_dtype)
             dequant_state[f"{prefix}.weight"] = dequant_weight.detach().cpu()
-            if qlinear.bias is not None:
+            if qlinear is not None and qlinear.bias is not None:
                 dequant_state[f"{prefix}.bias"] = qlinear.bias.detach().cpu()
+            elif qlinear is None and qat.bias is not None:
+                dequant_state[f"{prefix}.bias"] = qat.bias.detach().to(dtype=weight_dtype).cpu()
             _drop_quantizer_keys(dequant_state, prefix)
             _drop_triton_keys(dequant_state, prefix)
 
@@ -712,7 +839,7 @@ def main() -> None:
         _save_state_dict(dst_dequant, dequant_state)
 
     cfg = {
-        "quant_type": "tritonv2",
+        "quant_type": "mixed" if any(v != "tritonv2" for v in quant_impl_by_module.values()) else "tritonv2",
         "bits": int(args.bits),
         "group_size": int(resolved_group_size) if resolved_group_size is not None else None,
         "pack_dtype": args.pack_dtype,
@@ -721,6 +848,7 @@ def main() -> None:
         "excluded_patterns": args.exclude,
         "sym": bool(sym_all) if converted else False,
         "sym_by_module": sym_by_module,
+        "quant_impl_by_module": quant_impl_by_module,
     }
     with open(os.path.join(dst_dir, "quantize_config.json"), "w", encoding="utf-8") as f:
         json.dump(cfg, f, indent=2, ensure_ascii=False)
@@ -791,8 +919,9 @@ def main() -> None:
         pack_dtype = getattr(torch, pack_dtype_name)
         sym_map = qcfg.get("sym_by_module", {}) or {}
         sym_default = bool(qcfg.get("sym", False))
+        impl_map = qcfg.get("quant_impl_by_module", {}) or {}
 
-        def dequant_from_packed(prefix: str) -> "torch.Tensor":
+        def dequant_from_packed_tritonv2(prefix: str) -> "torch.Tensor":
             qlinear = TritonV2QuantLinear(
                 bits=bits,
                 group_size=group_size,
@@ -811,6 +940,13 @@ def main() -> None:
             if qlinear.bias is not None and f"{prefix}.bias" in out_state:
                 qlinear.bias = out_state[f"{prefix}.bias"]
             return qlinear.dequantize_weight()
+
+        def dequant_from_packed_quant_sim(prefix: str) -> "torch.Tensor":
+            return _dequant_seq2bit_from_stored(
+                qweight=out_state[f"{prefix}.qweight"],
+                scales=out_state[f"{prefix}.scales"],
+                g_idx=out_state[f"{prefix}.g_idx"],
+            )
 
         weight_keys = [k for k in src_state.keys() if k.endswith(".weight") and k in deq_state]
         weight_keys.sort()
@@ -831,42 +967,24 @@ def main() -> None:
                 skip_src_deq += 1
                 print(f"{k}:\n  src vs dequant: {b_note} (skipped)")
                 continue
-            if f"{prefix}.qweight" in out_state:
-                c = dequant_from_packed(prefix)
+            impl = impl_map.get(prefix, "tritonv2")
+            if f"{prefix}.qweight" in out_state and impl == "tritonv2":
+                c = dequant_from_packed_tritonv2(prefix)
                 c_aligned, c_note = _align_for_compare(a, c, "packed-dequant")
-                if c_aligned is None:
-                    skip_src_packed += 1
-                    print(
-                        "\n".join(
-                            [
-                                f"{k}:",
-                                _fmt_metrics("src vs dequant", b_note, a, b_aligned),
-                                f"  src vs packed-dequant: {c_note} (skipped)",
-                            ]
-                        )
-                    )
-                    continue
-                d_note = ""
-                if b_aligned.shape != c_aligned.shape:
-                    d_note = (
-                        f"shape mismatch dequant={_shape_str(b_aligned)} "
-                        f"packed-dequant={_shape_str(c_aligned)}"
-                    )
-                if d_note:
-                    skip_deq_packed += 1
-                    deq_line = f"  dequant vs packed-dequant: {d_note} (skipped)"
-                else:
-                    deq_line = _fmt_metrics("dequant vs packed-dequant", "", b_aligned, c_aligned)
+            elif f"{prefix}.qweight" in out_state and impl == "quant_sim_linear":
+                c = dequant_from_packed_quant_sim(prefix)
+                c_aligned, c_note = _align_for_compare(a, c, "packed-dequant")
+            elif f"{prefix}.qweight" in out_state:
                 print(
                     "\n".join(
                         [
                             f"{k}:",
                             _fmt_metrics("src vs dequant", b_note, a, b_aligned),
-                            _fmt_metrics("src vs packed-dequant", c_note, a, c_aligned),
-                            deq_line,
+                            f"  src vs packed-dequant: skipped (unsupported impl={impl}).",
                         ]
                     )
                 )
+                continue
             else:
                 print(
                     "\n".join(
@@ -876,6 +994,41 @@ def main() -> None:
                         ]
                     )
                 )
+                continue
+
+            if c_aligned is None:
+                skip_src_packed += 1
+                print(
+                    "\n".join(
+                        [
+                            f"{k}:",
+                            _fmt_metrics("src vs dequant", b_note, a, b_aligned),
+                            f"  src vs packed-dequant: {c_note} (skipped)",
+                        ]
+                    )
+                )
+                continue
+            d_note = ""
+            if b_aligned.shape != c_aligned.shape:
+                d_note = (
+                    f"shape mismatch dequant={_shape_str(b_aligned)} "
+                    f"packed-dequant={_shape_str(c_aligned)}"
+                )
+            if d_note:
+                skip_deq_packed += 1
+                deq_line = f"  dequant vs packed-dequant: {d_note} (skipped)"
+            else:
+                deq_line = _fmt_metrics("dequant vs packed-dequant", "", b_aligned, c_aligned)
+            print(
+                "\n".join(
+                    [
+                        f"{k}:",
+                        _fmt_metrics("src vs dequant", b_note, a, b_aligned),
+                        _fmt_metrics("src vs packed-dequant", c_note, a, c_aligned),
+                        deq_line,
+                    ]
+                )
+            )
         if skip_src_deq or skip_src_packed or skip_deq_packed:
             print(
                 "Compare summary (skipped due to shape mismatch): "
@@ -954,21 +1107,36 @@ def export_tritonv2_quantized_checkpoint(
     skipped: List[Tuple[str, str]] = []
     resolved_group_size: Optional[int] = group_size
     sym_by_module: Dict[str, bool] = {}
+    quant_impl_by_module: Dict[str, str] = {}
     sym_all = True
 
     for prefix in prefixes:
         qat = _extract_qat_params(state, prefix)
         try:
-            packed, qlinear = _pack_one_linear(
-                prefix=prefix,
-                qat=qat,
-                bits=int(bits),
-                group_size=group_size,
-                pack_dtype=pack_dtype_t,
-                weight_dtype=weight_dtype_t,
-                qat_param_order=qat_param_order,
-                return_dequant=dequant_state is not None,
-            )
+            if qat.quantizer_type == "seq2bit":
+                if int(bits) != 2:
+                    raise ValueError(f"{prefix}: seq2bit export requires bits=2, got bits={bits}")
+                packed, dequant_weight = _pack_one_linear_seq2bit_torch(
+                    prefix=prefix,
+                    qat=qat,
+                    group_size=group_size,
+                    weight_dtype=weight_dtype_t,
+                )
+                qlinear = None
+                quant_impl_by_module[prefix] = "quant_sim_linear"
+            else:
+                packed, qlinear = _pack_one_linear(
+                    prefix=prefix,
+                    qat=qat,
+                    bits=int(bits),
+                    group_size=group_size,
+                    pack_dtype=pack_dtype_t,
+                    weight_dtype=weight_dtype_t,
+                    qat_param_order=qat_param_order,
+                    return_dequant=dequant_state is not None,
+                )
+                dequant_weight = None
+                quant_impl_by_module[prefix] = "tritonv2"
         except Exception as e:
             _drop_quantizer_keys(new_state, prefix)
             skipped.append((prefix, f"{type(e).__name__}: {e}"))
@@ -987,11 +1155,14 @@ def export_tritonv2_quantized_checkpoint(
             idx = (g_idx == 1).nonzero(as_tuple=True)[0]
             resolved_group_size = int(idx[0].item()) if idx.numel() else int(g_idx.numel())
 
-        if dequant_state is not None and qlinear is not None:
-            dequant_weight = qlinear.dequantize_weight().to(dtype=weight_dtype_t)
+        if dequant_state is not None:
+            if qlinear is not None:
+                dequant_weight = qlinear.dequantize_weight().to(dtype=weight_dtype_t)
             dequant_state[f"{prefix}.weight"] = dequant_weight.detach().cpu()
-            if qlinear.bias is not None:
+            if qlinear is not None and qlinear.bias is not None:
                 dequant_state[f"{prefix}.bias"] = qlinear.bias.detach().cpu()
+            elif qlinear is None and qat.bias is not None:
+                dequant_state[f"{prefix}.bias"] = qat.bias.detach().to(dtype=weight_dtype_t).cpu()
             _drop_quantizer_keys(dequant_state, prefix)
             _drop_triton_keys(dequant_state, prefix)
 
@@ -1004,7 +1175,7 @@ def export_tritonv2_quantized_checkpoint(
         _save_state_dict(dst_dequant_dir, dequant_state)
 
     cfg: Dict[str, object] = {
-        "quant_type": "tritonv2",
+        "quant_type": "mixed" if any(v != "tritonv2" for v in quant_impl_by_module.values()) else "tritonv2",
         "bits": int(bits),
         "group_size": int(resolved_group_size) if resolved_group_size is not None else None,
         "pack_dtype": pack_dtype,
@@ -1013,6 +1184,7 @@ def export_tritonv2_quantized_checkpoint(
         "excluded_patterns": exclude,
         "sym": bool(sym_all) if converted else False,
         "sym_by_module": sym_by_module,
+        "quant_impl_by_module": quant_impl_by_module,
     }
     with open(os.path.join(dst_dir, "quantize_config.json"), "w", encoding="utf-8") as f:
         json.dump(cfg, f, indent=2, ensure_ascii=False)

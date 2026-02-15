@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-export CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-2,3,4,5}"
-export NPROC_PER_NODE=4
+export CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-0,1,2,3,4,5,6,7}"
+export NPROC_PER_NODE=8
 
 parallel=false
 hold=false
@@ -49,20 +49,27 @@ check_gpu_memory() {
 show_progress_bar() {
     local duration=600
     local cols=$(tput cols 2>/dev/null || echo 80)
-    local bar_width=$((cols - 25))
-    
+    # Keep bar width conservative to avoid line wrapping on narrow terminals.
+    local bar_width=$((cols - 36))
+    if (( bar_width < 10 )); then
+        bar_width=10
+    elif (( bar_width > 60 )); then
+        bar_width=60
+    fi
+
     for ((i=0; i<=duration; i++)); do
         local percent=$((i * 100 / duration))
         local filled=$((i * bar_width / duration))
         local empty=$((bar_width - filled))
-        
-        printf "\r\033[K["
-        printf "%${filled}s" | tr ' ' '█'
-        printf "%${empty}s" | tr ' ' '░'
-        printf "] %3d%% | Next check in %2ds" "$percent" "$((duration - i))"
+
+        # Single-line refresh: CR + clear line + redraw.
+        printf "\r\033[2K["
+        printf "%${filled}s" "" | tr ' ' '#'
+        printf "%${empty}s" "" | tr ' ' '-'
+        printf "] %3d%% | Next check in %3ds" "$percent" "$((duration - i))"
         sleep 1
     done
-    printf "\r\033[K"
+    printf "\r\033[2K"
 }
 
 # 如果开启 --hold，等待GPU显存充足
@@ -80,34 +87,50 @@ if "$hold"; then
 fi
 
 train_cmds=(
-  # "bash ./VeOmni/train.sh ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/qwen2-0.5B/qwen2-05B-int4.yaml"
-  # "bash ./VeOmni/train.sh ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/qwen2-0.5B/qwen2-05B-int4-gradual.yaml"
-#   "bash ./VeOmni/train.sh ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/qwen2-0.5B/qwen2-05B-int2.yaml"
-#   "bash ./VeOmni/train.sh ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/qwen2-0.5B/qwen2-05B-int2-gradual.yaml"
-  "bash ./VeOmni/train.sh ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/qwen2-0.5B/qwen2-05B-int2-gradual-kd.yaml"
-  "bash ./VeOmni/train.sh ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/qwen2-0.5B/qwen2-05B-int2-kd.yaml"
-  "bash ./VeOmni/train.sh ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/qwen2-0.5B/qwen2-05B-int3-kd.yaml"
-  "bash ./VeOmni/train.sh ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/qwen2-0.5B/qwen2-05B-int3-gradual-kd.yaml"
+  # ===== Active jobs =====
+  # Seq2Bit-KD (LLaMA)
+  "bash ./VeOmni/train.sh ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/llama2-7B/llama2-7B-seq2bit-kd.yaml"
+  "bash ./VeOmni/train.sh ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/llama3-8B/llama3-8B-seq2bit-kd.yaml"
+
+  # ===== Presets (commented) =====
+  # Baseline / non-KD (Qwen2-0.5B)
+  # "bash ./VeOmni/train.sh ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/qwen2-0.5B/qwen2-05B.yaml"
+  # "bash ./VeOmni/train.sh ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/qwen2-0.5B/qwen2-05B-int2.yaml"
   # "bash ./VeOmni/train.sh ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/qwen2-0.5B/qwen2-05B-int4.yaml"
   # "bash ./VeOmni/train.sh ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/qwen2-0.5B/qwen2-05B-int8.yaml"
+
+  # Gradual schedules (Qwen2-0.5B / Qwen2-3B)
+  # "bash ./VeOmni/train.sh ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/qwen2-0.5B/qwen2-05B-int2-gradual.yaml"
+  # "bash ./VeOmni/train.sh ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/qwen2-0.5B/qwen2-05B-int4-gradual.yaml"
+  # "bash ./VeOmni/train.sh ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/qwen2-0.5B/qwen2-05B-int8-gradual.yaml"
   # "bash ./VeOmni/train.sh ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/qwen2-0.5B/qwen2-05B-gradual-end025.yaml"
   # "bash ./VeOmni/train.sh ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/qwen2-0.5B/qwen2-05B-gradual-end050.yaml"
   # "bash ./VeOmni/train.sh ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/qwen2-0.5B/qwen2-05B-gradual-end075.yaml"
   # "bash ./VeOmni/train.sh ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/qwen2-3B/qwen2-3B-int2-gradual.yaml"
+
+  # Seq2Bit / Seq2Bit-KD
+  # "bash ./VeOmni/train.sh ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/qwen2-0.5B/qwen2-05B-seq2bit.yaml"
+  # "bash ./VeOmni/train.sh ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/qwen2-0.5B/qwen2-05B-seq2bit-kd.yaml"
+  # "bash ./VeOmni/train.sh ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/qwen2-3B/qwen2-3B-seq2bit-kd.yaml"
+  "bash ./VeOmni/train.sh ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/qwen2-7B/qwen2-7B-seq2bit-kd.yaml"
+
+  # INT2-KD / INT4-KD / INT8-KD
+  # "bash ./VeOmni/train.sh ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/qwen2-0.5B/qwen2-05B-int2-kd.yaml"
+  # "bash ./VeOmni/train.sh ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/qwen2-0.5B/qwen2-05B-int2-gradual-kd.yaml"
+  # "bash ./VeOmni/train.sh ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/qwen2-0.5B/qwen2-05B-int4-kd.yaml"
+  # "bash ./VeOmni/train.sh ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/qwen2-0.5B/qwen2-05B-int8-kd.yaml"
   # "bash ./VeOmni/train.sh ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/qwen2-3B/qwen2-3B-int2.yaml"
   # "bash ./VeOmni/train.sh ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/qwen2-3B/qwen2-3B-int2-gradual-kd.yaml"
   # "bash ./VeOmni/train.sh ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/qwen2-3B/qwen2-3B-int2-kd.yaml"
-  # "bash ./VeOmni/train.sh ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/qwen2-0.5B/qwen2-05B-int4-kd.yaml"
-  # "bash ./VeOmni/train.sh ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/qwen2-0.5B/qwen2-05B-int8-kd.yaml"
-  # "bash ./VeOmni/train.sh ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/qwen2-0.5B/qwen2-05B-int4-gradual.yaml"
-  # "bash ./VeOmni/train.sh ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/qwen2-0.5B/qwen2-05B-int8-gradual.yaml"
-  # "bash ./VeOmni/train.sh ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/llama2-7B/llama2-7B-int2-kd.yaml"
-  # "bash ./VeOmni/train.sh ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/llama3-8B/llama3-8B-int2-kd.yaml"
-#   "bash ./VeOmni/train.sh ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/qwen2-7B/qwen2-7B-int2-kd.yaml"
+  "bash ./VeOmni/train.sh ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/llama2-7B/llama2-7B-int2-kd.yaml"
+  "bash ./VeOmni/train.sh ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/llama3-8B/llama3-8B-int2-kd.yaml"
+  "bash ./VeOmni/train.sh ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/qwen2-7B/qwen2-7B-int2-kd.yaml"
   
-  # INT3-KD training - ordered by model size (small to large)
-#   "bash ./VeOmni/train.sh ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/qwen2-0.5B/qwen2-05B-int2-kd-multistep.yaml"
-#   "bash ./VeOmni/train.sh ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/qwen2-0.5B/qwen2-05B-int3-kd-multistep.yaml"
+  # INT3-KD variants
+  # "bash ./VeOmni/train.sh ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/qwen2-0.5B/qwen2-05B-int3-kd.yaml"
+  # "bash ./VeOmni/train.sh ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/qwen2-0.5B/qwen2-05B-int3-gradual-kd.yaml"
+  # "bash ./VeOmni/train.sh ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/qwen2-0.5B/qwen2-05B-int2-kd-multistep.yaml"
+  # "bash ./VeOmni/train.sh ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/qwen2-0.5B/qwen2-05B-int3-kd-multistep.yaml"
   # "bash ./VeOmni/train.sh ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/qwen2-3B/qwen2-3B-int3-kd.yaml"
   # "bash ./VeOmni/train.sh ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/qwen2-7B/qwen2-7B-int3-kd.yaml"
   # "bash ./VeOmni/train.sh ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/llama2-7B/llama2-7B-int3-kd.yaml"
@@ -118,6 +141,62 @@ train_cmds=(
 get_output_dir() {
     local yaml_file=$1
     python3 -c "import yaml; print(yaml.safe_load(open('$yaml_file'))['train']['output_dir'])" 2>/dev/null
+}
+
+resolve_eval_path() {
+    local out_dir="$1"
+    local checkpoints_dir="$out_dir/checkpoints"
+    local quant_cfg="$checkpoints_dir/out/quantize_config.json"
+    local quant_type=""
+
+    if [[ -f "$quant_cfg" ]]; then
+        quant_type=$(python3 - <<'PY' "$quant_cfg"
+import json, sys
+try:
+    with open(sys.argv[1], 'r', encoding='utf-8') as f:
+        print((json.load(f) or {}).get('quant_type', ''))
+except Exception:
+    print('')
+PY
+)
+    fi
+
+    # Seq2Bit torch simulated export writes quant_type=mixed.
+    # For evaluation, prefer dequantized HF-style checkpoint in this case.
+    if [[ "$quant_type" == "mixed" && -d "$checkpoints_dir/out_dequant" ]]; then
+        echo "$checkpoints_dir/out_dequant"
+        return 0
+    fi
+
+    if [[ -d "$checkpoints_dir/out" ]]; then
+        echo "$checkpoints_dir/out"
+        return 0
+    fi
+    if [[ -d "$checkpoints_dir/out_dequant" ]]; then
+        echo "$checkpoints_dir/out_dequant"
+        return 0
+    fi
+
+    # Fallback to latest HF checkpoint if packed export is not present.
+    local latest_hf=""
+    local latest_step=-1
+    if [[ -d "$checkpoints_dir" ]]; then
+        for d in "$checkpoints_dir"/global_step_*; do
+            [[ -d "$d" ]] || continue
+            local step="${d##*_}"
+            [[ "$step" =~ ^[0-9]+$ ]] || continue
+            if [[ -d "$d/hf_ckpt" ]] && (( step > latest_step )); then
+                latest_step=$step
+                latest_hf="$d/hf_ckpt"
+            fi
+        done
+    fi
+    if [[ -n "$latest_hf" ]]; then
+        echo "$latest_hf"
+        return 0
+    fi
+
+    return 1
 }
 
 eval_paths=()
@@ -131,7 +210,7 @@ for cmd in "${train_cmds[@]}"; do
     if [[ -f "$config_file" ]]; then
         out_dir=$(get_output_dir "$config_file")
         if [[ -n "$out_dir" ]]; then
-            eval_paths+=("$out_dir/checkpoints/out")
+            eval_paths+=("$out_dir")
         else
              echo "Warning: Could not extract output_dir from $config_file"
         fi
@@ -169,10 +248,19 @@ fi
 
 echo "Training complete. Starting evaluation..."
 
-if [ ${#eval_paths[@]} -gt 0 ]; then
-    echo "Evaluation paths: ${eval_paths[*]}"
+resolved_eval_paths=()
+for out_dir in "${eval_paths[@]}"; do
+    if path=$(resolve_eval_path "$out_dir"); then
+        resolved_eval_paths+=("$path")
+    else
+        echo "Warning: No evaluable checkpoint found under $out_dir (expected checkpoints/out or global_step_*/hf_ckpt)."
+    fi
+done
+
+if [ ${#resolved_eval_paths[@]} -gt 0 ]; then
+    echo "Evaluation paths: ${resolved_eval_paths[*]}"
     if [ -f "script/eval.sh" ]; then
-        bash script/eval.sh "${eval_paths[@]}"
+        bash script/eval.sh "${resolved_eval_paths[@]}"
     else
         echo "Error: script/eval.sh not found."
         exit 1

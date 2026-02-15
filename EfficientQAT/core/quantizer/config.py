@@ -7,7 +7,7 @@ class QuantConfig:
     """量化参数配置类
 
     Attributes:
-        quant_type (str): 量化类型 ('uniform_affine' 或 'gradual')
+        quant_type (str): 量化类型 ('uniform_affine'、'gradual' 或 'seq2bit')
         n_bits (int): 量化位数 (默认: 8)
         group_size (int): 分组大小 (默认: 128)
         clamp_method (str): 截断方法 ('STE' 或 'MAD') (默认: 'STE')
@@ -27,7 +27,7 @@ class QuantConfig:
         ramp_mode (str): 过渡调度函数 ('linear' 或 'sigmoid') (默认: 'linear')
         ramp_sigmoid_a (float): sigmoid 过渡斜率 (默认: 10.0)
     """
-    quant_type: str = "uniform_affine"  # "uniform_affine" | "gradual" - 量化类型
+    quant_type: str = "uniform_affine"  # "uniform_affine" | "gradual" | "seq2bit" - 量化类型
     n_bits: int = 8  # 量化位数
     group_size: int = 128  # 分组大小
     clamp_method: str = "STE"  # "STE" | "MAD" - 截断方法

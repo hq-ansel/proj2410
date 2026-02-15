@@ -2,6 +2,9 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+
+# 所有输出同时显示在屏幕并写入 exp.log
+exec > >(tee -a "$REPO_ROOT/exp.log") 2>&1
 EVAL_SH="$REPO_ROOT/script/eval.sh"
 
 quant_root="$REPO_ROOT/quant_model"
@@ -491,4 +494,4 @@ if [[ ${#missing_paths[@]} -gt 0 ]]; then
 fi
 
 wait_for_gpus_if_needed
-bash "$EVAL_SH" "${final_paths[@]}"
+bash "$EVAL_SH" "${final_paths[@]}" 2>&1 | tee exp.log

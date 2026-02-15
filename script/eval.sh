@@ -6,8 +6,13 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
 # Set environment variables
 export HF_HOME="${HF_HOME:-$REPO_ROOT/hf_home}"
+export HF_DATASETS_CACHE="${HF_DATASETS_CACHE:-$HF_HOME/datasets}"
 export CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-0,1,2,3,4,5,6,7}"
 export PYTHONPATH="$REPO_ROOT:$PYTHONPATH"
+# Prefer local cached datasets/models during evaluation to avoid HF Hub retries.
+# Override with HF_DATASETS_OFFLINE=0 / HF_HUB_OFFLINE=0 when remote access is needed.
+export HF_DATASETS_OFFLINE="${HF_DATASETS_OFFLINE:-1}"
+export HF_HUB_OFFLINE="${HF_HUB_OFFLINE:-1}"
 
 # Parse arguments for evaluation paths
 if [ "$#" -gt 0 ]; then

@@ -2,6 +2,7 @@
 
 from .config import QuantConfig
 from .uniform_affine import UniformAffineQuantizer, QuantLog
+from .seq2bit_quantizer import Seq2BitQuantizer
 from .gradual import GradualQuantizer
 
 # 仅导出类型，不需要具体实现
@@ -23,6 +24,7 @@ __all__ = [
     "QuantConfig",
     "UniformAffineQuantizer",
     "QuantLog",
+    "Seq2BitQuantizer",
     "GradualQuantizer",
     "PriorityCalculator",
     "UniformPriorityCalculator",

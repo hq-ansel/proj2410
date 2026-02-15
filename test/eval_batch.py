@@ -33,6 +33,96 @@ def load_quantized_model(path: str):
     return model, tokenizer
 
 
+def _get_submodule(root: torch.nn.Module, name: str):
+    try:
+        return root.get_submodule(name)
+    except AttributeError:
+        mod = root
+        for part in name.split("."):
+            mod = mod[int(part)] if part.isdigit() else getattr(mod, part)
+        return mod
+
+
+def _unpack_qweight_2bit(qweight: torch.Tensor, in_features: int) -> torch.Tensor:
+    # qweight: [out_features, in_features/16] int32
+    qweight = qweight.to(dtype=torch.int32)
+    out_features = qweight.shape[0]
+    pack_factor = 16  # 32 / 2
+    unpacked = []
+    for i in range(pack_factor):
+        unpacked.append((qweight >> (2 * i)) & 0x3)
+    codes = torch.stack(unpacked, dim=-1).reshape(out_features, -1)
+    if codes.shape[1] != in_features:
+        codes = codes[:, :in_features]
+    return codes
+
+
+def _dequant_seq2bit_from_packed(
+    qweight: torch.Tensor,
+    scales: torch.Tensor,
+    g_idx: torch.Tensor,
+) -> torch.Tensor:
+    # codes -> levels: {0,1,2,3} -> {-0.75,-0.25,0.25,0.75}
+    in_features = int(g_idx.numel())
+    codes = _unpack_qweight_2bit(qweight, in_features=in_features).to(torch.float32)
+    levels = codes * 0.5 - 0.75
+
+    # alpha per input pos via group index
+    g_idx = g_idx.to(dtype=torch.long).view(1, -1)
+    scales = scales.to(torch.float32)
+    alpha = torch.gather(scales, 1, g_idx.expand(scales.shape[0], -1))
+    return levels * alpha
+
+
+def load_mixed_quantized_model_torch_sim(path: str):
+    qcfg = _load_quantize_config(path) or {}
+    state = load_tritonv2_quant._load_state_dict(path)  # reuse loader utilities
+
+    # Build fp model and load all non-packed weights first.
+    model_dir = str(path)
+    config = AutoConfig.from_pretrained(model_dir, trust_remote_code=True, local_files_only=True)
+    try:
+        model = AutoModelForCausalLM.from_config(config, trust_remote_code=True, torch_dtype=torch.float16)
+    except TypeError:
+        model = AutoModelForCausalLM.from_config(config, trust_remote_code=True)
+        model = model.to(dtype=torch.float16)
+    tokenizer = AutoTokenizer.from_pretrained(model_dir, trust_remote_code=True, local_files_only=True)
+
+    packed_suffixes = (".qweight", ".qzeros", ".scales", ".g_idx")
+    filtered_state = {k: v for k, v in state.items() if not k.endswith(packed_suffixes)}
+    model.load_state_dict(filtered_state, strict=False)
+
+    converted = qcfg.get("converted_modules") or []
+    impl_map = qcfg.get("quant_impl_by_module") or {}
+
+    for prefix in converted:
+        impl = impl_map.get(prefix, "tritonv2")
+        if impl != "seq2bit_torch_pack":
+            continue
+        qweight_key = f"{prefix}.qweight"
+        scales_key = f"{prefix}.scales"
+        g_idx_key = f"{prefix}.g_idx"
+        if qweight_key not in state or scales_key not in state or g_idx_key not in state:
+            continue
+
+        w = _dequant_seq2bit_from_packed(
+            qweight=state[qweight_key],
+            scales=state[scales_key],
+            g_idx=state[g_idx_key],
+        )
+        mod = _get_submodule(model, prefix)
+        if not isinstance(mod, torch.nn.Linear):
+            continue
+        mod.weight.data.copy_(w.to(device=mod.weight.device, dtype=mod.weight.dtype))
+        b_key = f"{prefix}.bias"
+        if mod.bias is not None and b_key in state:
+            mod.bias.data.copy_(state[b_key].to(device=mod.bias.device, dtype=mod.bias.dtype))
+
+    model = model.to("cuda")
+    model.eval()
+    return model, tokenizer
+
+
 def _load_quantize_config(path: str):
     cand = Path(path) / "quantize_config.json"
     if cand.is_file():
@@ -233,6 +323,10 @@ def load_model_and_tokenizer(quant_path):
     quant_path = str(quant_path)
     if os.path.isfile(os.path.join(quant_path, "quantize_config.json")):
         qcfg = _load_quantize_config(quant_path)
+        quant_type = (qcfg or {}).get("quant_type", "")
+        if quant_type == "mixed":
+            print("Info: quant_type=mixed detected, using mixed quant loader (tritonv2 + quant_sim_linear).")
+            return load_quantized_model(quant_path)
         converted = qcfg.get("converted_modules") if qcfg else None
         if converted:
             return load_quantized_model(quant_path)

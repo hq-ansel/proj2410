@@ -1,5 +1,6 @@
 #!/bin/bash
 
+set -euo pipefail
 set -x
 
 export TOKENIZERS_PARALLELISM=false
@@ -13,6 +14,7 @@ NPROC_PER_NODE=${NPROC_PER_NODE:=$(nvidia-smi --list-gpus | wc -l)}
 NODE_RANK=${NODE_RANK:=0}
 MASTER_ADDR=${MASTER_ADDR:=127.0.0.1}
 MASTER_PORT=${MASTER_PORT:=12345}
+additional_args=${additional_args:-}
 # PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 if [[ "$NNODES" == "1" ]]; then
@@ -25,4 +27,5 @@ torchrun \
   --nnodes=$NNODES \
   --nproc-per-node=$NPROC_PER_NODE \
   --node-rank=$NODE_RANK \
-  $additional_args $@ 2>&1 | tee log.txt
+  $additional_args "$@" 2>&1 | tee log.txt
+exit ${PIPESTATUS[0]}

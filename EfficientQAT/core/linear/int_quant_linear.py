@@ -6,6 +6,7 @@ import torch.nn.functional as F
 from ..quantizer import(
     UniformAffineQuantizer,
     GradualQuantizer,
+    Seq2BitQuantizer,
     QuantConfig
 )
 
@@ -14,7 +15,7 @@ def build_weight_quantizer(
     prefix: str,
     weight: torch.Tensor,
     config: QuantConfig,
-) -> Union[UniformAffineQuantizer, GradualQuantizer]:
+) -> Union[UniformAffineQuantizer, GradualQuantizer, Seq2BitQuantizer]:
     """
     根据配置构建并返回相应的权重量化器实例
 
@@ -33,6 +34,8 @@ def build_weight_quantizer(
         return UniformAffineQuantizer(prefix, weight, config)
     elif config.quant_type == "gradual":
         return GradualQuantizer(prefix, weight, config)
+    elif config.quant_type == "seq2bit":
+        return Seq2BitQuantizer(prefix, weight, config)
     else:
         # fallback to uniform_affine 如果是无设置初始化
         # prefix 应该要能够通过上下文推测出来
@@ -330,6 +333,9 @@ def reinit_quant_params(model: nn.Module) -> None:
     for m in model.modules():
         if isinstance(m, IntQuantLinear) and m.weight_quantizer is not None:
             q = m.weight_quantizer
+            if hasattr(q, "update_qparams_from_weight"):
+                q.update_qparams_from_weight(m.weight)
+                continue
             scale, zp = q.init_with_weight(
                 m.weight,
                 q.n_bits,
@@ -389,6 +395,9 @@ def sanitize_quant_params(model: nn.Module) -> int:
     for m in model.modules():
         if isinstance(m, IntQuantLinear) and m.weight_quantizer is not None:
             q = m.weight_quantizer
+            if hasattr(q, "sanitize_qparams"):
+                repaired += int(q.sanitize_qparams())
+                continue
             if hasattr(q, "scale") and isinstance(q.scale, nn.Parameter):
                 scale = q.scale.data
                 if not torch.isfinite(scale).all():

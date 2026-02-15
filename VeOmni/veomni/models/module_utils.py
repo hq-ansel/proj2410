@@ -218,8 +218,20 @@ def _dispatch_buffer(
 
         device_mesh = getattr(orig_tensor, "device_mesh")
         placements = getattr(orig_tensor, "placements")
+        # Fallback for missing checkpoint buffer entries under meta init:
+        # construct deterministic zeros if source buffer is meta.
+        if getattr(buffer, "is_meta", False):
+            shape = tuple(orig_tensor.shape)
+            buffer = torch.zeros(shape, dtype=orig_tensor.dtype, device="cpu")
         module._buffers[name] = dtensor_factory(buffer.to(dtype=orig_tensor.dtype), device_mesh, placements)
     else:
+        # Fallback strategy for buffers mirrors parameter fallback intent:
+        # when checkpoint does not provide a real tensor and source is meta,
+        # initialize the destination buffer with zeros instead of failing.
+        if getattr(buffer, "is_meta", False):
+            module._buffers[name].zero_()
+            logger.warning_rank0("Buffer `%s` is missing in checkpoint; initialized to zeros.", name)
+            return
         module._buffers[name].copy_(buffer.to(device=orig_tensor.device, dtype=orig_tensor.dtype))
 
 

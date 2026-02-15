@@ -8,6 +8,7 @@ from .q_linear_triton_kernels import (
     make_dequant_configs,
     quant_matmul,
 )
+from .quant_sim_linear import QuantSimLinear
 from .q_linear_tritonv2 import TritonV2QuantLinear
 
 __all__ = [
@@ -23,5 +24,6 @@ __all__ = [
     "dequant",
     "make_dequant_configs",
     "quant_matmul",
+    "QuantSimLinear",
     "TritonV2QuantLinear",
 ]

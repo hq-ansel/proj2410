@@ -140,6 +140,7 @@ def load_tritonv2_quantized_model(
     import torch.nn as nn
     from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
 
+    from EfficientQAT.core.linear.quant_sim_linear import QuantSimLinear
     from EfficientQAT.core.linear.q_linear_tritonv2 import TritonV2QuantLinear
 
     model_dir = os.path.abspath(model_dir)
@@ -149,12 +150,16 @@ def load_tritonv2_quantized_model(
     if os.path.isfile(cfg_path):
         with open(cfg_path, "r", encoding="utf-8") as f:
             qcfg = json.load(f)
+        quant_type = qcfg.get("quant_type", "tritonv2")
+        if quant_type not in ("tritonv2", "mixed"):
+            raise RuntimeError(f"Unsupported quant_type='{quant_type}'. Expected 'tritonv2' or 'mixed'.")
         bits = int(qcfg["bits"])
         group_size = int(qcfg["group_size"]) if qcfg.get("group_size") is not None else None
         pack_dtype = _parse_pack_dtype(qcfg.get("pack_dtype", "int32"))
         converted = qcfg.get("converted_modules") or []
         sym = bool(qcfg.get("sym", False))
         sym_by_module = qcfg.get("sym_by_module", {}) or {}
+        impl_by_module = qcfg.get("quant_impl_by_module", {}) or {}
         if qcfg.get("excluded_patterns"):
             exclude_patterns = list(exclude_patterns) + list(qcfg["excluded_patterns"])
     else:
@@ -165,6 +170,7 @@ def load_tritonv2_quantized_model(
         converted = []
         sym = False
         sym_by_module = {}
+        impl_by_module = {}
 
     state = _load_state_dict(model_dir)
     prefixes = converted or _discover_quantized_prefixes(state)
@@ -188,8 +194,15 @@ def load_tritonv2_quantized_model(
         model = model.to(dtype=torch_dtype)
     model.eval()
 
+    consumed_quant_sim_keys = set()
+
     # Replace modules before loading weights
     for prefix in prefixes:
+        impl = impl_by_module.get(prefix)
+        if impl is None:
+            # Backward compatibility for early mixed exports without impl map.
+            has_qzeros = f"{prefix}.qzeros" in state
+            impl = "tritonv2" if has_qzeros else "quant_sim_linear"
         # Retrieve current module to get shapes
         try:
             mod = model.get_submodule(prefix)
@@ -204,22 +217,64 @@ def load_tritonv2_quantized_model(
         if bits is None:
             raise RuntimeError("Missing quantize_config.json (bits/group_size/pack_dtype are required).")
 
-        qlinear = TritonV2QuantLinear(
-            bits=bits,
-            group_size=group_size if group_size is not None else mod.in_features,
-            desc_act=False,
-            sym=bool(sym_by_module.get(prefix, sym)),
-            in_features=mod.in_features,
-            out_features=mod.out_features,
-            bias=mod.bias is not None,
-            pack_dtype=pack_dtype,
-        )
-        qlinear.post_init()
-        _set_module(model, prefix, qlinear)
+        if impl == "tritonv2":
+            qlinear = TritonV2QuantLinear(
+                bits=bits,
+                group_size=group_size if group_size is not None else mod.in_features,
+                desc_act=False,
+                sym=bool(sym_by_module.get(prefix, sym)),
+                in_features=mod.in_features,
+                out_features=mod.out_features,
+                bias=mod.bias is not None,
+                pack_dtype=pack_dtype,
+            )
+            qlinear.post_init()
+            _set_module(model, prefix, qlinear)
+            continue
+
+        if impl in ("quant_sim_linear", "seq2bit_torch_pack"):
+            g_idx_key = f"{prefix}.g_idx"
+            qweight_key = f"{prefix}.qweight"
+            scales_key = f"{prefix}.scales"
+            resolved_group_size = group_size
+            if resolved_group_size is None and g_idx_key in state:
+                g_idx = state[g_idx_key].to(dtype=torch.int64)
+                idx = (g_idx == 1).nonzero(as_tuple=True)[0]
+                resolved_group_size = int(idx[0].item()) if idx.numel() else int(g_idx.numel())
+            if resolved_group_size is None:
+                resolved_group_size = mod.in_features
+            qsim = QuantSimLinear(
+                in_features=mod.in_features,
+                out_features=mod.out_features,
+                bits=bits,
+                group_size=resolved_group_size,
+                impl="seq2bit",
+                bias=mod.bias is not None,
+            )
+            if qweight_key not in state or scales_key not in state or g_idx_key not in state:
+                raise RuntimeError(
+                    f"{prefix}: missing quant-sim tensors; requires {qweight_key}, {scales_key}, {g_idx_key}"
+                )
+            # Directly assign quant-sim buffers to avoid shape mismatch in load_state_dict.
+            qsim.qweight = state.pop(qweight_key)
+            qsim.scales = state.pop(scales_key)
+            qsim.g_idx = state.pop(g_idx_key)
+            consumed_quant_sim_keys.update({qweight_key, scales_key, g_idx_key})
+            # Legacy seq2bit_torch_pack exports may carry qzeros for compatibility.
+            qzeros_key = f"{prefix}.qzeros"
+            if qzeros_key in state:
+                state.pop(qzeros_key)
+                consumed_quant_sim_keys.add(qzeros_key)
+            _set_module(model, prefix, qsim)
+            continue
+
+        raise RuntimeError(f"{prefix}: unsupported quant impl '{impl}'")
 
     missing, unexpected = model.load_state_dict(state, strict=False)
     if unexpected:
         raise RuntimeError(f"Unexpected keys when loading quantized checkpoint: {unexpected[:20]}")
+    if missing:
+        missing = [k for k in missing if k not in consumed_quant_sim_keys]
     if missing:
         raise RuntimeError(f"Missing keys when loading quantized checkpoint: {missing[:20]}")
 

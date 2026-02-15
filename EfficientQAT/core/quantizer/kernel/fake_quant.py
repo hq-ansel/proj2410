@@ -101,6 +101,43 @@ def fake_quant_ste(x: torch.Tensor,
     return FakeQuantSTE.apply(x, scale, zp, int(qmin), int(qmax), int(group_size))
 
 
+class FakeQuantSTESeq2Bit(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, x, alpha, group_size: int):
+        assert x.is_cuda and x.is_contiguous()
+        assert alpha.is_cuda and alpha.is_contiguous()
+        assert alpha.dtype in (torch.float16, torch.bfloat16, torch.float32)
+        assert group_size in (64, 128, 256)
+        assert x.numel() % group_size == 0
+        assert alpha.numel() == x.numel() // group_size
+
+        with _nvtx_range("fake_quant_seq2bit_fwd"):
+            y = _ext.fake_quant_ste_seq2bit_fwd_cuda(x, alpha, int(group_size))
+
+        ctx.group_size = int(group_size)
+        ctx.save_for_backward(x, alpha)
+        return y
+
+    @staticmethod
+    def backward(ctx, dy):
+        x, alpha = ctx.saved_tensors
+        G = ctx.group_size
+        dy2 = dy.contiguous()
+
+        with _nvtx_range("fake_quant_seq2bit_bwd"):
+            dx, dalpha = _ext.fake_quant_ste_seq2bit_bwd_cuda(x, dy2, alpha, int(G))
+
+        return dx, dalpha, None
+
+
+def fake_quant_ste_seq2bit(
+    x: torch.Tensor,
+    alpha: torch.Tensor,
+    group_size: int,
+) -> torch.Tensor:
+    return FakeQuantSTESeq2Bit.apply(x, alpha, int(group_size))
+
+
 def _make_qparams(x: torch.Tensor, qmin: int, qmax: int):
     x2 = x.detach().reshape(x.shape[0], -1)
     scale = x2.abs().amax(dim=1) / max(int(qmax), 1)

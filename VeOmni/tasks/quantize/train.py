@@ -911,7 +911,13 @@ def _compute_quant_stats_for_module(
     prev_weight: torch.Tensor | None,
 ) -> tuple[Dict[str, float], torch.Tensor, torch.Tensor] | None:
     q = getattr(module, "weight_quantizer", None)
-    if q is None or not hasattr(q, "scale") or not hasattr(q, "zero_point"):
+    if (
+        q is None
+        or not hasattr(q, "scale")
+        or not hasattr(q, "cal_qparams")
+        or not hasattr(q, "_quantize")
+        or not hasattr(q, "_dequantize")
+    ):
         return None
     group_size = getattr(q, "group_size", None)
     if group_size is None or int(group_size) <= 0:
@@ -920,11 +926,18 @@ def _compute_quant_stats_for_module(
     with torch.no_grad():
         weight = _to_local_tensor(module.weight.detach())
         scale = _to_local_tensor(q.scale.detach())
-        zero_point = _to_local_tensor(q.zero_point.detach())
-        scale, round_zero_point = q.cal_qparams(scale, zero_point)
+        zp = getattr(q, "zero_point", None)
+        if isinstance(zp, torch.Tensor):
+            zp = _to_local_tensor(zp.detach())
+        else:
+            zp = None
+        scale, round_zero_point = q.cal_qparams(scale, zp)
         x = weight.reshape(-1, int(group_size))
         scale = scale.reshape(-1, 1)
-        round_zero_point = round_zero_point.reshape(-1, 1)
+        if isinstance(round_zero_point, torch.Tensor):
+            round_zero_point = round_zero_point.reshape(-1, 1)
+        else:
+            round_zero_point = None
 
         mask = None
         if hasattr(q, "group_mask") and q.group_mask is not None:
@@ -944,17 +957,23 @@ def _compute_quant_stats_for_module(
                 return None
             x = x[mask]
             scale = scale[mask]
-            round_zero_point = round_zero_point[mask]
+            if round_zero_point is not None:
+                round_zero_point = round_zero_point[mask]
 
-        x_int_raw = torch.round(x / scale) + round_zero_point
-        clip_mask = (x_int_raw < q.qmin) | (x_int_raw > q.qmax)
-        x_int = torch.clamp(x_int_raw, q.qmin, q.qmax)
-        sat_mask = (x_int == q.qmin) | (x_int == q.qmax)
+        x_int = q._quantize(x, scale, round_zero_point)
+        x_dequant = q._dequantize(x_int, scale, round_zero_point)
+
+        qmin = getattr(q, "qmin", None)
+        qmax = getattr(q, "qmax", None)
+        if qmin is not None and qmax is not None:
+            sat_mask = (x_int <= qmin) | (x_int >= qmax)
+            sat_rate = sat_mask.float().mean().item()
+        else:
+            sat_rate = 0.0
 
         abs_x = x.abs()
         abs_max = abs_x.max().item()
-        clip_rate = clip_mask.float().mean().item()
-        sat_rate = sat_mask.float().mean().item()
+        clip_rate = sat_rate
 
         stats: Dict[str, float] = {
             "clip_rate": clip_rate,
@@ -966,8 +985,7 @@ def _compute_quant_stats_for_module(
                 stats[f"weight_abs_{_percentile_label(p)}"] = torch.quantile(abs_x, p).item()
 
         weight_flat = x.reshape(-1).float()
-        quantized = (x_int - round_zero_point) * scale
-        quant_residual = (quantized - x).reshape(-1).float()
+        quant_residual = (x_dequant - x).reshape(-1).float()
         quant_norm = torch.norm(quant_residual).item()
         update_norm = 0.0
         if prev_weight is not None and prev_weight.shape == weight_flat.shape:
@@ -1375,8 +1393,13 @@ def main():
     
     # 转换到 Infra 模式 (如果启用)
     if getattr(args.quantizer, "enable_infra", False):
-        logger.info_rank0("Converting model to IntQuantLinearInfra mode.")
-        convert_to_infra(model, kernel_backend=int_matmul_backend)
+        if args.quantizer.quant_type == "seq2bit":
+            logger.warning_rank0(
+                "Seq2BitQuantizer currently uses torch simulated packing/export path; skip IntQuantLinearInfra conversion."
+            )
+        else:
+            logger.info_rank0("Converting model to IntQuantLinearInfra mode.")
+            convert_to_infra(model, kernel_backend=int_matmul_backend)
 
     frozen_modules = freeze_named_modules(model, skip_quant_modules)
     if frozen_modules:
@@ -2282,16 +2305,19 @@ def main():
             if hasattr(grad_norm, "full_tensor"):
                 grad_norm = grad_norm.full_tensor().item()
 
-            # collect mean loss across data parallel group
+            # Collect metrics across data-parallel ranks only.
+            # Loss may already be reduced inside sequence-parallel group in model loss functions.
+            # Averaging again on fsdp_group (dp_sp) can over-divide by sp_size.
+            metric_group = get_parallel_state().dp_group
             total_loss, grad_norm, total_task_loss, total_kd_loss = all_reduce(
                 (total_loss, grad_norm, total_task_loss, total_kd_loss),
-                group=get_parallel_state().fsdp_group,
+                group=metric_group,
             )
             qweight_metrics: Dict[str, float] = {}
             if enable_qweight_l2_reg:
                 qweight_l2_reg, qweight_l2_scaled = all_reduce(
                     (total_qweight_l2_reg, total_qweight_l2_scaled),
-                    group=get_parallel_state().fsdp_group,
+                    group=metric_group,
                 )
                 qweight_metrics = {
                     "monitor/quant/qweight_l2_reg": qweight_l2_reg,

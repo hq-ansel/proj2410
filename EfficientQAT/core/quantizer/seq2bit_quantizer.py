@@ -9,6 +9,27 @@ from .config import QuantConfig
 from .ops import clamp_ste, round_ste
 
 
+def _to_local_if_dtensor(x: torch.Tensor) -> torch.Tensor:
+    """Return local shard for DTensor-like inputs; no-op for regular Tensor."""
+    if hasattr(x, "to_local"):
+        return x.to_local()
+    return x
+
+
+def _align_alpha_numel(alpha: torch.Tensor, target_numel: int) -> torch.Tensor:
+    """Align alpha groups to local parameter shard size under uneven DTensor sharding."""
+    flat = alpha.reshape(-1)
+    cur = flat.numel()
+    if cur == target_numel:
+        return flat
+    if cur > target_numel:
+        return flat[:target_numel]
+    if cur == 0:
+        return torch.full((target_numel,), 1e-4, device=alpha.device, dtype=alpha.dtype)
+    pad = flat[-1:].expand(target_numel - cur)
+    return torch.cat([flat, pad], dim=0)
+
+
 class Seq2BitQuantizer(BaseQuantizer):
     """独立2-bit量化器。
 
@@ -59,6 +80,8 @@ class Seq2BitQuantizer(BaseQuantizer):
     ) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
         if weight is None:
             return None, None
+        # DTensor path: initialize from local shard to avoid reshape/view sharding propagation errors.
+        weight = _to_local_if_dtensor(weight)
         if group_size is None:
             raise ValueError("group_size must not be None")
         if weight.ndim != 2:
@@ -165,8 +188,10 @@ class Seq2BitQuantizer(BaseQuantizer):
             clamp_method=self.clamp_method,
             symmetric=False,
         )
-        alpha = alpha.to(device=weight.device, dtype=weight.dtype)
-        self.alpha.data.copy_(alpha)
+        target_alpha = _to_local_if_dtensor(self.alpha)
+        alpha = alpha.to(device=target_alpha.device, dtype=target_alpha.dtype)
+        aligned = _align_alpha_numel(alpha, target_alpha.numel()).view_as(target_alpha)
+        target_alpha.copy_(aligned)
 
     @torch.no_grad()
     def sanitize_qparams(self) -> int:

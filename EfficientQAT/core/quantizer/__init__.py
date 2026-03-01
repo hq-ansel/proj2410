@@ -4,6 +4,7 @@ from .config import QuantConfig
 from .uniform_affine import UniformAffineQuantizer, QuantLog
 from .seq2bit_quantizer import Seq2BitQuantizer
 from .gradual import GradualQuantizer
+from .pact_quantizer import PACTActivationQuantizer, PACTQuantLinear, pact_forward
 
 # 仅导出类型，不需要具体实现
 from .scheduler import (
@@ -26,6 +27,9 @@ __all__ = [
     "QuantLog",
     "Seq2BitQuantizer",
     "GradualQuantizer",
+    "PACTActivationQuantizer",
+    "PACTQuantLinear",
+    "pact_forward",
     "PriorityCalculator",
     "UniformPriorityCalculator",
     "MagnitudePriorityCalculator",

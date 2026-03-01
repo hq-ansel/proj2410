@@ -52,3 +52,9 @@ class QuantConfig:
     ramp_len: int = 0  # 渐进混合的过渡步数，0 表示禁用
     ramp_mode: str = "linear"  # "linear" | "sigmoid" - 过渡调度函数
     ramp_sigmoid_a: float = 10.0  # sigmoid 过渡的斜率
+
+    # PACT (Parametric Clipping Activation) 相关参数
+    enable_activation_quant: bool = False
+    activation_n_bits: int = 8
+    activation_group_size: int = -1
+    activation_clamp_method: str = "STE"

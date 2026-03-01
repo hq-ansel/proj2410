@@ -10,14 +10,27 @@ except Exception:
 
 _THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 
+def _fake_quant_cuda_cflags() -> list[str]:
+    """
+    Build NVCC flags for heterogeneous GPUs.
+    Override with EFFICIENTQAT_FAKE_QUANT_GENCODE, e.g.:
+      -gencode=arch=compute_86,code=sm_86 -gencode=arch=compute_120,code=sm_120
+    """
+    base = ["-O3", "--use_fast_math", "-lineinfo", "-std=c++17"]
+    custom = os.environ.get("EFFICIENTQAT_FAKE_QUANT_GENCODE", "").strip()
+    if custom:
+        return base + custom.split()
+    # Default covers this repo's common mixed setup: RTX A6000 (sm_86) + RTX 5090 (sm_120).
+    return base + [
+        "-gencode=arch=compute_86,code=sm_86",
+        "-gencode=arch=compute_89,code=sm_89",
+        "-gencode=arch=compute_120,code=sm_120",
+    ]
+
 _ext = load(
     name="fake_quant_ext",
     sources=[os.path.join(_THIS_DIR, "fake_quant_ext.cu")],
-    extra_cuda_cflags=["-O3",
-                    "--use_fast_math",
-                    "-lineinfo", # for better debugging
-                    "-gencode arch=compute_89,code=sm_89", # adjust according to your GPU
-                    "-std=c++17"],
+    extra_cuda_cflags=_fake_quant_cuda_cflags(),
     extra_cflags=["-O3"],
     with_cuda=True,
     verbose=False,

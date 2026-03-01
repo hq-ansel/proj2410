@@ -330,14 +330,38 @@ def reinit_quant_params(model: nn.Module) -> None:
     from .int_quant_linear_infra import IntQuantLinearInfra
     from ..quantizer import UniformAffineQuantizer
 
+    def _to_local_if_dtensor(x: torch.Tensor) -> torch.Tensor:
+        if hasattr(x, "to_local"):
+            return x.to_local()
+        return x
+
+    def _align_numel(src: torch.Tensor, target_numel: int) -> torch.Tensor:
+        flat = src.reshape(-1)
+        cur = flat.numel()
+        if cur == target_numel:
+            return flat
+        if cur > target_numel:
+            return flat[:target_numel]
+        if cur == 0:
+            return torch.zeros(target_numel, device=src.device, dtype=src.dtype)
+        pad = flat[-1:].expand(target_numel - cur)
+        return torch.cat([flat, pad], dim=0)
+
+    def _copy_param_data(param: nn.Parameter, value: torch.Tensor) -> None:
+        target = _to_local_if_dtensor(param.data)
+        value = value.to(device=target.device, dtype=target.dtype)
+        aligned = _align_numel(value, target.numel()).view_as(target)
+        target.copy_(aligned)
+
     for m in model.modules():
         if isinstance(m, IntQuantLinear) and m.weight_quantizer is not None:
             q = m.weight_quantizer
             if hasattr(q, "update_qparams_from_weight"):
                 q.update_qparams_from_weight(m.weight)
                 continue
+            weight_for_init = _to_local_if_dtensor(m.weight)
             scale, zp = q.init_with_weight(
-                m.weight,
+                weight_for_init,
                 q.n_bits,
                 q.group_size,
                 clamp_method=q.clamp_method,
@@ -345,37 +369,33 @@ def reinit_quant_params(model: nn.Module) -> None:
             )
             if scale is None:
                 continue
-            scale = scale.to(device=m.weight.device, dtype=m.weight.dtype)
             if hasattr(q, "scale") and isinstance(q.scale, nn.Parameter):
-                q.scale.data.copy_(scale)
+                _copy_param_data(q.scale, scale)
             else:
-                q.scale = nn.Parameter(scale)
+                q.scale = nn.Parameter(scale.to(device=weight_for_init.device, dtype=weight_for_init.dtype))
             if zp is None:
                 q.register_parameter("zero_point", None)
             else:
-                zp = zp.to(device=m.weight.device, dtype=m.weight.dtype)
                 if hasattr(q, "zero_point") and isinstance(q.zero_point, nn.Parameter):
-                    q.zero_point.data.copy_(zp)
+                    _copy_param_data(q.zero_point, zp)
                 else:
-                    q.zero_point = nn.Parameter(zp)
+                    q.zero_point = nn.Parameter(zp.to(device=weight_for_init.device, dtype=weight_for_init.dtype))
         elif isinstance(m, IntQuantLinearInfra):
             # For Infra, we use UniformAffineQuantizer's static method to init
+            weight_for_init = _to_local_if_dtensor(m.weight)
             scale, zp = UniformAffineQuantizer.init_with_weight(
-                m.weight, m.n_bits, m.group_size, clamp_method=m.config.clamp_method
+                weight_for_init, m.n_bits, m.group_size, clamp_method=m.config.clamp_method
             )
             if scale is None or zp is None:
                 continue
-            scale = scale.to(device=m.weight.device, dtype=m.weight.dtype)
-            zp = zp.to(device=m.weight.device, dtype=m.weight.dtype)
-            
             if hasattr(m, "scales") and isinstance(m.scales, nn.Parameter):
-                m.scales.data.copy_(scale)
+                _copy_param_data(m.scales, scale)
             else:
-                m.scales = nn.Parameter(scale)
+                m.scales = nn.Parameter(scale.to(device=weight_for_init.device, dtype=weight_for_init.dtype))
             if hasattr(m, "qzeros") and isinstance(m.qzeros, nn.Parameter):
-                m.qzeros.data.copy_(zp)
+                _copy_param_data(m.qzeros, zp)
             else:
-                m.qzeros = nn.Parameter(zp)
+                m.qzeros = nn.Parameter(zp.to(device=weight_for_init.device, dtype=weight_for_init.dtype))
 
 
 @torch.no_grad()

@@ -321,6 +321,16 @@ def build_eval_args():
 
 def load_model_and_tokenizer(quant_path):
     quant_path = str(quant_path)
+
+    # 优先检查 out/ 目录（如果有 quantize_config.json），因为那是量化格式
+    # 如果传入的是 out_dequant 且没有 quantize_config.json，尝试使用 out/ 的配置
+    out_path = None
+    if quant_path.endswith("out_dequant"):
+        out_path = quant_path.replace("out_dequant", "out")
+        if os.path.isfile(os.path.join(out_path, "quantize_config.json")):
+            print(f"Info: Found quantize_config.json in out/, using out/ for model loading.")
+            quant_path = out_path
+
     if os.path.isfile(os.path.join(quant_path, "quantize_config.json")):
         qcfg = _load_quantize_config(quant_path)
         quant_type = (qcfg or {}).get("quant_type", "")
@@ -351,12 +361,37 @@ def load_model_and_tokenizer(quant_path):
     if "gptq" in quant_path:
         return gptq_model_from_path(quant_path)
     print("Loading model from", quant_path)
+    # 检查模型大小，自动选择 device_map
+    # 7B+ 模型使用多卡加载
+    from transformers import AutoConfig
+    config = AutoConfig.from_pretrained(quant_path, trust_remote_code=True)
+    num_params = getattr(config, 'num_parameters', lambda: 0)()
+    if not isinstance(num_params, int):
+        num_params = 0
+
+    # 尝试获取模型参数量
+    if num_params == 0:
+        import json
+        safetensor_files = list(Path(quant_path).glob("*.safetensors"))
+        if safetensor_files:
+            # 估算：每个 safetensor 文件约 2GB
+            num_params = len(safetensor_files) * 2e9 / 4  # 假设 float16，每个参数 2 字节
+
+    # 使用 device_map="auto" 加载大模型
+    if num_params > 5e9 or "Qwen2.5-7B" in quant_path or "Qwen2.5-8B" in quant_path:
+        print(f"Using device_map='auto' for large model (estimated {num_params/1e9:.1f}B params)")
+        device_map = "auto"
+    else:
+        device_map = None
+
     model = AutoModelForCausalLM.from_pretrained(
         quant_path,
         torch_dtype=torch.float16,
-        device_map="auto",
+        device_map=device_map,
         attn_implementation="flash_attention_2",
     )
+    if device_map is None:
+        model = model.to('cuda:0')
     tokenizer = AutoTokenizer.from_pretrained(quant_path)
     return model, tokenizer
 

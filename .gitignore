@@ -90,3 +90,13 @@ EfficientQAT/.venv/
 # 1. Do not leave nested .git directories under component dirs in the final monorepo.
 # 2. If a notebook should be versioned, move it under a dedicated tracked directory
 #    such as docs/notebooks/ and add an explicit unignore rule.
+
+# Historical local-only content
+/figures/
+/test/figures/
+/test/analysis/
+/test/benchmark/
+/test/training/
+/test/utils/
+/fast-hadamard-transform/
+/modeling/

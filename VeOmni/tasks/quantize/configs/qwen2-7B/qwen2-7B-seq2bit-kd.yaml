@@ -82,7 +82,7 @@ quantizer:
 distill:
   kd_mode: logits
   teacher_model: /home/ubuntu/data/exp/proj2410/model/Qwen2.5-7B
-  kd_alpha: 1
+  kd_alpha: 0.5
   kd_temperature: 1.0
   enable_teacher_cuda_graph: true
   teacher_cuda_graph_warmup_iters: 3

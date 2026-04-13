@@ -304,18 +304,18 @@ def build_eval_args():
     args = EasyDict()
     args["train_param_settings"] = {}
     train_params = args["train_param_settings"]
-    train_params["eval_ppl"] = True
-    train_params["max_memory"] = "24GB"
-    train_params["ppl_seqlen"] = 2048
-    train_params["batch_size"] = 1
-    train_params["calib_dataset"] = "redpajama"
-    train_params["train_size"] = 1
-    train_params["val_size"] = 1
-    train_params["seed"] = 42
-    train_params["eval_tasks"] = "mmlu"
-    train_params["num_fewshot"] = 5
-    args.eval_batch_size = 8
-    args.training_seqlen = 2048
+    train_params["eval_ppl"] = os.environ.get("EVAL_PPL", "1") not in {"0", "false", "False"}
+    train_params["max_memory"] = os.environ.get("EVAL_MAX_MEMORY", "24GB")
+    train_params["ppl_seqlen"] = int(os.environ.get("EVAL_PPL_SEQLEN", "2048"))
+    train_params["batch_size"] = int(os.environ.get("EVAL_PPL_BATCH_SIZE", "1"))
+    train_params["calib_dataset"] = os.environ.get("EVAL_CALIB_DATASET", "redpajama")
+    train_params["train_size"] = int(os.environ.get("EVAL_TRAIN_SIZE", "1"))
+    train_params["val_size"] = int(os.environ.get("EVAL_VAL_SIZE", "1"))
+    train_params["seed"] = int(os.environ.get("EVAL_SEED", "42"))
+    train_params["eval_tasks"] = os.environ.get("EVAL_TASKS", "mmlu")
+    train_params["num_fewshot"] = int(os.environ.get("EVAL_NUM_FEWSHOT", "5"))
+    args.eval_batch_size = int(os.environ.get("EVAL_BATCH_SIZE", "8"))
+    args.training_seqlen = int(os.environ.get("EVAL_TRAINING_SEQLEN", "2048"))
     return args
 
 
@@ -384,12 +384,18 @@ def load_model_and_tokenizer(quant_path):
     else:
         device_map = None
 
-    model = AutoModelForCausalLM.from_pretrained(
-        quant_path,
-        torch_dtype=torch.float16,
-        device_map=device_map,
-        attn_implementation="flash_attention_2",
-    )
+    load_kwargs = {
+        "torch_dtype": torch.float16,
+        "device_map": device_map,
+    }
+    try:
+        import flash_attn  # noqa: F401
+    except ImportError:
+        print("flash_attn not installed; falling back to default attention implementation")
+    else:
+        load_kwargs["attn_implementation"] = "flash_attention_2"
+
+    model = AutoModelForCausalLM.from_pretrained(quant_path, **load_kwargs)
     if device_map is None:
         model = model.to('cuda:0')
     tokenizer = AutoTokenizer.from_pretrained(quant_path)

@@ -1,0 +1,138 @@
+# 消融实验配置矩阵
+# 目的：验证三个方法的协同效应
+# 模型：Qwen2.5-3B, Llama2-7B, Llama3-8B
+# 比特数：2-bit, 4-bit
+
+experiments:
+  # ========== Baseline ==========
+  baseline_uniform_w4:
+    quantizer:
+      quant_type: uniform_affine
+      n_bits: 4
+      group_size: 128
+    distill:
+      kd_mode: none
+    
+  baseline_uniform_w2:
+    quantizer:
+      quant_type: uniform_affine
+      n_bits: 2
+      group_size: 128
+    distill:
+      kd_mode: none
+
+  # ========== 单方法消融 ==========
+  seq2bit_only_w2:
+    quantizer:
+      quant_type: seq2bit
+      n_bits: 2
+      group_size: 64
+      enable_gradual_quant: false
+    distill:
+      kd_mode: none
+      
+  gjsd_only_w2:
+    quantizer:
+      quant_type: uniform_affine
+      n_bits: 2
+      group_size: 128
+    distill:
+      kd_mode: logits
+      kd_loss_type: gjsd
+      kd_gjsd_beta: 0.5
+      
+  gradual_only_w2:
+    quantizer:
+      quant_type: gradual
+      n_bits: 2
+      group_size: 128
+      enable_gradual_quant: true
+      gradual_start_ratio: 0.0
+      gradual_end_ratio: 1.0
+      priority_type: uniform
+    distill:
+      kd_mode: none
+
+  # ========== 双方法组合 ==========
+  seq2bit_gjsd_w2:
+    quantizer:
+      quant_type: seq2bit
+      n_bits: 2
+      group_size: 64
+      enable_gradual_quant: false
+    distill:
+      kd_mode: logits
+      kd_loss_type: gjsd
+      kd_gjsd_beta: 0.5
+      
+  seq2bit_gradual_w2:
+    quantizer:
+      quant_type: seq2bit  # 注意：Seq2Bit不支持gradual
+      n_bits: 2
+      group_size: 64
+      enable_gradual_quant: false  # Seq2Bit固定false
+    distill:
+      kd_mode: none
+      
+  gjsd_gradual_w2:
+    quantizer:
+      quant_type: gradual
+      n_bits: 2
+      group_size: 128
+      enable_gradual_quant: true
+      gradual_start_ratio: 0.0
+      gradual_end_ratio: 1.0
+    distill:
+      kd_mode: logits
+      kd_loss_type: gjsd
+      kd_gjsd_beta: 0.5
+
+  # ========== 完整组合 ==========
+  proq_w2:
+    quantizer:
+      quant_type: seq2bit
+      n_bits: 2
+      group_size: 64
+      enable_gradual_quant: false  # Seq2Bit不使用gradual
+    distill:
+      kd_mode: logits
+      kd_loss_type: gjsd
+      kd_gjsd_beta: 0.5
+      
+  proq_adaptive_w2:
+    # 自适应版本：根据训练阶段动态调整
+    quantizer:
+      quant_type: gradual
+      n_bits: 2
+      group_size: 64
+      enable_gradual_quant: true
+      gradual_start_ratio: 0.0
+      gradual_end_ratio: 0.3  # 仅前30%训练步骤使用渐进
+      priority_type: magnitude
+    distill:
+      kd_mode: logits
+      kd_loss_type: gjsd
+      kd_gjsd_beta: 0.5
+
+  # ========== 4-bit对比（验证Gradual在不同比特下的效果）==========
+  baseline_uniform_w4_gradual:
+    quantizer:
+      quant_type: gradual
+      n_bits: 4
+      group_size: 128
+      enable_gradual_quant: true
+    distill:
+      kd_mode: none
+      
+  proq_w4:
+    quantizer:
+      quant_type: uniform_affine
+      n_bits: 4
+      group_size: 128
+      enable_gradual_quant: true
+      gradual_start_ratio: 0.0
+      gradual_end_ratio: 1.0
+    distill:
+      kd_mode: logits
+      kd_loss_type: gjsd
+      kd_gjsd_beta: 0.5

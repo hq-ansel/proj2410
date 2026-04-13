@@ -1,0 +1,52 @@
+cluster_settings:
+  cuda_ids:
+    - 0
+model_settings:
+  net: Qwen2.5-0.5B
+  model: /home/ubuntu/data/exp/proj2410/model/Qwen2.5-0.5B
+  attn_implementation: eager
+  save_parent_dir: /home/ubuntu/data/exp/proj2410/quant_model/Qwen2.5-0.5B
+hyperparam_settings:
+  wbits: 2
+  group_size: 128
+  method_name: small-wikitext2-baseline
+  min_lr_factor: 20
+  clamp_method: STE
+  align_type: tail
+  crossblock_window_size: 1
+  slide_step: 1
+train_param_settings:
+  cache_dir: /home/ubuntu/data/exp/proj2410/cache
+  output_dir: /home/ubuntu/data/exp/proj2410/quant_model/Qwen2.5-0.5B/EfficientQAT/small_validation_wikitext2_baseline
+  save_quant_dir: null
+  real_quant: false
+  resume_quant: null
+  calib_dataset: wikitext2
+  train_size: 64
+  val_size: 8
+  training_seqlen: 1024
+  batch_size: 4
+  epochs: 1
+  ppl_seqlen: 1024
+  seed: 42
+  eval_ppl: false
+  eval_tasks: ""
+  eval_batch_size: 8
+  quant_lr: 0.0001
+  weight_lr: 0.00002
+  clip_grad: 1
+  wd: 0
+  max_memory: 45GiB
+  early_stop: 0
+  off_load_to_disk: false
+  log_loss: /home/ubuntu/data/exp/proj2410/quant_model/Qwen2.5-0.5B/EfficientQAT/small_validation_wikitext2_baseline/loss.csv
+  loss_func: MSE
+  clamp_method: STE
+  quant_shedule_type: partial
+  train_shedule_type: start2end
+  with_catcher: false
+  quant_method: block_ap
+method: small-wikitext2-baseline
+save_dir: null
+output_dir: /home/ubuntu/data/exp/proj2410/quant_model/Qwen2.5-0.5B/EfficientQAT/small_validation_wikitext2_baseline
+log_loss: /home/ubuntu/data/exp/proj2410/quant_model/Qwen2.5-0.5B/EfficientQAT/small_validation_wikitext2_baseline/loss.csv

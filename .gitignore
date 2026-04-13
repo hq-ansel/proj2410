@@ -1,122 +1,92 @@
-# 操作系统相关文件
+# proj2410 monorepo root .gitignore draft
+# Date: 2026-04-13
+# Goal: keep source in repo, keep runtime state and experiment artifacts out of git.
+
+# OS / editor
 .DS_Store
 Thumbs.db
-
-# 编辑器临时文件
-*.log
+.idea/
+.vscode/
+.claude/
 *.swp
 *.swo
 *.tmp
-.idea/
-.vscode/
 
-# Python 虚拟环境
-venv/
+# Python cache / build
 __pycache__/
 *.py[cod]
-
-# 日志和数据库
-*.sqlite3
-*.log
-*.pot
-wandb/
-
-# 单元测试覆盖率报告
+*.so
+*.o
+*.a
+*.out
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
 htmlcov/
 .coverage
-.cache
-
-# mypy
-.mypy_cache/
-
-# 构建工具
 build/
 dist/
-*.o
-*.out
-*.a
-*.so
+*.egg-info/
 
-# 日志和数据库
-*.log
-*.sqlite3
+# Environments and local secrets
+.env
+.env.local
+.env.*
+!.env.example
+!.env.template
+.envrc
+.direnv/
+.venv/
+venv/
+**/.venv/
+**/venv/
 
-# Git 合并冲突
+# Runtime state
+/cache/
+/hf_home/
+/wandb/
+/outputs/
+/exp/
+/logs/
+/log/
+/tmp/
+/megatron_checkpoints/
+/runtime/
+script/.queue/
+
+# Large artifacts
+/model/
+/quant_model/
+/artifacts/
+
+# Temporary and manual backups
+*.bak
 *.orig
 *.rej
+*.original.*
 
-# IDE 配置
-.idea/
-.vscode/
-
-# 系统cache
-hf_home/
-logs/
-log/
-hess/
-# 忽略所有 model/ 目录（递归忽略其内容）
-model/
-qtip/model/
-quip_sharp/model/
-
-# 排除需要跟踪的特定目录（使用 ! 取反规则）
-!EfficientQAT/yaml/model/
-quant_model/
-cache/
-output/
-data/
-build/  
-# 操作系统相关文件
-.DS_Store
-Thumbs.db
-
-# 编辑器临时文件
-*.log
-*.swp
-*.swo
-*.tmp
-.idea/
-.vscode/
-
-# Python 虚拟环境
-venv/
-__pycache__/
-*.py[cod]
-
-# 日志和数据库
-*.sqlite3
+# Logs and reports
 *.log
 *.logs
-*.pot
-*.db
-
-# 单元测试覆盖率报告
-htmlcov/
-.coverage
-.cache
-
-# mypy
-.mypy_cache/
-
-# 构建工具
-build/
-dist/
-*.o
-*.out
-*.a
-*.so
-
-# 日志和数据库
-*.log
 *.sqlite3
+*.db
+*.ncu-rep
+*.pid
 
-# Git 合并冲突
-*.orig
-*.rej
+# Notebooks:
+# default to ignoring notebooks; if one needs to be tracked, move it under
+# docs/notebooks/ and add an explicit unignore rule below.
+*.ipynb
+!docs/notebooks/**/*.ipynb
 
-# IDE 配置
-.idea/
-.vscode/
+# Known local scratch directories/files observed on 53
+/None/
+/.pkl_memoize_py3
 
+# Component-local runtime files
+EfficientQAT/.venv/
 
-baseline/VeOmni
+# Notes:
+# 1. Do not leave nested .git directories under component dirs in the final monorepo.
+# 2. If a notebook should be versioned, move it under a dedicated tracked directory
+#    such as docs/notebooks/ and add an explicit unignore rule.

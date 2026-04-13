@@ -1,6 +1,9 @@
 import contextlib
 import os
+import sys
+import time
 import torch
+import warnings
 from torch.utils.cpp_extension import load
 
 try:
@@ -9,6 +12,127 @@ except Exception:
     _nvtx = None
 
 _THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+
+
+def _extension_build_dir(ext_name: str) -> str:
+    root = os.environ.get("TORCH_EXTENSIONS_DIR")
+    if not root:
+        root = os.path.join(os.path.expanduser("~"), ".cache", "torch_extensions")
+    py_tag = f"py{sys.version_info.major}{sys.version_info.minor}"
+    cuda_version = torch.version.cuda
+    cuda_tag = "cpu" if not cuda_version else f"cu{cuda_version.replace('.', '')}"
+    return os.path.join(root, f"{py_tag}_{cuda_tag}", ext_name)
+
+
+def _cleanup_stale_extension_lock(ext_name: str) -> None:
+    if os.environ.get("EFFICIENTQAT_KEEP_TORCH_EXT_LOCK") == "1":
+        return
+
+    build_dir = _extension_build_dir(ext_name)
+    lock_path = os.path.join(build_dir, "lock")
+    so_path = os.path.join(build_dir, f"{ext_name}.so")
+    if not os.path.exists(lock_path) or not os.path.exists(so_path):
+        return
+
+    stale_after = max(float(os.environ.get("EFFICIENTQAT_TORCH_EXT_STALE_LOCK_SEC", "300")), 1.0)
+    try:
+        age = time.time() - os.path.getmtime(lock_path)
+    except OSError:
+        return
+    if age < stale_after:
+        return
+
+    try:
+        os.remove(lock_path)
+    except FileNotFoundError:
+        return
+    except OSError:
+        return
+
+    warnings.warn(
+        f"Removed stale torch extension lock: {lock_path}",
+        RuntimeWarning,
+        stacklevel=2,
+    )
+
+def fake_quant_backward(
+    grad_output: torch.Tensor,
+    weight: torch.Tensor,
+    scale: torch.Tensor,
+    zero_point: torch.Tensor | None,
+    qmin: int,
+    qmax: int,
+    group_size: int,
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor | None]:
+    """Compute gradients for fake quantization (stateless backward).
+
+    This is a pure function that computes gradients w.r.t. weight, scale, and
+    zero_point given the gradient w.r.t. the quantized output. It directly calls
+    the CUDA backward kernel without going through PyTorch's autograd system.
+
+    **Use case**: Custom autograd.Function implementations that need to compute
+    quantization gradients manually (e.g., when integrating with frameworks like
+    Megatron-LM that have custom gradient accumulation semantics).
+
+    **Contract**:
+    - Stateless: no side effects, no .grad assignment
+    - Pure function: same inputs → same outputs
+    - Only does math backward: no optimizer/DDP/framework logic
+
+    Args:
+        grad_output: Gradient w.r.t. quantized weight [out_features, in_features].
+                     Must be contiguous CUDA tensor.
+        weight: Original (unquantized) weight tensor [out_features, in_features].
+                Must be contiguous CUDA tensor.
+        scale: Quantization scale parameter [N_groups].
+               Must be contiguous CUDA tensor.
+        zero_point: Quantization zero point [N_groups] or None.
+                    If provided, must be contiguous CUDA tensor.
+        qmin: Minimum quantized value (typically 0 for unsigned).
+        qmax: Maximum quantized value (typically 2^n_bits - 1).
+        group_size: Quantization group size (must be 64, 128, or 256).
+
+    Returns:
+        tuple of (grad_weight, grad_scale, grad_zero_point):
+        - grad_weight: Gradient w.r.t. original weight [out_features, in_features]
+        - grad_scale: Gradient w.r.t. scale [N_groups]
+        - grad_zero_point: Gradient w.r.t. zero_point [N_groups] or None
+
+    Raises:
+        AssertionError: If input tensors are not contiguous CUDA tensors or
+                       if group_size is not in {64, 128, 256}.
+
+    Example:
+        >>> weight = torch.randn(1024, 512, device='cuda')
+        >>> scale = torch.randn(1024 * 512 // 64, device='cuda')
+        >>> zp = torch.randn_like(scale)
+        >>> grad_out = torch.randn_like(weight)
+        >>> grad_w, grad_s, grad_zp = fake_quant_backward(
+        ...     grad_out, weight, scale, zp, 0, 15, 64
+        ... )
+    """
+    assert weight.is_cuda and weight.is_contiguous(), "weight must be contiguous CUDA tensor"
+    assert scale.is_cuda and scale.is_contiguous(), "scale must be contiguous CUDA tensor"
+    assert grad_output.is_cuda and grad_output.is_contiguous(), "grad_output must be contiguous CUDA tensor"
+    assert group_size in (64, 128, 256), f"group_size must be 64/128/256, got {group_size}"
+
+    # Prepare zero_point buffer
+    zp = None
+    if zero_point is not None:
+        assert zero_point.is_cuda and zero_point.is_contiguous(), "zero_point must be contiguous CUDA tensor"
+        zp = zero_point
+
+    # Call CUDA backward kernel
+    with _nvtx_range("fake_quant_bwd_stateless"):
+        grad_weight, grad_scale, grad_zp = _ext.bwd(
+            weight, grad_output, scale, zp, int(qmin), int(qmax), int(group_size)
+        )
+
+    # Return None for grad_zp if zero_point was None
+    grad_zero_point = None if zero_point is None else grad_zp
+
+    return grad_weight, grad_scale, grad_zero_point
+
 
 def _fake_quant_cuda_cflags() -> list[str]:
     """
@@ -26,6 +150,8 @@ def _fake_quant_cuda_cflags() -> list[str]:
         "-gencode=arch=compute_89,code=sm_89",
         "-gencode=arch=compute_120,code=sm_120",
     ]
+
+_cleanup_stale_extension_lock("fake_quant_ext")
 
 _ext = load(
     name="fake_quant_ext",
@@ -112,6 +238,87 @@ def fake_quant_ste(x: torch.Tensor,
                    qmax: int,
                    group_size: int) -> torch.Tensor:
     return FakeQuantSTE.apply(x, scale, zp, int(qmin), int(qmax), int(group_size))
+
+
+
+def fake_quant_backward(
+    grad_output: torch.Tensor,
+    weight: torch.Tensor,
+    scale: torch.Tensor,
+    zero_point: torch.Tensor | None,
+    qmin: int,
+    qmax: int,
+    group_size: int,
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor | None]:
+    """Compute gradients for fake quantization (stateless backward).
+
+    This is a pure function that computes gradients w.r.t. weight, scale, and
+    zero_point given the gradient w.r.t. the quantized output. It directly calls
+    the CUDA backward kernel without going through PyTorch's autograd system.
+
+    **Use case**: Custom autograd.Function implementations that need to compute
+    quantization gradients manually (e.g., when integrating with frameworks like
+    Megatron-LM that have custom gradient accumulation semantics).
+
+    **Contract**:
+    - Stateless: no side effects, no .grad assignment
+    - Pure function: same inputs → same outputs
+    - Only does math backward: no optimizer/DDP/framework logic
+
+    Args:
+        grad_output: Gradient w.r.t. quantized weight [out_features, in_features].
+                     Must be contiguous CUDA tensor.
+        weight: Original (unquantized) weight tensor [out_features, in_features].
+                Must be contiguous CUDA tensor.
+        scale: Quantization scale parameter [N_groups].
+               Must be contiguous CUDA tensor.
+        zero_point: Quantization zero point [N_groups] or None.
+                    If provided, must be contiguous CUDA tensor.
+        qmin: Minimum quantized value (typically 0 for unsigned).
+        qmax: Maximum quantized value (typically 2^n_bits - 1).
+        group_size: Quantization group size (must be 64, 128, or 256).
+
+    Returns:
+        tuple of (grad_weight, grad_scale, grad_zero_point):
+        - grad_weight: Gradient w.r.t. original weight [out_features, in_features]
+        - grad_scale: Gradient w.r.t. scale [N_groups]
+        - grad_zero_point: Gradient w.r.t. zero_point [N_groups] or None
+
+    Raises:
+        AssertionError: If input tensors are not contiguous CUDA tensors or
+                       if group_size is not in {64, 128, 256}.
+
+    Example:
+        >>> weight = torch.randn(1024, 512, device='cuda')
+        >>> scale = torch.randn(1024 * 512 // 64, device='cuda')
+        >>> zp = torch.randn_like(scale)
+        >>> grad_out = torch.randn_like(weight)
+        >>> grad_w, grad_s, grad_zp = fake_quant_backward(
+        ...     grad_out, weight, scale, zp, 0, 15, 64
+        ... )
+    """
+    assert weight.is_cuda and weight.is_contiguous(), "weight must be contiguous CUDA tensor"
+    assert scale.is_cuda and scale.is_contiguous(), "scale must be contiguous CUDA tensor"
+    assert grad_output.is_cuda and grad_output.is_contiguous(), "grad_output must be contiguous CUDA tensor"
+    assert group_size in (64, 128, 256), f"group_size must be 64/128/256, got {group_size}"
+
+    # Prepare zero_point buffer
+    zp = None
+    if zero_point is not None:
+        assert zero_point.is_cuda and zero_point.is_contiguous(), "zero_point must be contiguous CUDA tensor"
+        zp = zero_point
+
+    # Call CUDA backward kernel
+    with _nvtx_range("fake_quant_bwd_stateless"):
+        grad_weight, grad_scale, grad_zp = _ext.bwd(
+            weight, grad_output, scale, zp, int(qmin), int(qmax), int(group_size)
+        )
+
+    # Return None for grad_zp if zero_point was None
+    grad_zero_point = None if zero_point is None else grad_zp
+
+    return grad_weight, grad_scale, grad_zero_point
+
 
 
 class FakeQuantSTESeq2Bit(torch.autograd.Function):
@@ -217,3 +424,54 @@ if __name__ == "__main__":
     torch.cuda.synchronize()
     end = time.perf_counter()
     print(f"avg fwd+bwd time: {(end - start) * 1000.0 / args.iters:.3f} ms")
+def fake_quant_backward_seq2bit(
+    grad_output: torch.Tensor,
+    weight: torch.Tensor,
+    alpha: torch.Tensor,
+    group_size: int,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Compute gradients for Seq2Bit fake quantization (stateless backward).
+
+    This is a pure function that computes gradients w.r.t. weight and alpha
+    given the gradient w.r.t. the quantized output. It directly calls
+    the CUDA backward kernel without going through PyTorch's autograd system.
+
+    **Use case**: Custom autograd.Function implementations that need to compute
+    Seq2Bit quantization gradients manually (e.g., when integrating with frameworks
+    like Megatron-LM that have custom gradient accumulation semantics).
+
+    **Contract**:
+    - Stateless: no side effects, no .grad assignment
+    - Pure function: same inputs → same outputs
+    - Only does math backward: no optimizer/DDP/framework logic
+
+    Args:
+        grad_output: Gradient w.r.t. quantized weight [out_features, in_features].
+                     Must be contiguous CUDA tensor.
+        weight: Original (unquantized) weight tensor [out_features, in_features].
+                Must be contiguous CUDA tensor.
+        alpha: Seq2Bit alpha parameter [N_groups].
+               Must be contiguous CUDA tensor.
+        group_size: Quantization group size (must be 64, 128, or 256).
+
+    Returns:
+        tuple of (grad_weight, grad_alpha):
+        - grad_weight: Gradient w.r.t. original weight [out_features, in_features]
+        - grad_alpha: Gradient w.r.t. alpha [N_groups]
+
+    Raises:
+        AssertionError: If input tensors are not contiguous CUDA tensors or
+                       if group_size is not in {64, 128, 256}.
+    """
+    assert weight.is_cuda and weight.is_contiguous(), "weight must be contiguous CUDA tensor"
+    assert alpha.is_cuda and alpha.is_contiguous(), "alpha must be contiguous CUDA tensor"
+    assert grad_output.is_cuda and grad_output.is_contiguous(), "grad_output must be contiguous CUDA tensor"
+    assert group_size in (64, 128, 256), f"group_size must be 64/128/256, got {group_size}"
+
+    # Call CUDA backward kernel
+    with _nvtx_range("fake_quant_seq2bit_bwd_stateless"):
+        grad_weight, grad_alpha = _ext.fake_quant_ste_seq2bit_bwd_cuda(
+            weight, grad_output, alpha, int(group_size)
+        )
+
+    return grad_weight, grad_alpha

@@ -1,0 +1,91 @@
+model:
+  model_path: /home/ubuntu/data/exp/proj2410/model/Qwen2.5-3B
+
+data:
+  train_path: /home/ubuntu/data/exp/proj2410/hf_home/rp_text_caches/data-00000-of-00001.arrow
+  dataloader_type: native
+  datasets_type: mapping
+  data_type: plaintext
+  max_seq_len: 1024
+  text_keys: text
+  drop_last: true
+
+train:
+  num_train_epochs: 1
+  output_dir: /home/ubuntu/data/exp/proj2410/quant_model/Qwen2.5-3B/EfficientQAT/seq2bit-g64-kd-dkd
+  data_parallel_mode: fsdp2
+  ulysses_parallel_size: 4
+  enable_activation_offload: true
+  activation_gpu_limit: 40.0
+  global_batch_size: 4
+  micro_batch_size: 1
+  rmpad: false
+  rmpad_with_pos_ids: false
+  bsz_warmup_ratio: 0.007
+  dyn_bsz_margin: 0
+  optimizer: adamw
+  lr: 1.0e-5
+  lr_warmup_ratio: 0.007
+  lr_decay_style: constant
+  lr_decay_ratio: 1.0
+  weight_decay: 0.01
+  max_grad_norm: 1.0
+  enable_mixed_precision: true
+  enable_gradient_checkpointing: false
+  enable_full_shard: true
+  enable_fsdp_offload: false
+  num_to_forward_prefetch: 2
+  num_to_backward_prefetch: 2
+  enable_activation_offload: false
+  init_device: meta
+  enable_full_determinism: false
+  debug: true
+  empty_cache_steps: 500
+  ckpt_manager: dcp
+  load_checkpoint_path: ""
+  save_steps: 1000
+  save_hf_weights: true
+  wandb_project: Qwen2-3B
+  wandb_name: Qwen2-3B-seq2bit-g64-kd-dkd
+
+quantizer:
+  quant_type: seq2bit
+  n_bits: 2
+  group_size: 64
+  clamp_method: STE
+  round_method: ste
+  quant_lr: 1e-5
+  quant_weight_decay: 0.0
+  enable_infra: false
+
+  # Seq2Bit uses independent quantizer path, without gradual scheduling
+  enable_gradual_quant: false
+  qat_warmup_steps: 0
+  gradual_start_ratio: 1.0
+  gradual_end_ratio: 1.0
+  priority_type: uniform
+
+  enable_qweight_l2_reg: false
+  qweight_l2_reg_lambda: 0.0
+
+  stat_quant: false
+  iterative_freezing: false
+  iterative_freezing_sheduler: linear
+  is_tracking: false
+  freeze_momentum: 0.004
+  freeze_threshold: 0.0
+  interpolate: false
+  lora_rank: 0
+  decay_rate: 0.01
+  shrinking_ratio: 0.5
+
+distill:
+  kd_mode: logits
+  teacher_model: /home/ubuntu/data/exp/proj2410/model/Qwen2.5-3B
+  kd_alpha: 1
+  kd_temperature: 1.0
+  kd_loss_type: dkd
+  kd_dkd_alpha: 1.0
+  kd_dkd_beta: 1.0
+  enable_teacher_cuda_graph: true
+  teacher_cuda_graph_warmup_iters: 3

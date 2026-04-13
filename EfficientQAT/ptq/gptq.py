@@ -148,7 +148,7 @@ class GPTQQuantizer:
         damp = self.config.damp
         if damp > 0:
             diag = torch.arange(columns, device=dev)
-            H[diag, diag] += damp * H[diag, diag].mean()
+            H[diag, diag] += damp * H[diag, diag].mean() + 1e-6
 
         # 排列（可选的激活顺序）
         perm = None
@@ -177,9 +177,14 @@ class GPTQQuantizer:
                 L = torch.linalg.cholesky(H_block)
             except torch.linalg.LinAlgError:
                 # 如果不是正定的，添加正则化
-                reg = torch.eye(count, device=dev, dtype=torch.double) * 1e-6
+                reg = torch.eye(count, device=dev, dtype=torch.double) * max(1e-4, H_block.abs().mean() * 1e-2)
                 H_block = H_block + reg
-                L = torch.linalg.cholesky(H_block)
+                try:
+                    L = torch.linalg.cholesky(H_block)
+                except:
+                    # 最后的保险措施
+                    H_block = H_block + torch.eye(count, device=dev, dtype=torch.double) * 1e-1
+                    L = torch.linalg.cholesky(H_block)
 
             Linv = torch.linalg.solve_triangular(L, torch.eye(count, device=dev, dtype=torch.double), upper=False)
             Hinv = Linv.T @ Linv
@@ -285,7 +290,7 @@ def apply_gptq_to_model(
     config: GPTQConfig,
     calib_dataloader: Any = None,
     verbose: bool = False,
-) -> Dict[str, GPTQQuantizer]:
+) -> Dict[str, 'GPTQQuantizer']:
     """对模型应用 GPTQ 量化
 
     Args:
@@ -336,6 +341,7 @@ def apply_gptq_to_model(
             for batch in calib_dataloader:
                 if isinstance(batch, dict):
                     inputs = batch.get('input_ids', batch)
+                    attention_mask = batch.get('attention_mask', None)
                 elif isinstance(batch, (list, tuple)):
                     inputs = batch[0]
                 else:
@@ -344,7 +350,9 @@ def apply_gptq_to_model(
                 if isinstance(inputs, torch.Tensor):
                     if inputs.ndim == 2:
                         inputs = inputs.unsqueeze(0)
-                    model(inputs.to(next(model.parameters()).device))
+                    # 移到模型所在设备
+                    device = next(model.parameters()).device
+                    model(inputs.to(device))
 
         if verbose:
             print(f"Collected Hessian from {len(calib_dataloader)} batches")
@@ -352,8 +360,6 @@ def apply_gptq_to_model(
     # 第三步：移除 hook 并执行量化
     for name, module, quantizer in layers_to_quantize:
         # 移除 hook
-        for hook in module._forward_hooks.values():
-            pass  # hooks are automatically managed
         module._forward_hooks.clear()
 
         # 执行量化
@@ -361,13 +367,10 @@ def apply_gptq_to_model(
             print(f"Quantizing {name}...")
         quantizer.quantize()
 
-        # 替换 forward
-        original_forward = module.forward
-        def make_quantized_forward(q, orig_fwd):
-            def forward(x):
-                return q.forward(x)
-            return forward
-        module.forward = make_quantized_forward(quantizer, original_forward)
+        # 将量化后的权重写回模型
+        if quantizer.qweight is not None:
+            with torch.no_grad():
+                module.weight.copy_(quantizer.qweight)
 
     if verbose:
         print(f"Applied GPTQ to {len(quantizers)} layers")

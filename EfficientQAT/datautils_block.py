@@ -72,6 +72,13 @@ class LazyLoadDatasetV2(Dataset):
                 self.position_embeddings = None
                 self.store_input = False
                 self.store_output = False
+
+            def __getattr__(self, name):
+                try:
+                    return super().__getattr__(name)
+                except AttributeError:
+                    return getattr(self.module, name)
+
             def forward(self, hidden_states: torch.Tensor, 
                         **kwargs):
                 output = self.module(hidden_states, **kwargs)
@@ -129,9 +136,28 @@ class LazyLoadDatasetV2(Dataset):
         del layers[crossblock_window_size - 1].out_data_list
         gc.collect()
 
-        tmp_dict["attention_mask"] = layers[0].attention_mask.half()
-        tmp_dict["position_embeddings"] = layers[0].position_embeddings
-        tmp_dict["position_embeddings"] = (tmp_dict["position_embeddings"][0].half(),tmp_dict["position_embeddings"][1].half())
+        attention_mask = layers[0].attention_mask
+        position_embeddings = layers[0].position_embeddings
+        if attention_mask is None or position_embeddings is None:
+            rotary_emb = getattr(model.model, "rotary_emb", None)
+            if rotary_emb is None:
+                rotary_emb = getattr(getattr(layers[0], "self_attn", None), "rotary_emb", None)
+            if rotary_emb is None:
+                raise RuntimeError("无法为 LazyLoadDatasetV2 构造 rotary embedding")
+            seq_len = self.data_list[0][0].shape[0]
+            attention_mask, position_embeddings = generate_llama_mask_and_position_embedding(
+                seq_len=seq_len,
+                rotary_emb=rotary_emb,
+                batch_size=1,
+                hidden_size=model.config.hidden_size,
+                dtype=next(model.parameters()).dtype,
+                device=device,
+            )
+        tmp_dict["attention_mask"] = attention_mask.half()
+        tmp_dict["position_embeddings"] = (
+            position_embeddings[0].half(),
+            position_embeddings[1].half(),
+        )
         self.attention_mask = tmp_dict["attention_mask"]
         self.position_embeddings = tmp_dict["position_embeddings"]
 
@@ -576,42 +602,10 @@ def get_wikitext2(
     """
     
     print("Loading Wikitext-2 dataset...")
-
-    cache_dir = os.environ.get("HF_DATASETS_CACHE")
-    if not cache_dir:
-        hf_home = os.environ.get("HF_HOME")
-        if hf_home:
-            cache_dir = os.path.join(hf_home, "datasets")
-
-    offline_mode = os.environ.get("HF_DATASETS_OFFLINE") == "1" or os.environ.get("HF_HUB_OFFLINE") == "1"
-
-    def _load_wikitext_split(split: str):
-        common_kwargs = {}
-        if cache_dir:
-            common_kwargs["cache_dir"] = cache_dir
-
-        local_kwargs = dict(common_kwargs)
-        local_kwargs["download_config"] = DownloadConfig(cache_dir=cache_dir, local_files_only=True)
-        local_kwargs["download_mode"] = "reuse_cache_if_exists"
-        local_kwargs["revision"] = "main"
-        try:
-            return load_dataset("wikitext", "wikitext-2-raw-v1", split=split, **local_kwargs)
-        except Exception as e:
-            if offline_mode:
-                raise RuntimeError(
-                    f"Wikitext local cache not found for split={split}. "
-                    "Offline mode is enabled; skipping remote download."
-                ) from e
-            print(f"Local Wikitext cache miss for split={split}: {e}")
-            print("Falling back to remote cache/download...")
-            remote_kwargs = dict(common_kwargs)
-            remote_kwargs["download_mode"] = "reuse_cache_if_exists"
-            remote_kwargs["revision"] = "main"
-            return load_dataset("wikitext", "wikitext-2-raw-v1", split=split, **remote_kwargs)
-
-    # Load datasets (local cache first)
-    traindata = _load_wikitext_split("train")
-    testdata = _load_wikitext_split("test")
+    
+    # Load datasets
+    traindata = load_dataset('wikitext', 'wikitext-2-raw-v1', split='train')
+    testdata = load_dataset('wikitext', 'wikitext-2-raw-v1', split='test')
 
     # Tokenize test data
     testenc = tokenizer("\n\n".join(testdata['text']), return_tensors='pt')

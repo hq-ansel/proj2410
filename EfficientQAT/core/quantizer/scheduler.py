@@ -6,7 +6,7 @@ import torch
 from torch import nn
 
 # import GradualQuantizer
-from .gradual import GradualQuantizer, _collect_gradual_quantizers
+from .gradual import GradualQuantizer
 
 @dataclass
 class ScheduleState:
@@ -52,6 +52,18 @@ def _get_total_elements(q: "GradualQuantizer") -> int:
         except Exception:
             pass
     return int(getattr(q, "_num_elements_full", getattr(q, "_num_elements")))
+
+
+def _is_schedulable_quantizer(module: nn.Module) -> bool:
+    required_attrs = (
+        "prefix",
+        "group_size",
+        "_device",
+        "set_group_mask",
+        "set_group_ratio",
+        "get_weight_for_priority",
+    )
+    return all(hasattr(module, attr) for attr in required_attrs)
 
 
 class BudgetPolicy(Protocol):
@@ -424,7 +436,7 @@ class GradualQuantController:
         """
         self.model = model
         self.scheduler = scheduler
-        self.quantizers = [m for m in model.modules() if isinstance(m, GradualQuantizer)]
+        self.quantizers = [m for m in model.modules() if _is_schedulable_quantizer(m)]
 
     def on_step_end(self, step: int, epoch: int = 0,
                     metrics: Optional[Dict[str, float]] = None) -> None:

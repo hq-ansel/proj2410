@@ -136,12 +136,13 @@ def main() -> None:
     else:
         model_config = AutoConfig.from_pretrained(config['model_settings']['model'])
         tokenizer = AutoTokenizer.from_pretrained(config['model_settings']['model'], use_fast=False, legacy=False)
+        attn_implementation = config["model_settings"].get("attn_implementation", "flash_attention_2")
         # apply_liger_kernel(
         #     config=model_config, 
         #     require_logits=True)
         model = AutoModelForCausalLM.from_pretrained(
             config['model_settings']['model'],
-            attn_implementation="flash_attention_2",
+            attn_implementation=attn_implementation,
             config=model_config,
             device_map='cpu',
             torch_dtype=torch.float16 

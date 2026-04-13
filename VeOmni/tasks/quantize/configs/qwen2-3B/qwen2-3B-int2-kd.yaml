@@ -17,7 +17,7 @@ train:
   ulysses_parallel_size: 4
   enable_activation_offload: true
   activation_gpu_limit: 40.0
-  global_batch_size: 4
+  global_batch_size: 8
   micro_batch_size: 1
   rmpad: false
   rmpad_with_pos_ids: false
@@ -45,8 +45,8 @@ train:
   load_checkpoint_path: ""
   save_steps: 1000
   save_hf_weights: true
-  wandb_project: Qwen2-3B
-  wandb_name: Qwen2-3B-int2-g64-uniform-kd
+  #wandb_project: Qwen2-3B
+  #wandb_name: Qwen2-3B-int2-g64-uniform-kd
 
 quantizer:
   quant_type: uniform_affine # gradual
@@ -81,7 +81,7 @@ quantizer:
 distill:
   kd_mode: logits
   teacher_model: /home/ubuntu/data/exp/proj2410/model/Qwen2.5-3B
-  kd_alpha: 1
+  kd_alpha: 0.5
   kd_temperature: 1.0
   enable_teacher_cuda_graph: true
   teacher_cuda_graph_warmup_iters: 3

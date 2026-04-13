@@ -1,0 +1,80 @@
+model:
+  model_path: /home/ubuntu/data/exp/proj2410/model/Qwen2.5-7B
+
+data:
+  train_path: /home/ubuntu/data/exp/proj2410/hf_home/rp_text_caches/data-00000-of-00001.arrow
+  dataloader_type: native
+  datasets_type: mapping
+  data_type: plaintext
+  max_seq_len: 512
+  text_keys: text
+  drop_last: true
+
+train:
+  num_train_epochs: 2
+  output_dir: /home/ubuntu/data/exp/proj2410/quant_model/Qwen2.5-7B/EfficientQAT/w2g64-int2-uniform-gradual-muon
+  data_parallel_mode: fsdp2
+  ulysses_parallel_size: 4
+  enable_activation_offload: true
+  activation_gpu_limit: 40.0
+  global_batch_size: 4
+  micro_batch_size: 1
+  rmpad: false
+  rmpad_with_pos_ids: false
+  bsz_warmup_ratio: 0.007
+  dyn_bsz_margin: 0
+  optimizer: muon
+  lr: 1.0e-5
+  lr_warmup_ratio: 0.007
+  lr_decay_style: constant
+  lr_decay_ratio: 1.0
+  weight_decay: 0.01
+  max_grad_norm: 1.0
+  enable_mixed_precision: true
+  enable_gradient_checkpointing: true
+  enable_full_shard: true
+  enable_fsdp_offload: false
+  num_to_forward_prefetch: 2
+  num_to_backward_prefetch: 2
+  enable_activation_offload: true
+  init_device: meta
+  enable_full_determinism: false
+  debug: false
+  empty_cache_steps: 500
+  ckpt_manager: dcp
+  load_checkpoint_path: ""
+  save_steps: 1000
+  save_hf_weights: true
+  wandb_project: Qwen2-7B
+  wandb_name: Qwen2-7B-int2-g64-uniform-gradual-muon
+
+quantizer:
+  quant_type: uniform_affine  # Uniform quantization (no seq2bit)
+  n_bits: 2
+  group_size: 64
+  clamp_method: STE
+  round_method: ste
+  symmetric: false
+  quant_lr: 0.0001
+
+  # Gradual quantization configuration - 渐进混合模块（无 seq2bit）
+  enable_gradual_quant: true
+  qat_warmup_steps: 0
+  gradual_start_ratio: 0.0  # 从 0% 量化覆盖率开始
+  gradual_end_ratio: 1.0    # 逐渐增加到 100%
+  priority_type: uniform     # 按 uniform 顺序选择 group
+
+  stat_quant: false
+  iterative_freezing: false
+  iterative_freezing_sheduler: linear
+  is_tracking: false
+  freeze_momentum: 0.004
+  freeze_threshold: 0.0
+  interpolate: false
+  lora_rank: 0
+  decay_rate: 0.01
+  shrinking_ratio: 0.5
+  quant_weight_decay: 0.0
+
+# No KD - this is for ablation: Uniform + Progressive Blending (no seq2bit, no KD)
+# Using Muon optimizer to reduce optimizer state memory by ~33%

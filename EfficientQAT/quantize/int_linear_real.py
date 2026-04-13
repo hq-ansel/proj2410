@@ -18,7 +18,11 @@ from .utils import get_named_linears,set_op_by_name
 try:
     from gptqmodel.nn_modules.qlinear.qlinear_tritonv2 import TritonV2QuantLinear
 except ImportError:
-    from gptqmodel.nn_modules.qlinear.tritonv2 import TritonV2QuantLinear
+    try:
+        from gptqmodel.nn_modules.qlinear.tritonv2 import TritonV2QuantLinear
+    except ImportError:
+        class TritonV2QuantLinear:  # optional dependency for GPTQModel-compatible checkpoints
+            pass
 
 logger = getLogger(__name__)
 

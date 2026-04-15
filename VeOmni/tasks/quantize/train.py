@@ -139,7 +139,7 @@ def build_qat_param_groups(model, base_lr, base_weight_decay, quant_lr, quant_we
 def _should_skip_module(module_name: str, skip_names: Set[str]) -> bool:
     return any(module_name == skip or module_name.endswith(f".{skip}") for skip in skip_names)
 
-
+# 将模型中的线性层替换为量化版本，支持跳过指定模块（如输出层） torch.nn.Linear -> IntQuantLinear
 def convert_linear_with_skip(module: torch.nn.Module, prefix: str, config: EQuantConfig, skip_names: Set[str]) -> None:
     for name, child in module.named_children():
         child_prefix = f"{prefix}.{name}" if prefix else name
@@ -1431,7 +1431,7 @@ def main():
     )
     # 将 CLI/YAML 量化参数映射到 EfficientQAT 的 QuantConfig，并替换线性层
     qcfg = EQuantConfig(
-        quant_type=args.quantizer.quant_type,
+        quant_type=args.quantizer.quant_type,   # *** 量化类型 ('uniform_affine'、'gradual' 或 'seq2bit')
         n_bits=args.quantizer.n_bits,
         group_size=args.quantizer.group_size,
         clamp_method=args.quantizer.clamp_method,
@@ -1459,6 +1459,7 @@ def main():
         logger.info_rank0("Converting model to IntQuantLinearInfra mode.")
         convert_to_infra(model, kernel_backend=int_matmul_backend)
 
+    # 冻结指定模块的权重
     frozen_modules = freeze_named_modules(model, skip_quant_modules)
     if frozen_modules:
         logger.info_rank0("Skip quantization and freeze modules: %s", ", ".join(sorted(frozen_modules)))
@@ -1469,14 +1470,16 @@ def main():
         sum(1 for m in model.modules() if isinstance(m, IntQuantLinear)),
         sum(1 for m in model.modules() if isinstance(m, torch.nn.Linear) and not isinstance(m, IntQuantLinear)),
     )
-# <------QAT模型构建设计-------->
-# 计划：在构建完成后读取QAT配置（wbits/group_size/quant_type），调用 EfficientQAT 的 convert_linear 将 nn.Linear 替换为 IntQuantLinear/QuantLinearFake，并挂载 weight_quantizer。
-# 预留：可选逐层白名单/正则匹配，或从 YAML/CLI 指定需要量化的模块列表，默认跳过嵌入/头部。
-# 设备：保持 init_device=meta/cuda 的流程不变，转换后权重依然沿用原参数设备和 dtype。
+
+    # <------QAT模型构建设计-------->
+    # 计划：在构建完成后读取QAT配置（wbits/group_size/quant_type），调用 EfficientQAT 的 convert_linear 将 nn.Linear 替换为 IntQuantLinear/QuantLinearFake，并挂载 weight_quantizer。
+    # 预留：可选逐层白名单/正则匹配，或从 YAML/CLI 指定需要量化的模块列表，默认跳过嵌入/头部。
+    # 设备：保持 init_device=meta/cuda 的流程不变，转换后权重依然沿用原参数设备和 dtype。
     model_config = model.config
     helper.print_device_mem_info("VRAM usage after building model")
 
     get_optimizer_pre_hook = getattr(model, "get_optimizer_pre_hook", None)
+    # 流水线并行处理
     pp_input_shape = None
     if args.train.pipeline_parallel_size > 1:
         pp_input_shape = infer_pp_input_shape(
@@ -1500,7 +1503,7 @@ def main():
     )
     
     # Substitute HF flash attention with ring attention if CP is enabled
-    ps = get_parallel_state()
+    ps = get_parallel_state()   # 如果开启了 Context Parallelism (CP)
     if ps.cp_enabled:
         from veomni.distributed.sequence_parallel import (
             is_ring_flash_attn_available,
@@ -1537,6 +1540,7 @@ def main():
                 "Install with: pip install ring-flash-attn"
             )
     
+    # 分布式环境下，模型构建完成后再进行量化参数的初始化和同步
     reinit_quant_params(model)
     sanitize_quant_params(model)
     
@@ -1597,11 +1601,12 @@ def main():
 
     # Gradual sync only for non-infra (since infra has no quantizer object)
     if not getattr(args.quantizer, "enable_infra", False):
-        _sync_gradual_quantizer_metadata(model)
+        _sync_gradual_quantizer_metadata(model)     # 渐进式量化元数据同步
         logger.info_rank0("Reinitialized quantizer params from loaded weights.")
     else:
         logger.info_rank0("Skipping gradual metadata sync for Infra mode.")
 
+    # 基础kd蒸馏参数校验与冲突处理
     kd_mode = args.distill.kd_mode
     kd_enabled = kd_mode != "none"
     if kd_enabled and get_parallel_state().pp_enabled:
@@ -1644,6 +1649,7 @@ def main():
                 [f"{w:.4f}" for w in multistep_kd_loss_weights],
             )
 
+    # 教师模型的构建与冻结
     teacher_model = None
     if kd_enabled:
         if not args.distill.teacher_model:
@@ -1682,7 +1688,7 @@ def main():
         teacher_model.requires_grad_(False)
     teacher_graph = None
     teacher_graph_failed = False
-    if kd_enabled and args.distill.enable_teacher_cuda_graph:
+    if kd_enabled and args.distill.enable_teacher_cuda_graph:   # 教师模型 CUDA Graph 加速准备
         if get_device_type() != "cuda" or not torch.cuda.is_available():
             logger.warning_rank0("Teacher CUDA graph requested but CUDA is unavailable; disabling.")
             teacher_graph_failed = True
@@ -1701,6 +1707,7 @@ def main():
                 expected_local_len,
                 args.distill.teacher_cuda_graph_warmup_iters,
             )
+
     # <------QAT并行与开关管理设计-------->
     # 设置量化开关：初始化时 use_weight_quant=False，用于前期预热；在 warmup_steps 后切换为 True。
     # 渐进量化：如果使用 GradualQuantizer，创建 GradualQuantContext(total_steps=train_steps*num_epochs, warmup_steps=qat_warmup)，在训练循环中 step(step_id) 更新 quantization_position_ratio。
@@ -1751,10 +1758,11 @@ def main():
         optimizer_type=args.train.optimizer,
         param_groups=qat_param_groups,
     )
-# <------QAT参数分组设计-------->
-# 计划拆分参数组：1) 主权重（低 lr/或与原配置一致）；
-# 2) 量化参数 scale/zero_point（单独 lr、weight_decay=0）；必要时冻结部分权重仅训练量化参数。
-# 可通过 EfficientQAT.core.linear.int_quant_linear.{weight_parameters,quant_parameters} 辅助函数构建 param_groups。
+
+    # <------QAT参数分组设计-------->
+    # 计划拆分参数组：1) 主权重（低 lr/或与原配置一致）；
+    # 2) 量化参数 scale/zero_point（单独 lr、weight_decay=0）；必要时冻结部分权重仅训练量化参数。
+    # 可通过 EfficientQAT.core.linear.int_quant_linear.{weight_parameters,quant_parameters} 辅助函数构建 param_groups。
     if get_optimizer_pre_hook is not None:
         optimizer_pre_hook = get_optimizer_pre_hook(model, model_config, args.train.data_parallel_mode)
         optimizer.register_step_pre_hook(optimizer_pre_hook)
@@ -2009,6 +2017,7 @@ def main():
     logger.info(
         f"rank{args.train.local_rank} Start training, train_steps: {args.train.train_steps}, epochs: {args.train.num_train_epochs}"
     )
+
     # <------QAT训练循环设计-------->
     # 在 epoch/step 循环外部：with GradualQuantContext(model, total_steps=args.train.train_steps*args.train.num_train_epochs, warmup_steps=qat_warmup) as qat_sched:
     # 在每个 global_step 开始时调用 qat_sched.step(global_step) 以更新 ratio；在 warmup 结束时 set_quant_state(model, weight_quant=True) 启用假量化。

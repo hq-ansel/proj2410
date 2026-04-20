@@ -4,10 +4,12 @@ set -euo pipefail
 set -x
 
 # Activate virtual environment
-source /home/ubuntu/data/exp/proj2410/.venv/bin/activate
+# source /home/ubuntu/data/exp/proj2410/.venv/bin/activate
 
 export TOKENIZERS_PARALLELISM=false
-export PYTHONPATH="/home/ubuntu/data/exp/proj2410:/home/ubuntu/data/exp/proj2410/EfficientQAT:${PYTHONPATH:-}"
+# export PYTHONPATH="/home/ubuntu/data/exp/proj2410:/home/ubuntu/data/exp/proj2410/EfficientQAT:${PYTHONPATH:-}"
+# export PYTHONPATH="/home/ubuntu/Projects/Quantization/proj2410:/home/ubuntu/Projects/Quantization/proj2410/EfficientQAT:${PYTHONPATH:-}"
+export PYTHONPATH="/home/ubuntu/Projects/Quantization/proj2410/VeOmni:/home/ubuntu/Projects/Quantization/proj2410/EfficientQAT:${PYTHONPATH:-}"
 export TORCH_NCCL_AVOID_RECORD_STREAMS=1
 export WANDB_MODE="${WANDB_MODE:-disabled}"
 

@@ -183,7 +183,7 @@ tokenizers==0.22.1
 tomlkit==0.13.3
 # torch==2.9.0+cu128
 torchao==0.14.1
-# torchaudio==2.8.0.dev20250714+cu128
+# torchaudio==2.9.0+cu128
 torchdata==0.11.0
 # torchvision==0.24.0+cu128
 tornado==6.5.2

@@ -111,7 +111,7 @@ except ImportError:
 logger = helper.create_logger(__name__)
 _emit_debug_init("module imports complete")
 
-
+# 在一张庞大且错综复杂的模型计算图中，精准地把“量化参数”和“基础权重”分拣出来，并为它们分别绑定不同的优化器超参数（学习率和权重衰减）。
 def build_qat_param_groups(model, base_lr, base_weight_decay, quant_lr, quant_weight_decay):
     quant_params = [p for p in quantizer_parameters(model) if p.requires_grad]
     if not quant_params:
@@ -1315,14 +1315,76 @@ class Arguments:
     distill: "DistillArguments" = field(default_factory=DistillArguments)
 
 def main():
+    # _emit_debug_init("main() entered")
+    # _emit_debug_init(f"calling dist.init_process_group backend={get_nccl_backend()}")
+    # dist.init_process_group(backend=get_nccl_backend(), timeout=timedelta(minutes=30))
+    # _emit_debug_init("dist.init_process_group returned")
+    # args = parse_args(Arguments)
+    # logger.info(f"Process rank: {args.train.global_rank}, world size: {args.train.world_size}")
+    # logger.info_rank0(json.dumps(asdict(args), indent=2))
+    # get_torch_device().set_device(f"{get_device_type()}:{args.train.local_rank}")
+    # helper.set_seed(args.train.seed, args.train.enable_full_determinism)
+    # if args.train.local_rank == 0:
+    #     helper.enable_third_party_logging()
+
+    # if args.train.global_rank == 0:
+    #     save_args(args, args.train.output_dir)
+
+    # Checkpointer = build_checkpointer(dist_backend=args.train.data_parallel_mode, ckpt_manager=args.train.ckpt_manager)
+
     _emit_debug_init("main() entered")
-    _emit_debug_init(f"calling dist.init_process_group backend={get_nccl_backend()}")
-    dist.init_process_group(backend=get_nccl_backend(), timeout=timedelta(minutes=30))
+
+    # 1) 先按 torchrun 注入的 LOCAL_RANK 绑定设备
+    local_rank_env = int(os.environ.get("LOCAL_RANK", "0"))
+    device_type = get_device_type()
+
+    if device_type == "cuda" and torch.cuda.is_available():
+        get_torch_device().set_device(f"cuda:{local_rank_env}")
+
+    backend = get_nccl_backend()
+    _emit_debug_init(
+        f"calling dist.init_process_group backend={backend} device={device_type}:{local_rank_env}"
+    )
+
+    # 2) 再初始化进程组；CUDA 显式传 device_id
+    try:
+        if device_type == "cuda" and torch.cuda.is_available():
+            dist.init_process_group(
+                backend=backend,
+                timeout=timedelta(minutes=30),
+                device_id=torch.device(f"cuda:{local_rank_env}"),
+            )
+        else:
+            dist.init_process_group(
+                backend=backend,
+                timeout=timedelta(minutes=30),
+            )
+    except TypeError:
+        # 兼容旧 torch（无 device_id 参数）
+        dist.init_process_group(
+            backend=backend,
+            timeout=timedelta(minutes=30),
+        )
+        if device_type == "cuda" and torch.cuda.is_available():
+            get_torch_device().set_device(f"cuda:{local_rank_env}")
+
     _emit_debug_init("dist.init_process_group returned")
+
     args = parse_args(Arguments)
+
+    # 3) 一致性检查（env 与 args）
+    if args.train.local_rank != local_rank_env:
+        logger.warning(
+            "LOCAL_RANK mismatch: env=%s, args=%s",
+            local_rank_env,
+            args.train.local_rank,
+        )
+        if device_type == "cuda" and torch.cuda.is_available():
+            get_torch_device().set_device(f"cuda:{args.train.local_rank}")
+
     logger.info(f"Process rank: {args.train.global_rank}, world size: {args.train.world_size}")
     logger.info_rank0(json.dumps(asdict(args), indent=2))
-    get_torch_device().set_device(f"{get_device_type()}:{args.train.local_rank}")
+
     helper.set_seed(args.train.seed, args.train.enable_full_determinism)
     if args.train.local_rank == 0:
         helper.enable_third_party_logging()
@@ -1330,7 +1392,12 @@ def main():
     if args.train.global_rank == 0:
         save_args(args, args.train.output_dir)
 
-    Checkpointer = build_checkpointer(dist_backend=args.train.data_parallel_mode, ckpt_manager=args.train.ckpt_manager)
+    Checkpointer = build_checkpointer(
+        dist_backend=args.train.data_parallel_mode,
+        ckpt_manager=args.train.ckpt_manager,
+    )
+
+    # --------------------------------------------------------
 
     init_parallel_state(
         dp_size=args.train.data_parallel_size,
@@ -1429,6 +1496,7 @@ def main():
         init_device=args.train.init_device,
         force_use_huggingface=args.model.force_use_huggingface,
     )
+
     # 将 CLI/YAML 量化参数映射到 EfficientQAT 的 QuantConfig，并替换线性层
     qcfg = EQuantConfig(
         quant_type=args.quantizer.quant_type,   # *** 量化类型 ('uniform_affine'、'gradual' 或 'seq2bit')
@@ -1452,7 +1520,7 @@ def main():
         ramp_sigmoid_a=args.quantizer.ramp_sigmoid_a,
     )
     skip_quant_modules = {"lm_head","embed_tokens"}
-    convert_linear_with_skip(model, prefix="", config=qcfg, skip_names=skip_quant_modules)
+    convert_linear_with_skip(model, prefix="", config=qcfg, skip_names=skip_quant_modules)  # ***
     
     # 转换到 Infra 模式 (如果启用)
     if getattr(args.quantizer, "enable_infra", False):
@@ -1713,9 +1781,9 @@ def main():
     # 渐进量化：如果使用 GradualQuantizer，创建 GradualQuantContext(total_steps=train_steps*num_epochs, warmup_steps=qat_warmup)，在训练循环中 step(step_id) 更新 quantization_position_ratio。
     # 激活假量化：若引入 activation observer，可在 model_fwd_context 前后包一层 autocast + fake_quant_hook。
 
-    quant_lr = args.quantizer.quant_lr if args.quantizer.quant_lr is not None else args.train.lr
+    quant_lr = args.quantizer.quant_lr if args.quantizer.quant_lr is not None else args.train.lr    # 去读配置文件里有没有专门为量化参数设定的学习率 (quant_lr)。如果有，就用它；如果没填（None），就退而求其次，直接复用模型大盘的基础学习率 (args.train.lr)。
     quant_weight_decay = args.quantizer.quant_weight_decay
-    qat_param_groups = build_qat_param_groups(
+    qat_param_groups = build_qat_param_groups(      # 构建优化器参数组
         model,
         base_lr=args.train.lr,
         base_weight_decay=args.train.weight_decay,
@@ -1731,14 +1799,14 @@ def main():
             quant_weight_decay,
         )
 
-    qweight_l2_reg_lambda = float(args.quantizer.qweight_l2_reg_lambda)
+    qweight_l2_reg_lambda = float(args.quantizer.qweight_l2_reg_lambda) # l2正则化系数
     if qweight_l2_reg_lambda < 0.0:
         logger.warning_rank0(
             "qweight_l2_reg_lambda=%s is negative; clamping to 0.",
             qweight_l2_reg_lambda,
         )
         qweight_l2_reg_lambda = 0.0
-    enable_qweight_l2_reg = (
+    enable_qweight_l2_reg = (   # 是否启用量化权重的L2正则化
         args.quantizer.enable_qweight_l2_reg
         and qat_param_groups is not None
         and qweight_l2_reg_lambda > 0.0
@@ -1750,6 +1818,7 @@ def main():
     if enable_qweight_l2_reg:
         logger.info_rank0("QWeight L2 reg enabled with lambda=%s", qweight_l2_reg_lambda)
 
+    # 构建优化器
     optimizer = build_optimizer(
         model,
         lr=args.train.lr,
@@ -1763,7 +1832,7 @@ def main():
     # 计划拆分参数组：1) 主权重（低 lr/或与原配置一致）；
     # 2) 量化参数 scale/zero_point（单独 lr、weight_decay=0）；必要时冻结部分权重仅训练量化参数。
     # 可通过 EfficientQAT.core.linear.int_quant_linear.{weight_parameters,quant_parameters} 辅助函数构建 param_groups。
-    if get_optimizer_pre_hook is not None:
+    if get_optimizer_pre_hook is not None:  # 注册优化器前置钩子，在每次执行 optimizer.step()（也就是真正修改模型权重）的前一瞬间，强行插入一段自定义逻辑。
         optimizer_pre_hook = get_optimizer_pre_hook(model, model_config, args.train.data_parallel_mode)
         optimizer.register_step_pre_hook(optimizer_pre_hook)
 
@@ -1792,10 +1861,11 @@ def main():
                 },  # flatten dict
             )
 
-        # save model_assets before training
+        # 在训练前保存 model_assets
         model_assets = [model_config, tokenizer if args.data.data_type == "plaintext" else chat_template]
         save_model_assets(args.train.model_assets_dir, model_assets)
 
+    # profiler
     if args.train.profile_this_rank:
         profiler = helper.create_profiler(
             start_step=args.train.profile_start_step,
@@ -1854,10 +1924,10 @@ def main():
 
     start_epoch, start_step, global_step = 0, 0, 0
     save_checkpoint_path = None
-    grad_probes = []
+    grad_probes = []    # 梯度探针组
     if args.profile.profile_module_name:
         grad_probes.append(GradNormProbe(module_names=args.profile.profile_module_name, metric_prefix="monitor/grad_norm"))
-    linear_grad_probe = None
+    linear_grad_probe = None    
     if args.profile.profile_module_name and args.profile.linear_grad_interval > 0:
         linear_grad_probe = LinearGradStatsProbe(
             module_names=args.profile.profile_module_name,
@@ -1890,11 +1960,11 @@ def main():
         dataloader=train_dataloader,
         data_path=args.data.train_path,
     )
-    loss_spike_meter = LossSpikeMeter(
+    loss_spike_meter = LossSpikeMeter(  # Loss 尖峰监控
         ema_decay=args.profile.loss_spike_ema_decay,
         spike_k=args.profile.loss_spike_k,
     )
-    forward_consistency_meter = ForwardConsistencyMeter(
+    forward_consistency_meter = ForwardConsistencyMeter(    # 前向传播一致性与散度
         history_size=args.profile.forward_consistency_history_size
     )
     logit_metric_allowlist = {"kl", "js"}
@@ -1920,6 +1990,7 @@ def main():
     kd_warning_emitted = False
     kd_info_emitted = False
 
+    # 断点续训
     if args.train.load_checkpoint_path:
         state = {"model": model, "optimizer": optimizer, "extra_state": {}}  # cannot be None
         Checkpointer.load(args.train.load_checkpoint_path, state)
@@ -1940,6 +2011,7 @@ def main():
         dist.barrier()
         logger.info_rank0(f"Load distributed checkpoint from {args.train.load_checkpoint_path} successfully!")
 
+    # 显存优化
     helper.empty_cache()
     model_fwd_context, model_bwd_context = build_activation_offloading_context(
         args.train.enable_activation_offload, args.train.enable_gradient_checkpointing, args.train.activation_gpu_limit
@@ -1952,6 +2024,7 @@ def main():
     gradual_controller = None
     enable_infra = getattr(args.quantizer, "enable_infra", False)
     
+    # 渐进式量化调度器 ***
     if args.quantizer.enable_gradual_quant and args.quantizer.quant_type == "gradual" and not enable_infra:
         logger.info_rank0("Initializing GradualQuantController with gradual quantization")
         total_steps = args.train.train_steps * args.train.num_train_epochs
@@ -1985,7 +2058,7 @@ def main():
         if priority_kind == "uniform":
             ratio_assigner = UniformRatioAssigner()
         else:
-            ratio_assigner = ScoreProportionalRatioAssigner()
+            ratio_assigner = ScoreProportionalRatioAssigner()   # 按分分配：如果某一层（比如靠近 Embedding 的第一层）极其重要，它的优先级分数很高，分配器就会给它分配一个更低的量化 Ratio（让它少量化一点）；而对那些不敏感的深层，直接把 Ratio 拉满。
 
         budget = RatioBudget(
             start_ratio=start_ratio,
@@ -2025,7 +2098,7 @@ def main():
     for epoch in range(start_epoch, args.train.num_train_epochs):
         if global_step == 50:
             helper.empty_cache()
-        if hasattr(train_dataloader, "set_epoch"):
+        if hasattr(train_dataloader, "set_epoch"):  # 分布式采样器打乱
             train_dataloader.set_epoch(epoch)
 
         data_loader_tqdm = trange(
@@ -2037,7 +2110,7 @@ def main():
         )
         data_iterator = iter(train_dataloader)
         pending_micro_batches = None
-        if (
+        if (    # 教师模型的 CUDA Graph 捕获与预热
             kd_enabled
             and args.distill.enable_teacher_cuda_graph
             and teacher_model is not None
@@ -2060,10 +2133,10 @@ def main():
             except StopIteration:
                 logger.warning_rank0("No batch available for teacher CUDA graph warmup; disabling.")
                 teacher_graph_failed = True
-        for _ in range(start_step, args.train.train_steps):
+        for _ in range(start_step, args.train.train_steps): # 每个 epoch 内的 step 循环
             global_step += 1
 
-            try:
+            try:    # 获取训练数据
                 with _record_function("data_load"):
                     if pending_micro_batches is not None:
                         micro_batches = pending_micro_batches
@@ -2086,14 +2159,14 @@ def main():
             debug_batch = None
             synchronize()
             start_time = time.time()
-            if get_parallel_state().pp_enabled:
+            if get_parallel_state().pp_enabled:     # 流水线并行
                 pipeline_model = model.module if hasattr(model, "module") else model
                 if not hasattr(pipeline_model, "forward_backward_1f1b"):
                     raise RuntimeError("Pipeline model does not implement forward_backward_1f1b.")
                 if teacher_model is not None:
                     raise NotImplementedError("KD is not supported with pipeline parallelism yet.")
 
-                prepared_micro_batches = []
+                prepared_micro_batches = []     # Micro-batch 数据预处理
                 for micro_batch in micro_batches:
                     environ_meter.add(micro_batch)
                     if args.data.enable_multisource:
@@ -2104,7 +2177,7 @@ def main():
                         debug_batch = {k: v for k, v in micro_batch.items()}
                     prepared_micro_batches.append(micro_batch)
 
-                def loss_fn(output, micro_batch):
+                def loss_fn(output, micro_batch):   # 损失计算函数
                     nonlocal total_task_loss, total_qweight_l2_reg, total_qweight_l2_scaled
                     task_loss = pipeline_model._compute_lm_loss(output, micro_batch)
                     task_loss = _to_local_tensor(task_loss)
@@ -2129,7 +2202,7 @@ def main():
                         use_cache=False,
                         loss_fn=loss_fn,
                     )
-            else:
+            else:   # 非流水线并行的常规训练循环
                 for micro_batch in micro_batches:
                     environ_meter.add(micro_batch)
                     if args.data.enable_multisource:
@@ -2140,7 +2213,7 @@ def main():
                         debug_batch = {k: v for k, v in micro_batch.items()}
                     # For ring-flash-attn with CP, update cu_seqlens before each forward.
                     ps = get_parallel_state()
-                    if ps.cp_enabled:
+                    if ps.cp_enabled:   # 上下文并行
                         try:
                             from veomni.distributed.sequence_parallel import (
                                 is_ring_flash_attn_available,
@@ -2153,19 +2226,21 @@ def main():
                         except Exception:
                             # Avoid breaking training if ring-flash-attn is unavailable.
                             pass
+                    
                     micro_batch = {
                         k: v.to(get_device_type(), non_blocking=True) if isinstance(v, torch.Tensor) else v
                         for k, v in micro_batch.items()
                     }
                     with _record_function("forward"):
                         with model_fwd_context:
-                            student_out = model(**micro_batch, use_cache=False)
+                            student_out = model(**micro_batch, use_cache=False) # 学生模型前向传播
                             task_loss = student_out.loss.mean()
                             task_loss = _to_local_tensor(task_loss)
                             combined_loss = task_loss
+
                             kd_loss = None
                             multistep_kd_metrics = {}
-                            if teacher_model is not None:
+                            if teacher_model is not None:   # 知识蒸馏损失计算
                                 if enable_multistep_kd:
                                     # Multi-step extrapolation KD: teacher generates, student aligns
                                     ps = get_parallel_state()
@@ -2266,7 +2341,7 @@ def main():
                     del micro_batch
 
             # Prefer model-provided clip_grad_norm_ (now both FSDP1 and FSDP2 registers custom grad norm clipping)
-            if hasattr(model, "clip_grad_norm_"):
+            if hasattr(model, "clip_grad_norm_"):   # 梯度裁剪
                 _gn = model.clip_grad_norm_(args.train.max_grad_norm)
                 grad_norm = _gn.item() if hasattr(_gn, "item") else float(_gn)
             else:
@@ -2275,11 +2350,11 @@ def main():
                 )
                 grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), args.train.max_grad_norm)
 
-            local_non_finite = 0
+            local_non_finite = 0    # 全局异常检测 (NaN / Inf Detection)
             if not math.isfinite(total_loss) or not math.isfinite(grad_norm):
                 local_non_finite = 1
             non_finite = all_reduce(local_non_finite, op="max", group=get_parallel_state().fsdp_group)
-            if non_finite > 0:
+            if non_finite > 0:  # 阻断训练
                 debug_dir = os.path.join(args.train.output_dir, "nan_debug", f"global_step_{global_step}")
                 if local_non_finite > 0 and debug_batch is not None:
                     os.makedirs(debug_dir, exist_ok=True)
@@ -2314,6 +2389,7 @@ def main():
 
             if enable_qweight_l2_reg:
                 model._last_qweight_l2_reg = total_qweight_l2_reg
+            # 前向一致性探针：测量量化到底给模型造成了多大破坏
             if linear_grad_probe is not None:
                 linear_grad_probe.set_step(global_step)
             environ_meter.capture_metrics()
@@ -2348,9 +2424,9 @@ def main():
                             meter_metrics["monitor/fc_delta_loss_max"]
                         )
                     forward_metrics.update(probe_metrics)
-
+ 
             with _record_function("optimizer_step"):
-                optimizer.step()
+                optimizer.step()    # 参数更新
 
                 # Record event for FSDP2 optimization
                 if hasattr(model, "set_post_optim_event"):
@@ -2358,10 +2434,10 @@ def main():
                     evt.record()
                     model.set_post_optim_event(evt)
                 
-                lr_scheduler.step()
-                optimizer.zero_grad(set_to_none=True)
+                lr_scheduler.step() # 更新学习率
+                optimizer.zero_grad(set_to_none=True)   # 清空梯度
             quant_stat_metrics: Dict[str, float] = {}
-            if (
+            if (    # 量化状态统计
                 enable_quant_stats
                 and args.train.global_rank == 0
                 and quant_stat_interval > 0
@@ -2382,8 +2458,10 @@ def main():
             # <------QAT Gradual Quantization Step Update-------->
             # Update gradual quantization state: group_mask/group_ratio controls quantization strength
             # 在 gradual 模式下，全程 use_weight_quant=True，但通过 group_mask/group_ratio 控制量化强度
-            if gradual_controller is not None:
+            if gradual_controller is not None:  # 通知渐进量化调度器
                 gradual_controller.on_step_end(step=global_step, epoch=epoch)
+
+            # 收集监控指标
             if hasattr(grad_norm, "full_tensor"):
                 grad_norm = grad_norm.full_tensor().item()
 
@@ -2426,6 +2504,7 @@ def main():
                 if accumulated_multistep_kd_metrics:
                     train_metrics.update(accumulated_multistep_kd_metrics)
 
+            # 更新进度条和日志
             data_loader_tqdm.set_postfix_str(f"loss: {total_loss:.2f}, grad_norm: {grad_norm:.2f}, lr: {lr:.2e}")
             data_loader_tqdm.update()
 
@@ -2444,6 +2523,7 @@ def main():
             if debug_profiler is not None:
                 debug_profiler.step()
 
+            # 保存检查点
             if args.train.save_steps and global_step % args.train.save_steps == 0:
                 helper.empty_cache()
                 save_checkpoint_path = os.path.join(args.train.save_checkpoint_path, f"global_step_{global_step}")
@@ -2468,6 +2548,7 @@ def main():
         data_loader_tqdm.close()
         start_step = 0
         helper.print_device_mem_info(f"VRAM usage after epoch {epoch + 1}")
+        # 每隔一定 epoch 保存一次检查点
         if args.train.save_epochs and (epoch + 1) % args.train.save_epochs == 0:
             helper.empty_cache()
             save_checkpoint_path = os.path.join(args.train.save_checkpoint_path, f"global_step_{global_step}")
@@ -2494,7 +2575,7 @@ def main():
         handle.remove()
 
     synchronize()
-    # release memory
+    # 释放memory
     del optimizer, lr_scheduler
     helper.empty_cache()
     # save model in huggingface's format

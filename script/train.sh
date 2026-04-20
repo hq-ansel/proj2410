@@ -193,8 +193,9 @@ if [[ "$backbone" == "veomni" ]]; then
     else
         echo "Default experiments VeOmni..."
         train_cmds+=(
-            "$(build_veomni_cmd ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/qwen2-3B/qwen2-3B-seq2bit-kd-forwardkl-alpha05-3gpus.yaml)"
-            "$(build_veomni_cmd ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/qwen2-3B/qwen2-3B-seq2bit-g128-3gpus.yaml)"
+            # "$(build_veomni_cmd ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/qwen2-3B/qwen2-3B-seq2bit-kd-forwardkl-alpha05-3gpus.yaml)"
+            # "$(build_veomni_cmd ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/qwen2-3B/qwen2-3B-seq2bit-g128-3gpus.yaml)"
+            "$(build_veomni_cmd ./VeOmni/tasks/quantize/train.py VeOmni/tasks/quantize/configs/qwen2-1.5B/qwen2-1.5B-uniform-int2-3gpus.yaml)"
         )
     fi
 elif [[ "$backbone" == "megatron-lm" ]]; then
@@ -228,3 +229,5 @@ else
 fi
 
 echo "Training complete!"
+
+# bash script/train.sh --backbone veomni

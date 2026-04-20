@@ -2,7 +2,7 @@ model:
   model_path: /home/ubuntu/data/exp/proj2410/model/Qwen2.5-0.5B
 
 data:
-  train_path: /home/ubuntu/data/exp/proj2410/hf_home/rp_text_caches/data-00000-of-00001.arrow
+  train_path: /home/ubuntu/Projects/Quantization/proj2410/hf_home/rp_text_caches/data-00000-of-00001.arrow
   dataloader_type: native
   datasets_type: mapping
   data_type: plaintext

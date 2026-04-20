@@ -1,0 +1,6 @@
+stu (loss,logits)
+ teacher logits
+    taskloss*alpha+ kl(t_logits,s_logits)
+quantization-aware distill nvidia 
+paretoQ seq
+spinquant 

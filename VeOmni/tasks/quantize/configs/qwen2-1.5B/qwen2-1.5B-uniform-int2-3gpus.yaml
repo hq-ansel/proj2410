@@ -1,6 +1,5 @@
 model:
   model_path: /home/ubuntu/data2/models/Qwen/Qwen2-1.5B
-  attn_implementation: sdpa
 
 data:
   train_path: /home/ubuntu/data/exp/proj2410/hf_home/rp_text_caches/redpajama_text_ns1024_sl4096_seed42_train/data-00000-of-00001.arrow
@@ -46,8 +45,8 @@ train:
   load_checkpoint_path: ""
   save_steps: 1000
   save_hf_weights: true
-  wandb_project: Qwen2-3B
-  wandb_name: Qwen2-3B-uniform-int2-3gpus
+  wandb_project: Qwen2-1.5B
+  wandb_name: Qwen2-1.5B-uniform-int2-3gpus
 
 quantizer:
   quant_type: uniform_affine

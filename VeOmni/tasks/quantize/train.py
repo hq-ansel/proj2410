@@ -1346,9 +1346,10 @@ def main():
         f"calling dist.init_process_group backend={backend} device={device_type}:{local_rank_env}"
     )
 
-    # 2) 再初始化进程组；CUDA 显式传 device_id
+    # 2) 再初始化进程组；某些 torch/NCCL 组合下显式传 device_id 会触发段错误，默认关闭并保留显式开关。
+    use_pg_device_id = os.environ.get("VEOMNI_USE_PG_DEVICE_ID", "0") == "1"
     try:
-        if device_type == "cuda" and torch.cuda.is_available():
+        if device_type == "cuda" and torch.cuda.is_available() and use_pg_device_id:
             dist.init_process_group(
                 backend=backend,
                 timeout=timedelta(minutes=30),
@@ -1560,6 +1561,7 @@ def main():
         model,
         init_device=args.train.init_device,
         weights_path=args.model.model_path,
+        broadcast_model_weights_from_rank0=args.train.broadcast_model_weights_from_rank0,
         enable_full_shard=args.train.enable_full_shard,
         enable_mixed_precision=args.train.enable_mixed_precision,
         enable_gradient_checkpointing=args.train.enable_gradient_checkpointing,
@@ -1742,6 +1744,7 @@ def main():
             teacher_model,
             init_device=args.train.init_device,
             weights_path=args.distill.teacher_model,
+            broadcast_model_weights_from_rank0=args.train.broadcast_model_weights_from_rank0,
             enable_full_shard=args.train.enable_full_shard,
             enable_mixed_precision=False,
             enable_gradient_checkpointing=False,

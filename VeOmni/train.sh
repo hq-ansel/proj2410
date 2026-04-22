@@ -11,6 +11,7 @@ export TOKENIZERS_PARALLELISM=false
 # export PYTHONPATH="/home/ubuntu/Projects/Quantization/proj2410:/home/ubuntu/Projects/Quantization/proj2410/EfficientQAT:${PYTHONPATH:-}"
 export PYTHONPATH="/home/ubuntu/Projects/Quantization/proj2410/VeOmni:/home/ubuntu/Projects/Quantization/proj2410/EfficientQAT:${PYTHONPATH:-}"
 export TORCH_NCCL_AVOID_RECORD_STREAMS=1
+export NCCL_CUMEM_ENABLE="${NCCL_CUMEM_ENABLE:-0}"
 export WANDB_MODE="${WANDB_MODE:-disabled}"
 
 # Pre-compile CUDA extensions to avoid multi-process lock contention

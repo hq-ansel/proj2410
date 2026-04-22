@@ -3,9 +3,9 @@ bitsandbytes
 datasets
 lm_eval==0.4.2
 numpy
-# torch
+torch
 tqdm
-# liger-kernel 
+liger-kernel 
 transformers==4.56.2
 triton
 termcolor
@@ -14,9 +14,9 @@ protobuf
 easydict
 matplotlib
 logbar
-# tokenicer
+tokenicer
 ninja
-# gptqmodel
+gptqmodel
 # uv pip install -r requirements.txt --no-build-isolation
 # export NINJA_JOBS=192
 # uv pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128 && \

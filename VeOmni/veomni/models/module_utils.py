@@ -47,7 +47,7 @@ from ..utils.helper import empty_cache, get_cache_dir, get_dtype_size
 
 if is_safetensors_available():
     from safetensors import safe_open
-    from safetensors.torch import save_file
+    from safetensors.torch import load_file, save_file
 
 
 if TYPE_CHECKING:
@@ -59,6 +59,21 @@ if TYPE_CHECKING:
 
 
 logger = logging.get_logger(__name__)
+_OBJECT_BROADCAST_GROUP = None
+
+
+def _get_object_broadcast_group():
+    global _OBJECT_BROADCAST_GROUP
+    if not dist.is_available() or not dist.is_initialized():
+        return None
+    if dist.get_world_size() == 1:
+        return None
+    backend = dist.get_backend()
+    if isinstance(backend, str) and backend.lower() != "nccl":
+        return None
+    if _OBJECT_BROADCAST_GROUP is None:
+        _OBJECT_BROADCAST_GROUP = dist.new_group(backend="gloo")
+    return _OBJECT_BROADCAST_GROUP
 
 
 @contextmanager
@@ -101,9 +116,14 @@ class StateDictIterator:
 
     def __iter__(self) -> Generator[Tuple[str, "torch.Tensor"], None, None]:
         if self.filepath.endswith(".safetensors"):
-            with safe_open(self.filepath, framework="pt", device="cpu") as f:
-                for key in f.keys():
-                    yield key, f.get_tensor(key)
+            if os.environ.get("VEOMNI_SAFETENSORS_ITERATOR_MODE", "safe_open") == "load_file":
+                state_dict = load_file(self.filepath, device="cpu")
+                for key, tensor in state_dict.items():
+                    yield key, tensor
+            else:
+                with safe_open(self.filepath, framework="pt", device="cpu") as f:
+                    for key in f.keys():
+                        yield key, f.get_tensor(key)
 
         else:
             state_dict = torch.load(self.filepath, map_location="cpu", weights_only=True, mmap=True)
@@ -188,15 +208,50 @@ def _dispatch_parameter(
     if parallel_plan is not None:
         tensor = parallel_plan.shard_tensor(tensor, full_param_name, orig_tensor.shape)
 
-    tensor = tensor.to(orig_tensor)
     if hasattr(orig_tensor, "device_mesh"):  # dtensor
         if orig_tensor.device.type == "cpu":
             raise ValueError("Cannot load dtensor on CPU.")
 
         device_mesh = getattr(orig_tensor, "device_mesh")
         placements = getattr(orig_tensor, "placements")
-        module._parameters[local_name].data.copy_(dtensor_factory(tensor, device_mesh, placements))
+        if os.environ.get("VEOMNI_DTENSOR_FACTORY_MODE", "distribute_tensor") == "from_local_shard":
+            from torch.distributed.tensor import DTensor
+            import torch.nn.functional as F
+
+            if len(placements) == 1 and placements[0].__class__.__name__ == "Shard" and device_mesh.ndim == 1:
+                shard_dim = placements[0].dim
+                local_rank = device_mesh.get_local_rank()
+                global_shape = torch.Size(orig_tensor.shape)
+                global_stride = tuple(orig_tensor.stride())
+                local_shard_dim_size = (tensor.shape[shard_dim] + device_mesh.size() - 1) // device_mesh.size()
+                padded_shape = list(tensor.shape)
+                padded_shape[shard_dim] = local_shard_dim_size * device_mesh.size()
+                if tensor.shape[shard_dim] < padded_shape[shard_dim]:
+                    pad_by_dim = []
+                    for dim, (loaded, expected) in enumerate(zip(tensor.shape, padded_shape)):
+                        pad_by_dim.append((0, expected - loaded))
+                    pad_args = tuple(item for pair in reversed(pad_by_dim) for item in pair)
+                    tensor = F.pad(tensor, pad_args)
+                local_tensor = tensor.chunk(device_mesh.size(), dim=shard_dim)[local_rank].contiguous()
+                local_tensor = local_tensor.to(device=orig_tensor.device, dtype=orig_tensor.dtype)
+                module._parameters[local_name].data = DTensor.from_local(
+                    local_tensor,
+                    device_mesh=device_mesh,
+                    placements=placements,
+                    run_check=False,
+                    shape=global_shape,
+                    stride=global_stride,
+                )
+                return
+
+        tensor = tensor.to(orig_tensor)
+        loaded_dtensor = dtensor_factory(tensor, device_mesh, placements)
+        if os.environ.get("VEOMNI_DTENSOR_ASSIGN_MODE", "copy") == "set_data":
+            module._parameters[local_name].data = loaded_dtensor
+        else:
+            module._parameters[local_name].data.copy_(loaded_dtensor)
     else:  # not dtensor
+        tensor = tensor.to(orig_tensor)
         module._parameters[local_name].data.copy_(tensor)
 
 
@@ -351,18 +406,19 @@ def rank0_load_and_broadcast_weights(
 
     global_rank = get_parallel_state().global_rank
     torch_device = torch.device(init_device)
+    if torch_device.type == "cuda" and torch_device.index is None:
+        torch_device = torch.device("cuda", torch.cuda.current_device())
 
     # get the safetensor file iterator
     state_dict_iterators = _load_state_dict(weights_path) if global_rank == 0 else None
     shard_count = len(state_dict_iterators) if global_rank == 0 else 0
     logger.info_rank0(f"rank0_load_and_broadcast_weights: {shard_count=} ")
-    shard_count_tensor = torch.tensor(
-        [shard_count],
-        dtype=torch.int64,
-        device=torch_device if torch_device.type != "cpu" else torch.device("cpu"),
-    )
-    dist.broadcast(shard_count_tensor, src=0)
-    shard_count = int(shard_count_tensor.item())
+    object_group = _get_object_broadcast_group()
+    tensor_broadcast_group = object_group if os.environ.get("VEOMNI_TENSOR_BROADCAST_GROUP", "") == "gloo" else None
+    tensor_broadcast_device = torch.device("cpu") if tensor_broadcast_group is not None else torch_device
+    shard_count_list = [shard_count]
+    dist.broadcast_object_list(shard_count_list, src=0, group=object_group)
+    shard_count = int(shard_count_list[0])
 
     if global_rank == 0:
         # only rank0 would actual read weights from safetensor state_dict iterators
@@ -400,7 +456,7 @@ def rank0_load_and_broadcast_weights(
                 metadata = BroadcastMetadata(False, None, None, None)
 
             metadata_list = [metadata]
-            dist.broadcast_object_list(metadata_list, src=0)
+            dist.broadcast_object_list(metadata_list, src=0, group=object_group)
             metadata = metadata_list[0]
 
             if metadata.done:
@@ -413,12 +469,12 @@ def rank0_load_and_broadcast_weights(
                 raise RuntimeError("Received incomplete broadcast metadata.")
             logger.info_rank0(f"rank0_load_and_broadcast_weights: broadcasting {name=}")
             if global_rank != 0:
-                tensor = torch.empty(shape, dtype=dtype, device=torch_device)
+                tensor = torch.empty(shape, dtype=dtype, device=tensor_broadcast_device)
             else:
-                tensor = tensor.to(torch_device, non_blocking=True)  # type: ignore[assignment]
+                tensor = tensor.to(tensor_broadcast_device, non_blocking=True)  # type: ignore[assignment]
 
             start_time = time.perf_counter()
-            dist.broadcast(tensor, src=0)
+            dist.broadcast(tensor, src=0, group=tensor_broadcast_group)
             logger.info_rank0(
                 f"{name=}, {shape=}, {dtype=}, broadcast time (ms) spent: {1000 * (time.perf_counter() - start_time)}"
             )

@@ -14,6 +14,7 @@
 
 
 import os
+from contextlib import nullcontext
 from functools import partial
 from typing import Callable, Dict, List, Literal, Optional
 
@@ -267,7 +268,11 @@ def build_mapping_dataset(
         raise ValueError(f"{file_extenstion} files are not supported.")
 
     file_extenstion = "json" if file_extenstion == "jsonl" else file_extenstion
-    with main_process_first():
+    dataset_load_context = nullcontext()
+    if not (file_extenstion == "arrow" and all(not path.startswith("hdfs://") for path in data_files)):
+        dataset_load_context = main_process_first()
+
+    with dataset_load_context:
         dataset = load_dataset(file_extenstion, data_files=data_files, split=namespace)
 
     if transform:

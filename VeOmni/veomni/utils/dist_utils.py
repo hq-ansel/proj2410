@@ -27,6 +27,13 @@ if TYPE_CHECKING:
     from torch.distributed import ProcessGroup
 
 
+def _barrier() -> None:
+    if get_device_type() == "cuda" and torch.cuda.is_available() and dist.get_backend() == "nccl":
+        dist.barrier(device_ids=[torch.cuda.current_device()])
+    else:
+        dist.barrier()
+
+
 def all_gather(tensor: "torch.Tensor", world_size: int) -> "torch.Tensor":
     """
     Gathers the tensor from all ranks and concats them along the first dim.
@@ -75,11 +82,11 @@ def main_process_first(local_only: bool = True) -> None:
         is_main_process = int(os.getenv("LOCAL_RANK")) == 0 if local_only else int(os.getenv("RANK")) == 0
         try:
             if not is_main_process:
-                dist.barrier()
+                _barrier()
             yield
         finally:
             if is_main_process:
-                dist.barrier()
+                _barrier()
     else:
         yield
 
@@ -91,13 +98,13 @@ def execute_in_order(task: Callable, *, local_only: bool = True, **kwargs) -> An
     world_size = int(os.getenv("LOCAL_WORLD_SIZE", "1") if local_only else os.getenv("WORLD_SIZE", "1"))
     rank = int(os.getenv("LOCAL_RANK", "1") if local_only else os.getenv("RANK", "1"))
     if world_size > 1:
-        dist.barrier()
+        _barrier()
         for i in range(world_size):
             if rank == i:
                 result = task(**kwargs)
-                dist.barrier()
+                _barrier()
             else:
-                dist.barrier()
+                _barrier()
 
         return result
     else:

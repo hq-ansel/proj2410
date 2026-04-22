@@ -1,0 +1,77 @@
+model:
+  model_path: /home/ubuntu/data2/models/Qwen/Qwen2-1.5B
+
+data:
+  train_path: /home/ubuntu/Projects/Quantization/proj2410/hf_home/rp_text_caches/data-00000-of-00001.arrow
+  dataloader_type: native
+  datasets_type: mapping
+  data_type: plaintext
+  max_seq_len: 256
+  text_keys: text
+  drop_last: true
+
+train:
+  num_train_epochs: 1
+  max_steps: 1
+  output_dir: /home/ubuntu/data2/ProgQ/models/Qwen/Qwen2-1.5B/EfficientQAT/uniform-int2-local-1gpu
+  data_parallel_mode: ddp
+  ulysses_parallel_size: 1
+  enable_activation_offload: false
+  activation_gpu_limit: 40.0
+  global_batch_size: 1
+  micro_batch_size: 1
+  rmpad: false
+  rmpad_with_pos_ids: false
+  bsz_warmup_ratio: 0.007
+  dyn_bsz_margin: 0
+  optimizer: adamw
+  lr: 1.0e-5
+  lr_warmup_ratio: 0.007
+  lr_decay_style: constant
+  lr_decay_ratio: 1.0
+  weight_decay: 0.01
+  max_grad_norm: 1.0
+  enable_mixed_precision: true
+  enable_gradient_checkpointing: true
+  enable_full_shard: false
+  enable_fsdp_offload: false
+  num_to_forward_prefetch: 2
+  num_to_backward_prefetch: 2
+  init_device: cuda
+  enable_full_determinism: false
+  debug: false
+  empty_cache_steps: 500
+  ckpt_manager: dcp
+  load_checkpoint_path: ""
+  save_steps: 0
+  save_hf_weights: false
+  use_wandb: false
+  wandb_project: Qwen2-1.5B
+  wandb_name: Qwen2-1.5B-uniform-int2-local-1gpu
+
+quantizer:
+  quant_type: uniform_affine
+  n_bits: 2
+  group_size: 128
+  clamp_method: STE
+  round_method: ste
+  quant_lr: 1e-5
+  quant_weight_decay: 0.0
+  enable_gradual_quant: false
+  qat_warmup_steps: 0
+  gradual_start_ratio: 1.0
+  gradual_end_ratio: 1.0
+  priority_type: uniform
+  stat_quant: false
+  iterative_freezing: false
+  iterative_freezing_sheduler: linear
+  is_tracking: false
+  freeze_momentum: 0.004
+  freeze_threshold: 0.0
+  interpolate: false
+  lora_rank: 0
+  decay_rate: 0.01
+  shrinking_ratio: 0.5
+
+distill:
+  kd_mode: none
